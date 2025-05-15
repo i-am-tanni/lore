@@ -71,9 +71,7 @@ pub fn recv(
 pub fn lookup(table_name: String, key key: k) -> Result(v, Nil) {
   // Converting to a string to convert to an atom may not be the most efficient.
   use table <- result.try(table.ref(table_name))
-  let result = table.lookup(table, key)
-
-  case result {
+  case table.lookup(table, key) {
     [#(_, val)] -> Ok(val)
     _ -> Error(Nil)
   }
