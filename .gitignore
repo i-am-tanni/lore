@@ -1,0 +1,8 @@
+*.beam
+*.ez
+/build
+/.github
+erl_crash.dump
+*.env
+/db
+manifest.toml
