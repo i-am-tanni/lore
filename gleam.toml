@@ -20,8 +20,8 @@ gleam_erlang = ">= 1.1.0 and < 2.0.0"
 gleam_otp = ">= 1.0.0 and < 2.0.0"
 gleam_stdlib = ">= 0.60.0 and < 1.0.0"
 glets = { git = "https://github.com/i-am-tanni/glets", ref = "80e15c2" }
+hyphenation = { git = "https://github.com/i-am-tanni/hyphenation", ref = "74bfb9f" }
 simplifile = ">= 2.3.0 and < 3.0.0"
-hyphenation = ">= 0.3.1 and < 1.0.0"
 
 [dev-dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"
