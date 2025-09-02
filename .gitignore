@@ -6,3 +6,4 @@ erl_crash.dump
 *.env
 /db
 manifest.toml
+/.vscode
