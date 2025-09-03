@@ -29,14 +29,14 @@ pub fn route_player(
       notify(conn, event, data, communication_view.notify)
     event.ItemGetNotify(item) -> item_event.get(conn, event, item)
     event.ItemDropNotify(item) -> item_event.drop(conn, event, item)
-    event.ItemInspect(item) -> item_event.look_at(conn, event, item)
-    event.MobileInspectRequest(by: requester) -> {
+    event.ItemInspect(item) -> item_event.look_at(conn, item)
+    event.MobileInspectRequest(by: requester) ->
       conn.character_event(
         conn,
         event.MobileInspectResponse(conn.get_character(conn)),
         send: requester,
       )
-    }
+
     event.MobileInspectResponse(character:) ->
       conn
       |> conn.renderln(character_view.look_at(character))

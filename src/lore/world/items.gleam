@@ -74,6 +74,34 @@ pub fn load(
   cache.lookup(table_name, item_id)
 }
 
+pub fn load_items(
+  table_name: process.Name(Message),
+  instances: List(world.ItemInstance),
+) -> List(world.Item) {
+  list.filter_map(instances, fn(item_instance) {
+    case item_instance.item {
+      world.Loading(id) -> load(table_name, id)
+      world.Loaded(item) -> Ok(item)
+    }
+  })
+}
+
+pub fn load_instances(
+  table_name: process.Name(Message),
+  instances: List(world.ItemInstance),
+) -> List(world.ItemInstance) {
+  list.filter_map(instances, fn(item_instance) {
+    case item_instance.item {
+      world.Loading(id) -> {
+        use item <- result.try(load(table_name, id))
+        Ok(world.ItemInstance(..item_instance, item: world.Loaded(item)))
+      }
+
+      world.Loaded(_) -> Ok(item_instance)
+    }
+  })
+}
+
 /// Generate an item instance given an item id
 /// 
 pub fn instance(

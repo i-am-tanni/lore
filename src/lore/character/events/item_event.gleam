@@ -68,11 +68,7 @@ pub fn drop(
   }
 }
 
-pub fn look_at(
-  conn: Conn,
-  _event: Event(CharacterEvent, RoomMessage),
-  item_instance: world.ItemInstance,
-) -> Conn {
+pub fn look_at(conn: Conn, item_instance: world.ItemInstance) -> Conn {
   case load_item(conn, item_instance) {
     Ok(item) ->
       conn

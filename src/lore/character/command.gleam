@@ -1,6 +1,7 @@
 //// Parsers and parser primatives useful for parsing commands.
 //// 
 
+import gleam/bool
 import gleam/dict.{type Dict}
 import gleam/list
 import gleam/option.{None, Some}
@@ -8,6 +9,7 @@ import gleam/result
 import gleam/string
 import lore/character/act
 import lore/character/conn.{type Conn}
+import lore/character/events/item_event
 import lore/character/users
 import lore/character/view/character_view
 import lore/character/view/communication_view
@@ -54,6 +56,11 @@ type Channel {
 type Argument {
   Adverb
   At
+}
+
+type Found {
+  Self
+  Item(world.ItemInstance)
 }
 
 pub fn parse(conn: Conn, input: String) -> Conn {
@@ -111,8 +118,30 @@ fn look_command(conn: Conn, _: Command(Verb, Nil)) -> Conn {
 }
 
 fn look_at_command(conn: Conn, command: Command(Verb, String)) -> Conn {
-  let keyword = command.data
-  conn.event(conn, event.LookAt(keyword))
+  let search_term = command.data
+  let self = conn.get_character(conn)
+  let found_result = {
+    use <- bool.guard(
+      search_term == "self"
+        || list.any(self.keywords, fn(keyword) { search_term == keyword }),
+      Ok(Self),
+    )
+    list.find(self.inventory, fn(item_instance) {
+      list.any(item_instance.keywords, fn(keyword) { search_term == keyword })
+    })
+    |> result.map(Item)
+  }
+
+  case found_result {
+    Ok(Self) ->
+      conn
+      |> conn.renderln(character_view.look_at(self))
+      |> conn.prompt()
+
+    Ok(Item(item_instance)) -> item_event.look_at(conn, item_instance)
+
+    Error(Nil) -> conn.event(conn, event.LookAt(search_term))
+  }
 }
 
 fn door_command(conn: Conn, command: Command(DoorVerb, world.Direction)) -> Conn {
