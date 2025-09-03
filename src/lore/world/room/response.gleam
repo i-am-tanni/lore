@@ -460,17 +460,13 @@ fn send_event(
 
     ToCharacterId(id:, event:) -> {
       case character_registry.whereis(system_tables.character, id) {
-        Ok(subject) -> {
-          echo "Sending Event to Character Id"
+        Ok(subject) ->
           process.send(
             subject,
             event.RoomSent(event.RoomToCharacter(event), room.id),
           )
-        }
-        _ -> {
-          echo "Error: Not Found"
-          Nil
-        }
+
+        _ -> Nil
       }
     }
 

@@ -31,7 +31,6 @@ pub fn route_player(
     event.ItemDropNotify(item) -> item_event.drop(conn, event, item)
     event.ItemInspect(item) -> item_event.look_at(conn, event, item)
     event.MobileInspectRequest(by: requester) -> {
-      echo "Recieved inspection request"
       conn.character_event(
         conn,
         event.MobileInspectResponse(conn.get_character(conn)),

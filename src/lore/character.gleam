@@ -178,7 +178,6 @@ fn handle_message(
   state: State,
   msg: CharacterMessage,
 ) -> actor.Next(State, CharacterMessage) {
-  echo msg
   let state = case msg {
     event.UserSentCommand(text) ->
       on_controller_message(state, controller.UserSentCommand(text))
