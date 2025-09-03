@@ -301,6 +301,7 @@ fn push_text(state: State, outputs: List(output.Text)) -> State {
       output.map(_, [
         output.expand_newline,
         output.expand_colors_16,
+        output.expand_colors_256,
       ]),
     )
 

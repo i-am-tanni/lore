@@ -82,6 +82,27 @@ pub fn expand_colors_16(binary: BitArray) -> BitArray {
   }
 }
 
+/// Expands 16 colors. & indicates foreground. { indicates background.
+/// 0; is reset.
+/// 
+/// Codes:
+/// - x - black
+/// - r - red
+/// - g - green
+/// - O - brown / orange
+/// - b - blue
+/// - p - purple
+/// - c - cyan
+/// - w - white
+/// - z - grey
+/// - R - bright red
+/// - G - bright green
+/// - Y - yellow
+/// - B - bright blue
+/// - P - bright pink
+/// - C - bright cyan
+/// - W - bright white
+/// 
 fn expand_colors_16_loop(
   binary: BitArray,
   found is_found: Bool,
@@ -327,6 +348,8 @@ fn expand_colors_16_loop(
   }
 }
 
+/// &000 == foreground color. {000 == background color. 0; is reset.
+/// 
 pub fn expand_colors_256(binary: BitArray) -> BitArray {
   let result =
     expand_colors_256_loop(binary, found: False, accumulating: bytes_tree.new())
@@ -345,6 +368,15 @@ fn expand_colors_256_loop(
   case binary {
     <<>> if is_found -> Ok(acc)
     <<>> -> Error(Nil)
+
+    // avoid messing up existing color escape sequences
+    <<"\u{1b}[", rest:bits>> ->
+      expand_colors_256_loop(
+        rest,
+        True,
+        bytes_tree.append_string(acc, "\u{1b}["),
+      )
+
     <<"&", a, b, c, rest:bits>>
       if a >= char0
       && a <= char9
@@ -430,6 +462,7 @@ fn expand_colors_256_loop(
   }
 }
 
+/// Avoid replacing escape sequences
 /// Like `list.map` but works on a StringTree.
 /// 
 @external(erlang, "lore_ffi", "iolist_map")
