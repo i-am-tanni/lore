@@ -39,7 +39,7 @@ pub fn drop(
 
 fn find_local_item(
   builder: response.Builder(CharacterMessage),
-  search_keyword: String,
+  search_term: String,
 ) -> Result(world.ItemInstance, world.ErrorRoomRequest) {
-  response.find_local_item(builder, search_keyword)
+  response.find_local_item(builder, search_term)
 }

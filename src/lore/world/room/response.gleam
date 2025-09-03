@@ -150,28 +150,28 @@ pub fn find_local_exit(
 /// 
 pub fn find_local_character(
   builder: Builder(a),
-  search_keyword: String,
+  search_term: String,
 ) -> Result(Mobile, world.ErrorRoomRequest) {
   {
     use character <- my_list.find_nth(builder.room.characters, 0)
     use keyword <- list.any(character.keywords)
-    search_keyword == keyword
+    search_term == keyword
   }
-  |> result.replace_error(world.CharacterLookupFailed(search_keyword))
+  |> result.replace_error(world.CharacterLookupFailed(search_term))
 }
 
 /// Finds a local item based on the given boolean function.
 /// 
 pub fn find_local_item(
   builder: Builder(a),
-  search_keyword: String,
+  search_term: String,
 ) -> Result(world.ItemInstance, world.ErrorRoomRequest) {
   {
     use item <- my_list.find_nth(builder.room.items, 0)
     use keyword <- list.any(item.keywords)
-    search_keyword == keyword
+    search_term == keyword
   }
-  |> result.replace_error(world.ItemLookupFailed(search_keyword))
+  |> result.replace_error(world.ItemLookupFailed(search_term))
 }
 
 /// Finds a local items based on the given boolean function.

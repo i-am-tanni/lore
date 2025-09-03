@@ -37,13 +37,13 @@ pub fn room_look(
 pub fn look_at(
   builder: response.Builder(CharacterMessage),
   event: Event(event.CharacterToRoomEvent, CharacterMessage),
-  search_keyword: String,
+  search_term: String,
 ) -> response.Builder(CharacterMessage) {
   let result = {
     use _ <- result.try_recover(
-      response.find_local_item(builder, search_keyword) |> result.map(Item),
+      response.find_local_item(builder, search_term) |> result.map(Item),
     )
-    response.find_local_character(builder, search_keyword)
+    response.find_local_character(builder, search_term)
     |> result.map(Mobile)
   }
 
@@ -64,7 +64,7 @@ pub fn look_at(
       response.reply_character(
         builder,
         event,
-        event.ActFailed(world.NotFound(search_keyword)),
+        event.ActFailed(world.NotFound(search_term)),
       )
   }
 }
