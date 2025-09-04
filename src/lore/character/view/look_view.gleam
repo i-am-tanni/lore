@@ -1,4 +1,5 @@
 import gleam/list
+import gleam/option.{None, Some}
 import gleam/string_tree.{type StringTree}
 import lore/character/view.{type View}
 import lore/world.{type Room}
@@ -7,16 +8,27 @@ const reset = "0;"
 
 pub fn room(room: Room, observer: world.Mobile) -> View {
   let preamble =
-    ["&c", room.name, reset, "\n  ", room.description, "\n"]
+    ["&193", room.name, reset, "\n  ", room.description, "\n"]
     |> string_tree.from_strings
 
   let exits =
     room.exits
-    |> list.map(fn(exit) { world.direction_to_string(exit.keyword) })
-    |> list.intersperse(" ")
-    |> string_tree.from_strings
-    |> string_tree.prepend("Obvious Exits: ")
-    |> string_tree.append("\n")
+    |> list.map(fn(exit) {
+      case exit.door {
+        Some(world.Door(state: world.Closed, ..)) ->
+          ["#", world.direction_to_string(exit.keyword)]
+          |> string_tree.from_strings
+
+        Some(world.Door(state: world.Open, ..)) ->
+          ["'", world.direction_to_string(exit.keyword)]
+          |> string_tree.from_strings
+
+        _ -> world.direction_to_string(exit.keyword) |> string_tree.from_string
+      }
+    })
+    |> string_tree.join(" ")
+    |> string_tree.prepend("Obvious Exits: &W")
+    |> string_tree.append("\n0;")
 
   let observer_id = observer.id
   let mobiles =
