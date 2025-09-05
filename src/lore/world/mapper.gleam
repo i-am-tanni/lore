@@ -65,14 +65,14 @@ const center_index = 12
 
 const max_depth = 4
 
-const you_are_here = "&C<>0;"
+const you_are_here = "&123@0;"
 
-const default_symbol = "  "
+const default_symbol = " "
 
 // The default map render if an error is encountered
 const uncharted = [
-  "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "<>",
-  "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ",
+  " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", "&123@0;", " ",
+  " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ",
 ]
 
 /// Generates a 5x5 map where `<>` is the player's position

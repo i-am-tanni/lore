@@ -42,6 +42,12 @@ fn init(
   // register room on init
   room_registry.register(system_tables.room, room.id, self)
 
+  let update =
+    list.map(room.items, fn(instance) {
+      world.ItemInstance(..instance, id: world.generate_id())
+    })
+  let room = world.Room(..room, items: update)
+
   State(room:, system_tables:, self:)
   |> actor.initialised()
   |> actor.selecting(process.new_selector() |> process.select(self))

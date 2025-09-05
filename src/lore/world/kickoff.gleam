@@ -31,7 +31,7 @@ const zones = [
         id: Id(1),
         template_id: Id(1),
         zone_id: Id(1),
-        symbol: ">>",
+        symbol: ".",
         x: 0,
         y: 0,
         z: 0,
@@ -53,7 +53,7 @@ const zones = [
         id: Id(2),
         template_id: Id(2),
         zone_id: Id(1),
-        symbol: "<<",
+        symbol: ".",
         x: 0,
         y: -1,
         z: 0,
@@ -71,7 +71,7 @@ const zones = [
         characters: [],
         items: [
           world.ItemInstance(
-            id: world.StringId("TEST"),
+            id: world.StringId(""),
             item: world.Loading(Id(1)),
             keywords: ["socks", "programmer"],
           ),

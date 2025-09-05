@@ -4,11 +4,13 @@ import gleam/string_tree.{type StringTree}
 import lore/character/view.{type View}
 import lore/world.{type Room}
 
-const reset = "0;"
+const color_room_title = "&189"
+
+const color_reset = "0;"
 
 pub fn room(room: Room, observer: world.Mobile) -> View {
   let preamble =
-    ["&193", room.name, reset, "\n  ", room.description, "\n"]
+    [color_room_title, room.name, color_reset, "\n  ", room.description, "\n"]
     |> string_tree.from_strings
 
   let exits =
@@ -16,14 +18,16 @@ pub fn room(room: Room, observer: world.Mobile) -> View {
     |> list.map(fn(exit) {
       case exit.door {
         Some(world.Door(state: world.Closed, ..)) ->
-          ["#", world.direction_to_string(exit.keyword)]
+          ["+", world.direction_to_string(exit.keyword)]
           |> string_tree.from_strings
 
         Some(world.Door(state: world.Open, ..)) ->
           ["'", world.direction_to_string(exit.keyword)]
           |> string_tree.from_strings
 
-        _ -> world.direction_to_string(exit.keyword) |> string_tree.from_string
+        None ->
+          world.direction_to_string(exit.keyword)
+          |> string_tree.from_string
       }
     })
     |> string_tree.join(" ")
