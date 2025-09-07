@@ -52,7 +52,7 @@ fn init(
     list.map(rows, fn(row) {
       let sql.ItemsGetRow(item_id:, name:, short:, long:, keywords:) = row
       let id = world.Id(item_id)
-      #(id, world.Item(id: id, name:, short:, long:, keywords:))
+      #(id, world.Item(id:, name:, short:, long:, keywords:))
     })
   table.insert_many(table, items)
 
