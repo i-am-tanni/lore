@@ -30,9 +30,6 @@ pub type View {
   Blank
 }
 
-/// Basically a dynamic view that can be loaded in at run time for uses
-/// with exit / enter strings or spell effects.
-/// 
 /// Template varables:
 /// - $n - Subject name
 /// - $e - He / She pronouns
@@ -45,9 +42,9 @@ pub type View {
 /// - $S - Victim his / her 
 /// - $MSELF - Victim himself, herself
 /// 
-pub type Echo {
-  EchoSimple(self: String, witness: String)
-  EchoAdvanced(
+pub type Report {
+  ReportBasic(self: String, witness: String)
+  ReportAdvanced(
     self: String,
     witness: String,
     victim: String,
@@ -55,52 +52,55 @@ pub type Echo {
   )
 }
 
-pub fn render_echo(
-  occurance: Echo,
+pub fn render_report(
+  occurance: Report,
   witness: world.Mobile,
   actor: world.Mobile,
   actee: Option(world.Mobile),
 ) -> View {
   let witness_id = witness.id
   case occurance, actee {
-    EchoSimple(..), _ | EchoAdvanced(..), None ->
+    ReportBasic(..), _ | ReportAdvanced(..), None ->
       case witness_id == actor.id {
-        True -> echo_simple_stringify(occurance.self, actor)
-        False -> echo_simple_stringify(occurance.witness, actor)
+        True -> report_simple_stringify(occurance.self, actor)
+        False -> report_simple_stringify(occurance.witness, actor)
       }
 
-    EchoAdvanced(victim:, self:, self_victim:, witness:), Some(actee) ->
+    ReportAdvanced(victim:, self:, self_victim:, witness:), Some(actee) ->
       case witness_id {
         _ if witness_id == actee.id ->
-          echo_advanced_stringify(victim, actor, actee)
+          report_advanced_stringify(victim, actor, actee)
 
         _ if witness_id == actor.id ->
-          echo_advanced_stringify(self, actor, actee)
+          report_advanced_stringify(self, actor, actee)
 
         _ if witness_id == actor.id && witness_id == actee.id ->
-          echo_advanced_stringify(self_victim, actor, actee)
+          report_advanced_stringify(self_victim, actor, actee)
 
-        _ -> echo_advanced_stringify(witness, actor, actee)
+        _ -> report_advanced_stringify(witness, actor, actee)
       }
   }
   |> Leaf
 }
 
-fn echo_simple_stringify(echo_basic: String, subject: world.Mobile) -> String {
-  let to_transform = bit_array.from_string(echo_basic)
-  case echo_simple_loop(to_transform, subject, bytes_tree.new()) {
+fn report_simple_stringify(
+  report_basic: String,
+  subject: world.Mobile,
+) -> String {
+  let to_transform = bit_array.from_string(report_basic)
+  case report_simple_loop(to_transform, subject, bytes_tree.new()) {
     Ok(string) -> string
     Error(Nil) -> ""
   }
 }
 
-fn echo_simple_loop(
-  echo_basic: BitArray,
+fn report_simple_loop(
+  report_basic: BitArray,
   subject: world.Mobile,
   acc: BytesTree,
 ) -> Result(String, Nil) {
   let pronouns = pronoun.lookup(subject.pronouns)
-  case echo_basic {
+  case report_basic {
     <<>> ->
       acc
       |> bytes_tree.to_bit_array
@@ -108,7 +108,7 @@ fn echo_simple_loop(
 
     // subject name
     <<"$n", rest:bits>> ->
-      echo_simple_loop(
+      report_simple_loop(
         rest,
         subject,
         bytes_tree.append_string(acc, subject.name),
@@ -116,7 +116,7 @@ fn echo_simple_loop(
 
     // he / her type pronouns
     <<"$e", rest:bits>> ->
-      echo_simple_loop(
+      report_simple_loop(
         rest,
         subject,
         bytes_tree.append_string(acc, pronouns.he),
@@ -124,7 +124,7 @@ fn echo_simple_loop(
 
     // his / hers type pronouns
     <<"$s", rest:bits>> ->
-      echo_simple_loop(
+      report_simple_loop(
         rest,
         subject,
         bytes_tree.append_string(acc, pronouns.his),
@@ -132,7 +132,7 @@ fn echo_simple_loop(
 
     // him / hers type pronouns
     <<"$m", rest:bits>> ->
-      echo_simple_loop(
+      report_simple_loop(
         rest,
         subject,
         bytes_tree.append_string(acc, pronouns.him),
@@ -140,27 +140,27 @@ fn echo_simple_loop(
 
     // himself / herself type pronouns
     <<"$mself", rest:bits>> ->
-      echo_simple_loop(
+      report_simple_loop(
         rest,
         subject,
         bytes_tree.append_string(acc, pronouns.himself),
       )
 
     <<x:8, rest:bits>> ->
-      echo_simple_loop(rest, subject, bytes_tree.append(acc, <<x>>))
+      report_simple_loop(rest, subject, bytes_tree.append(acc, <<x>>))
 
-    _ -> echo_simple_loop(<<>>, subject, acc)
+    _ -> report_simple_loop(<<>>, subject, acc)
   }
 }
 
-fn echo_advanced_stringify(
-  echo_advanced: String,
+fn report_advanced_stringify(
+  report_advanced: String,
   subject: world.Mobile,
   victim: world.Mobile,
 ) -> String {
   let result =
-    echo_advanced_loop(
-      bit_array.from_string(echo_advanced),
+    report_advanced_loop(
+      bit_array.from_string(report_advanced),
       subject,
       victim,
       bytes_tree.new(),
@@ -172,8 +172,8 @@ fn echo_advanced_stringify(
   }
 }
 
-fn echo_advanced_loop(
-  echo_advanced: BitArray,
+fn report_advanced_loop(
+  report_advanced: BitArray,
   subject: world.Mobile,
   victim: world.Mobile,
   acc: BytesTree,
@@ -181,14 +181,14 @@ fn echo_advanced_loop(
   let subject_pronouns = pronoun.lookup(subject.pronouns)
   let victim_pronouns = pronoun.lookup(subject.pronouns)
 
-  case echo_advanced {
+  case report_advanced {
     <<>> ->
       acc
       |> bytes_tree.to_bit_array
       |> bit_array.to_string
 
     <<"$n", rest:bits>> ->
-      echo_advanced_loop(
+      report_advanced_loop(
         rest,
         subject,
         victim,
@@ -196,7 +196,7 @@ fn echo_advanced_loop(
       )
 
     <<"$e", rest:bits>> ->
-      echo_advanced_loop(
+      report_advanced_loop(
         rest,
         subject,
         victim,
@@ -204,7 +204,7 @@ fn echo_advanced_loop(
       )
 
     <<"$s", rest:bits>> ->
-      echo_advanced_loop(
+      report_advanced_loop(
         rest,
         subject,
         victim,
@@ -212,7 +212,7 @@ fn echo_advanced_loop(
       )
 
     <<"$m", rest:bits>> ->
-      echo_advanced_loop(
+      report_advanced_loop(
         rest,
         subject,
         victim,
@@ -220,7 +220,7 @@ fn echo_advanced_loop(
       )
 
     <<"$mself", rest:bits>> ->
-      echo_advanced_loop(
+      report_advanced_loop(
         rest,
         subject,
         victim,
@@ -228,7 +228,7 @@ fn echo_advanced_loop(
       )
 
     <<"$N", rest:bits>> ->
-      echo_advanced_loop(
+      report_advanced_loop(
         rest,
         subject,
         victim,
@@ -236,7 +236,7 @@ fn echo_advanced_loop(
       )
 
     <<"$E", rest:bits>> ->
-      echo_advanced_loop(
+      report_advanced_loop(
         rest,
         subject,
         victim,
@@ -244,7 +244,7 @@ fn echo_advanced_loop(
       )
 
     <<"$S", rest:bits>> ->
-      echo_advanced_loop(
+      report_advanced_loop(
         rest,
         subject,
         victim,
@@ -252,7 +252,7 @@ fn echo_advanced_loop(
       )
 
     <<"$M", rest:bits>> ->
-      echo_advanced_loop(
+      report_advanced_loop(
         rest,
         subject,
         victim,
@@ -260,7 +260,7 @@ fn echo_advanced_loop(
       )
 
     <<"$MSELF", rest:bits>> ->
-      echo_advanced_loop(
+      report_advanced_loop(
         rest,
         subject,
         victim,
@@ -268,9 +268,9 @@ fn echo_advanced_loop(
       )
 
     <<x:8, rest:bits>> ->
-      echo_advanced_loop(rest, subject, victim, bytes_tree.append(acc, <<x>>))
+      report_advanced_loop(rest, subject, victim, bytes_tree.append(acc, <<x>>))
 
-    _ -> echo_advanced_loop(<<>>, subject, victim, acc)
+    _ -> report_advanced_loop(<<>>, subject, victim, acc)
   }
 }
 

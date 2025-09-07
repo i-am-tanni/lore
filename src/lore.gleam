@@ -1,6 +1,7 @@
 import envoy
 import gleam/erlang/process
 import gleam/int
+import gleam/io
 import gleam/otp/actor
 import gleam/otp/static_supervisor
 import gleam/otp/supervision
@@ -64,8 +65,7 @@ pub fn main() {
       process.sleep_forever()
     }
 
-    Error(error) ->
-      logging.log(logging.Critical, "Cannot start: " <> string.inspect(error))
+    Error(error) -> io.print_error(string.inspect(error))
   }
 }
 
