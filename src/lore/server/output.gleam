@@ -9,7 +9,10 @@ import gleam/result
 import gleam/string_tree.{type StringTree}
 
 // ascii char '0'
-const char0 = 48
+const char0 = 49
+
+// ascii char '1'
+const char1 = 50
 
 // ascii char '9'
 const char9 = 57
@@ -348,7 +351,7 @@ fn expand_colors_16_loop(
   }
 }
 
-/// &000 == foreground color. {000 == background color. 0; is reset.
+/// &00# == foreground color. {00# == background color. 0; is reset.
 /// 
 pub fn expand_colors_256(binary: BitArray) -> BitArray {
   let result =
@@ -394,18 +397,9 @@ fn expand_colors_256_loop(
     }
 
     <<"&", a, b, rest:bits>>
-      if a >= char0 && a <= char9 && b >= char0 && b <= char9
+      if a >= char1 && a <= char9 && b >= char0 && b <= char9
     -> {
       use code <- result.try(bit_array.to_string(<<a, b>>))
-      expand_colors_256_loop(
-        rest,
-        True,
-        bytes_tree.append_string(acc, "\u{1b}[38;5;" <> code <> "m"),
-      )
-    }
-
-    <<"&", a, rest:bits>> if a >= char0 && a <= char9 -> {
-      use code <- result.try(bit_array.to_string(<<a>>))
       expand_colors_256_loop(
         rest,
         True,
@@ -430,18 +424,9 @@ fn expand_colors_256_loop(
     }
 
     <<"{", a, b, rest:bits>>
-      if a >= char0 && a <= char9 && b >= char0 && b <= char9
+      if a >= char1 && a <= char9 && b >= char0 && b <= char9
     -> {
       use code <- result.try(bit_array.to_string(<<a, b>>))
-      expand_colors_256_loop(
-        rest,
-        True,
-        bytes_tree.append_string(acc, "\u{1b}[48;5;" <> code <> "m"),
-      )
-    }
-
-    <<"{", a, rest:bits>> if a >= char0 && a <= char9 -> {
-      use code <- result.try(bit_array.to_string(<<a>>))
       expand_colors_256_loop(
         rest,
         True,
