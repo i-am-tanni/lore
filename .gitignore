@@ -7,4 +7,3 @@ erl_crash.dump
 /db
 manifest.toml
 /.vscode
-*.gitignore
