@@ -1,47 +1,62 @@
+import envoy
 import gleam/erlang/process
 import gleam/int
 import gleam/otp/actor
 import gleam/otp/static_supervisor
 import gleam/otp/supervision
+import gleam/result
 import gleam/string
 import glisten
 import logging
 import lore/server/telnet/protocol
 import lore/world/kickoff
 import lore/world/system_tables
+import pog
 
 pub type ServerStartError {
-  //ReadEnvFileError(dotenv.Error)
-  //CannotReadEnvVar(env.Error)
+  MissingEnvVar(var: String)
   StartError(actor.StartError)
 }
 
 pub fn main() {
-  let server_ip = "127.0.0.1"
-  let port = 4444
-  logging.configure()
+  let start_result = {
+    use server_ip <- result.try(env_var("SERVER_IP"))
+    use port <- result.try(env_var("PORT"))
+    let port = string_to_int(port)
+    use database_name <- result.try(env_var("DB_NAME"))
 
-  let system_tables =
-    system_tables.Lookup(
-      zone: process.new_name("zone_registry"),
-      room: process.new_name("room_registry"),
-      character: process.new_name("character_registry"),
-      communication: process.new_name("comms"),
-      presence: process.new_name("presence"),
-      mapper: process.new_name("mapper"),
-      users: process.new_name("users"),
-      items: process.new_name("items"),
+    logging.configure()
+
+    let system_tables =
+      system_tables.Lookup(
+        zone: process.new_name("zone_registry"),
+        room: process.new_name("room_registry"),
+        character: process.new_name("character_registry"),
+        communication: process.new_name("comms"),
+        presence: process.new_name("presence"),
+        mapper: process.new_name("mapper"),
+        users: process.new_name("users"),
+        items: process.new_name("items"),
+        db: process.new_name("db"),
+      )
+
+    use _ <- result.try(
+      static_supervisor.new(static_supervisor.OneForOne)
+      |> static_supervisor.add(start_database_connection(
+        system_tables.db,
+        database_name,
+      ))
+      |> static_supervisor.add(system_tables.supervised(system_tables))
+      |> static_supervisor.add(kickoff.supervised(system_tables))
+      |> static_supervisor.add(telnet_supervised(server_ip, port, system_tables))
+      |> static_supervisor.start()
+      |> result.map_error(StartError),
     )
-
-  let start_result =
-    static_supervisor.new(static_supervisor.OneForOne)
-    |> static_supervisor.add(system_tables.supervised(system_tables))
-    |> static_supervisor.add(kickoff.supervised(system_tables))
-    |> static_supervisor.add(telnet_supervised(server_ip, port, system_tables))
-    |> static_supervisor.start()
+    Ok(#(server_ip, port))
+  }
 
   case start_result {
-    Ok(_) -> {
+    Ok(#(server_ip, port)) -> {
       let start_msg =
         "Server started! " <> server_ip <> ":" <> int.to_string(port)
 
@@ -69,3 +84,27 @@ fn telnet_supervised(
   |> glisten.bind(server_ip)
   |> glisten.supervised(port)
 }
+
+pub fn start_database_connection(
+  pool_name: process.Name(pog.Message),
+  database_name: String,
+) {
+  let pool_child =
+    pog.default_config(pool_name)
+    |> pog.host("127.0.0.1")
+    |> pog.database(database_name)
+    |> pog.pool_size(15)
+    |> pog.supervised
+
+  static_supervisor.new(static_supervisor.RestForOne)
+  |> static_supervisor.add(pool_child)
+  |> static_supervisor.supervised
+}
+
+fn env_var(name: String) -> Result(String, ServerStartError) {
+  envoy.get(name)
+  |> result.replace_error(MissingEnvVar(name))
+}
+
+@external(erlang, "erlang", "binary_to_integer")
+fn string_to_int(string: String) -> Int

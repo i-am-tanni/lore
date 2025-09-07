@@ -9,15 +9,17 @@ import gleam/result
 import glets/cache
 import glets/table
 import lore/world.{type Id, type Item}
+import lore/world/sql
+import pog
 
 pub type Message =
   cache.Message(Id(Item), Item)
 
 pub fn start(
   table_name: process.Name(Message),
-  items: List(Item),
+  db: process.Name(pog.Message),
 ) -> Result(actor.Started(process.Subject(Message)), actor.StartError) {
-  actor.new_with_initialiser(500, fn(self) { init(self, table_name, items) })
+  actor.new_with_initialiser(500, fn(self) { init(self, table_name, db) })
   |> actor.named(table_name)
   |> actor.on_message(recv)
   |> actor.start
@@ -26,7 +28,7 @@ pub fn start(
 fn init(
   self: process.Subject(Message),
   table_name: process.Name(Message),
-  items: List(Item),
+  db: process.Name(pog.Message),
 ) -> Result(
   actor.Initialised(
     table.Set(Id(Item), Item),
@@ -35,14 +37,23 @@ fn init(
   ),
   String,
 ) {
-  let start_table =
+  use table <- result.try(
     table_name
     |> table.new
     |> table.set
-    |> result.replace_error("Failed to start ets table: 'items'")
+    |> result.replace_error("Failed to start ets table: 'items'"),
+  )
+  use pog.Returned(rows:, ..) <- result.try(
+    sql.items_get(pog.named_connection(db))
+    |> result.replace_error("Could not get items from the database!"),
+  )
 
-  use table <- result.try(start_table)
-  let items = list.map(items, fn(item) { #(item.id, item) })
+  let items =
+    list.map(rows, fn(row) {
+      let sql.ItemsGetRow(item_id:, name:, short:, long:, keywords:) = row
+      let id = world.Id(item_id)
+      #(id, world.Item(id: id, name:, short:, long:, keywords:))
+    })
   table.insert_many(table, items)
 
   table

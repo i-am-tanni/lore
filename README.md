@@ -21,6 +21,6 @@ connection at `src/lore/server/telnet/protocol.gleam`.
 - ✅ Color (16 and 256 colors)
 - ✅ Who command
 - ✅ Items
+- ✅ Postgres
 - ⬜ Socials
 - ⬜ Spawn mobiles
-- ⬜ Postgres

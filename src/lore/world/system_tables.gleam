@@ -12,6 +12,7 @@ import lore/world/mapper
 import lore/world/room/presence
 import lore/world/room/room_registry
 import lore/world/zone/zone_registry
+import pog
 
 /// Record for looking up a registry name created at runtime.
 /// 
@@ -37,6 +38,7 @@ pub type Lookup {
     users: process.Name(users.Message),
     mapper: process.Name(mapper.Message),
     items: process.Name(items.Message),
+    db: process.Name(pog.Message),
   )
 }
 

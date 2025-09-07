@@ -13,19 +13,11 @@ import lore/world/room
 import lore/world/system_tables
 import lore/world/zone
 
-const test_item = world.Item(
-  name: "a pair of &WP&Pr&Wo&Pg&Wr&Pa&Wm&Pm&We&Pr &WS&Po&Wc&Pk&Ws0;",
-  keywords: ["socks", "programmer"],
-  short: "A pair of striped socks have been discarded here.",
-  long: "A legendary pair of long socks said to improve programming prowess.",
-  id: Id(1),
-)
-
 const zones = [
   Zone(
     id: Id(1),
     name: "Test Zone",
-    items: [test_item],
+    items: [],
     rooms: [
       Room(
         id: Id(1),
@@ -85,9 +77,6 @@ pub fn supervised(
   system_tables: system_tables.Lookup,
 ) -> supervision.ChildSpecification(static_supervisor.Supervisor) {
   let supervisor = static_supervisor.new(static_supervisor.OneForOne)
-
-  let items = list.flat_map(zones, fn(zone) { zone.items })
-
   // Add a supervisor per zone and the mapper worker
   list.fold(zones, supervisor, fn(acc, zone) {
     static_supervisor.add(acc, zone_supervised(zone, system_tables))
@@ -96,7 +85,7 @@ pub fn supervised(
     worker(fn() { mapper.start(system_tables.mapper, zones) }),
   )
   |> static_supervisor.add(
-    worker(fn() { items.start(system_tables.items, items) }),
+    worker(fn() { items.start(system_tables.items, system_tables.db) }),
   )
   |> static_supervisor.supervised
 }
