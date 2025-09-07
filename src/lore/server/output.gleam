@@ -462,7 +462,6 @@ fn expand_colors_256_loop(
   }
 }
 
-/// Avoid replacing escape sequences
 /// Like `list.map` but works on a StringTree.
 /// 
 @external(erlang, "lore_ffi", "iolist_map")
