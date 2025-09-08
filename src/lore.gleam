@@ -30,6 +30,7 @@ pub fn main() {
 
     let system_tables =
       system_tables.Lookup(
+        db: process.new_name("db"),
         zone: process.new_name("zone_registry"),
         room: process.new_name("room_registry"),
         character: process.new_name("character_registry"),
@@ -38,7 +39,7 @@ pub fn main() {
         mapper: process.new_name("mapper"),
         users: process.new_name("users"),
         items: process.new_name("items"),
-        db: process.new_name("db"),
+        socials: process.new_name("socials"),
       )
 
     use _ <- result.try(

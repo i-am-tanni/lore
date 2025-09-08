@@ -10,7 +10,9 @@ import gleam/string
 import lore/character/act
 import lore/character/conn.{type Conn}
 import lore/character/events/item_event
+import lore/character/socials
 import lore/character/users
+import lore/character/view
 import lore/character/view/character_view
 import lore/character/view/communication_view
 import lore/character/view/error_view
@@ -65,6 +67,7 @@ type Found {
 
 pub fn parse(conn: Conn, input: String) -> Conn {
   let result = party.go(parser(conn), input)
+
   case result {
     Ok(conn) -> conn
 
@@ -101,6 +104,7 @@ fn parser(conn: Conn) -> Parser(Conn, e) {
       no_args(Inventory, "inventory", ["i", "inv"]),
     ),
     command(conn, quit_command, no_args(Quit, "quit", ["q"])),
+    social(conn),
   ])
 }
 
@@ -160,12 +164,28 @@ fn room_comms(
   command: Command(CommunicationVerb, event.RoomCommunicationData),
 ) {
   let data = command.data
-  case data.text != "" {
-    True -> conn.action(conn, act.communicate(command.data))
-    False ->
+  case data {
+    event.SayData(text: "", ..) ->
       conn
-      |> conn.renderln(communication_view.empty())
+      |> conn.renderln(communication_view.empty("say"))
       |> conn.prompt()
+
+    event.SayAtData(text: "", at:, ..) ->
+      conn
+      |> conn.renderln(communication_view.empty("say to " <> at))
+      |> conn.prompt()
+
+    event.WhisperData(text: "", at:, ..) ->
+      conn
+      |> conn.renderln(communication_view.empty("whisper to " <> at))
+      |> conn.prompt()
+
+    event.EmoteData(text: "") ->
+      conn
+      |> conn.renderln(communication_view.empty("emote"))
+      |> conn.prompt()
+
+    _ -> conn.action(conn, act.communicate(data))
   }
 }
 
@@ -222,6 +242,55 @@ fn drop_command(conn: Conn, command: Command(Verb, String)) -> Conn {
 fn who_command(conn: Conn, _command: Command(Verb, Nil)) -> Conn {
   let system_tables.Lookup(users:, ..) = conn.system_tables(conn)
   conn.render(conn, character_view.who_list(users.players_logged_in(users)))
+}
+
+pub fn social(conn: Conn) -> Parser(Conn, e) {
+  use command <- party.do(word())
+  use victim <- party.do(party.perhaps(word()))
+  let victim = option.from_result(victim)
+  let system_tables.Lookup(socials:, ..) = conn.system_tables(conn)
+  let self = conn.get_character(conn)
+  let is_auto = case victim {
+    None -> False
+    Some("self") -> True
+    Some(search_term) ->
+      list.any(self.keywords, fn(keyword) { search_term == keyword })
+  }
+
+  case socials.lookup(socials, command), victim {
+    Ok(social), None -> {
+      let report =
+        view.ReportBasic(
+          self: social.char_no_arg,
+          witness: social.others_no_arg,
+        )
+      conn.event(conn, event.RoomCommunication(event.SocialData(report)))
+      |> party.return
+    }
+
+    Ok(social), Some(_) if is_auto -> {
+      let report =
+        view.ReportBasic(self: social.char_auto, witness: social.others_auto)
+      conn.event(conn, event.RoomCommunication(event.SocialData(report)))
+      |> party.return
+    }
+
+    Ok(social), Some(search_term) -> {
+      let report =
+        view.ReportAdvanced(
+          self: social.char_found,
+          witness: social.others_found,
+          victim: social.victim_found,
+        )
+      conn.event(
+        conn,
+        event.RoomCommunication(event.SocialAtData(report, search_term)),
+      )
+      |> party.return
+    }
+
+    Error(Nil), _ -> party.fail()
+  }
 }
 
 pub fn command(
@@ -410,9 +479,14 @@ fn whitespace() -> Parser(Nil, e) {
 }
 
 fn word() -> party.Parser(String, e) {
-  party.until(party.any_char(), party.choice([whitespace1(), party.end()]))
-  |> party.map(string.concat)
-  |> party.map(string.lowercase)
+  use list <- party.do(party.until(
+    party.any_char(),
+    party.choice([whitespace1(), end()]),
+  ))
+  case list != [] {
+    True -> party.return(list |> string.concat |> string.lowercase)
+    False -> party.fail()
+  }
 }
 
 fn replace(parser: Parser(a, e), replacement: b) -> Parser(b, e) {

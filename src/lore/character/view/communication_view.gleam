@@ -26,63 +26,75 @@ pub fn notify(
   let is_acting_character = self_id == acting_character.id
 
   case data {
-    event.Say(text:, adverb:) if is_acting_character -> [
-      "You ",
-      adverb_to_string(adverb),
-      verb(text, Self),
-      ", \"",
-      text,
-      "\"",
-    ]
+    event.Say(text:, adverb:) if is_acting_character ->
+      [
+        "You ",
+        adverb_to_string(adverb),
+        verb(text, Self),
+        ", \"",
+        text,
+        "\"",
+      ]
+      |> view.Leaves
 
-    event.Say(text:, adverb:) -> [
-      character_view.name(acting_character),
-      " ",
-      adverb_to_string(adverb),
-      verb(text, NotSelf),
-      ", \"",
-      text,
-      "\"",
-    ]
+    event.Say(text:, adverb:) ->
+      [
+        character_view.name(acting_character),
+        " ",
+        adverb_to_string(adverb),
+        verb(text, NotSelf),
+        ", \"",
+        text,
+        "\"",
+      ]
+      |> view.Leaves
 
-    event.SayAt(text:, at:, adverb:) if is_acting_character && self_id == at.id -> [
-      "You ",
-      adverb_to_string(adverb),
-      "mutter to yourself, \"",
-      text,
-      "\"",
-    ]
+    event.SayAt(text:, at:, adverb:) if is_acting_character && self_id == at.id ->
+      [
+        "You ",
+        adverb_to_string(adverb),
+        "mutter to yourself, \"",
+        text,
+        "\"",
+      ]
+      |> view.Leaves
 
-    event.SayAt(text:, at:, adverb:) if is_acting_character -> [
-      "You ",
-      adverb_to_string(adverb),
-      verb_to(text, Self),
-      " ",
-      character_view.name(at),
-      ", \"",
-      text,
-      "\"",
-    ]
+    event.SayAt(text:, at:, adverb:) if is_acting_character ->
+      [
+        "You ",
+        adverb_to_string(adverb),
+        verb_to(text, Self),
+        " ",
+        character_view.name(at),
+        ", \"",
+        text,
+        "\"",
+      ]
+      |> view.Leaves
 
-    event.SayAt(text:, at:, adverb:) if acting_character.id == at.id -> [
-      character_view.name(acting_character),
-      adverb_to_string(adverb),
-      " mutters to ",
-      pronoun_self(acting_character),
-      ", \"",
-      text,
-      "\"",
-    ]
+    event.SayAt(text:, at:, adverb:) if acting_character.id == at.id ->
+      [
+        character_view.name(acting_character),
+        adverb_to_string(adverb),
+        " mutters to ",
+        pronoun_self(acting_character),
+        ", \"",
+        text,
+        "\"",
+      ]
+      |> view.Leaves
 
-    event.SayAt(text:, at:, adverb:) if self_id == at.id -> [
-      character_view.name(acting_character),
-      " ",
-      adverb_to_string(adverb),
-      verb_to(text, NotSelf),
-      " you, \"",
-      text,
-      "\"",
-    ]
+    event.SayAt(text:, at:, adverb:) if self_id == at.id ->
+      [
+        character_view.name(acting_character),
+        " ",
+        adverb_to_string(adverb),
+        verb_to(text, NotSelf),
+        " you, \"",
+        text,
+        "\"",
+      ]
+      |> view.Leaves
 
     event.SayAt(text:, at:, adverb:) -> {
       let acting_character = character_view.name(acting_character)
@@ -98,38 +110,52 @@ pub fn notify(
         text,
         "\"",
       ]
+      |> view.Leaves
     }
 
-    event.Whisper(text:, at:) if is_acting_character && self_id == at.id -> [
-      "You whisper to yourself, \"",
-      text,
-      "\"",
-    ]
+    event.Whisper(text:, at:) if is_acting_character && self_id == at.id ->
+      [
+        "You whisper to yourself, \"",
+        text,
+        "\"",
+      ]
+      |> view.Leaves
 
-    event.Whisper(text:, at:) if is_acting_character -> [
-      "You whisper to ",
-      character_view.name(at),
-      ", \"",
-      text,
-      "\"",
-    ]
+    event.Whisper(text:, at:) if is_acting_character ->
+      [
+        "You whisper to ",
+        character_view.name(at),
+        ", \"",
+        text,
+        "\"",
+      ]
+      |> view.Leaves
 
-    event.Whisper(text:, at:) if self_id == at.id -> [
-      character_view.name(acting_character),
-      " whispers in your ear, \"",
-      text,
-      "\"",
-    ]
+    event.Whisper(text:, at:) if self_id == at.id ->
+      [
+        character_view.name(acting_character),
+        " whispers in your ear, \"",
+        text,
+        "\"",
+      ]
+      |> view.Leaves
 
     event.Whisper(at:, ..) -> {
       let acting_character = character_view.name(acting_character)
       let victim = character_view.name(at)
       [acting_character, " whispers something to ", victim, "."]
+      |> view.Leaves
     }
 
-    event.Emote(text:) -> [character_view.name(acting_character), " ", text]
+    event.Emote(text:) ->
+      [character_view.name(acting_character), " ", text] |> view.Leaves
+
+    event.Social(report:) ->
+      view.render_report(report, self, acting_character, None)
+
+    event.SocialAt(report:, at:) ->
+      view.render_report(report, self, acting_character, Some(at))
   }
-  |> view.Leaves
 }
 
 pub fn chat(data: event.ChatData) -> View {
@@ -146,9 +172,9 @@ pub fn chat(data: event.ChatData) -> View {
   |> view.Leaves
 }
 
-pub fn empty() -> View {
-  "What do you want to say?"
-  |> view.Leaf
+pub fn empty(verb: String) -> View {
+  ["What do you want to ", verb, "?"]
+  |> view.Leaves
 }
 
 pub fn channel_not_subscribed(channel: world.ChatChannel) -> View {

@@ -44,17 +44,12 @@ pub type View {
 /// 
 pub type Report {
   ReportBasic(self: String, witness: String)
-  ReportAdvanced(
-    self: String,
-    witness: String,
-    victim: String,
-    self_victim: String,
-  )
+  ReportAdvanced(self: String, witness: String, victim: String)
 }
 
 pub fn render_report(
   occurance: Report,
-  witness: world.Mobile,
+  witness: world.MobileInternal,
   actor: world.Mobile,
   actee: Option(world.Mobile),
 ) -> View {
@@ -66,16 +61,13 @@ pub fn render_report(
         False -> report_simple_stringify(occurance.witness, actor)
       }
 
-    ReportAdvanced(victim:, self:, self_victim:, witness:), Some(actee) ->
+    ReportAdvanced(victim:, self:, witness:), Some(actee) ->
       case witness_id {
         _ if witness_id == actee.id ->
           report_advanced_stringify(victim, actor, actee)
 
         _ if witness_id == actor.id ->
           report_advanced_stringify(self, actor, actee)
-
-        _ if witness_id == actor.id && witness_id == actee.id ->
-          report_advanced_stringify(self_victim, actor, actee)
 
         _ -> report_advanced_stringify(witness, actor, actee)
       }

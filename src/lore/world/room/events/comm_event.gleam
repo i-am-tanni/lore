@@ -21,6 +21,13 @@ pub fn broadcast(
     }
 
     event.EmoteData(text:) -> Ok(event.Emote(text:))
+
+    event.SocialData(report:) -> Ok(event.Social(report:))
+
+    event.SocialAtData(report:, at:) -> {
+      response.find_local_character(builder, at)
+      |> result.map(fn(victim) { event.SocialAt(report:, at: victim) })
+    }
   }
 
   case result {

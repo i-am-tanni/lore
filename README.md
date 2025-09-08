@@ -22,5 +22,5 @@ connection at `src/lore/server/telnet/protocol.gleam`.
 - ✅ Who command
 - ✅ Items
 - ✅ Postgres
-- ⬜ Socials
+- ✅ Socials
 - ⬜ Spawn mobiles

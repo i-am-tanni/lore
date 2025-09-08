@@ -5,6 +5,7 @@ import gleam/erlang/process
 import gleam/otp/static_supervisor.{add}
 import gleam/otp/supervision.{worker}
 import lore/character/character_registry
+import lore/character/socials
 import lore/character/users
 import lore/world/communication
 import lore/world/items
@@ -30,6 +31,7 @@ pub type Lookup {
   /// - Items: A table for exposing item data by id
   /// 
   Lookup(
+    db: process.Name(pog.Message),
     zone: process.Name(zone_registry.Message),
     room: process.Name(room_registry.Message),
     character: process.Name(character_registry.Message),
@@ -38,7 +40,7 @@ pub type Lookup {
     users: process.Name(users.Message),
     mapper: process.Name(mapper.Message),
     items: process.Name(items.Message),
-    db: process.Name(pog.Message),
+    socials: process.Name(socials.Message),
   )
 }
 
@@ -54,5 +56,6 @@ pub fn supervised(
   |> add(worker(fn() { communication.start(name.communication) }))
   |> add(worker(fn() { presence.start(name.presence, name.room) }))
   |> add(worker(fn() { users.start(name.users, name.communication) }))
+  |> add(worker(fn() { socials.start(name.socials, name.db) }))
   |> static_supervisor.supervised
 }

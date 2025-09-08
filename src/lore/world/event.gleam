@@ -11,6 +11,7 @@
 import gleam/erlang/process.{type Subject}
 import gleam/option.{type Option}
 import gleam/order
+import lore/character/view
 import lore/server/output
 import lore/world.{
   type Direction, type Id, type Mobile, type Room, type StringId,
@@ -206,6 +207,8 @@ pub type RoomCommunicationData {
   SayAtData(text: String, at: String, adverb: Option(String))
   WhisperData(text: String, at: String, adverb: Option(String))
   EmoteData(text: String)
+  SocialData(report: view.Report)
+  SocialAtData(report: view.Report, at: String)
 }
 
 // Character Data
@@ -231,6 +234,8 @@ pub type CommunicationData {
   SayAt(text: String, adverb: Option(String), at: world.Mobile)
   Whisper(text: String, at: world.Mobile)
   Emote(text: String)
+  Social(report: view.Report)
+  SocialAt(report: view.Report, at: world.Mobile)
 }
 
 pub type ChatData {
