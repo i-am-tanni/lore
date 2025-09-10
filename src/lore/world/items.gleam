@@ -44,13 +44,13 @@ fn init(
     |> result.replace_error("Failed to start ets table: 'items'"),
   )
   use pog.Returned(rows:, ..) <- result.try(
-    sql.items_get(pog.named_connection(db))
+    sql.items(pog.named_connection(db))
     |> result.replace_error("Could not get items from the database!"),
   )
 
   let items =
     list.map(rows, fn(row) {
-      let sql.ItemsGetRow(item_id:, name:, short:, long:, keywords:) = row
+      let sql.ItemsRow(item_id:, name:, short:, long:, keywords:) = row
       let id = world.Id(item_id)
       #(id, world.Item(id:, name:, short:, long:, keywords:))
     })

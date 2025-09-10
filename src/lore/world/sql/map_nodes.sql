@@ -1,0 +1,1 @@
+SELECT room_id, symbol, x, y, z from room;

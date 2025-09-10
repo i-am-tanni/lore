@@ -1,0 +1,1 @@
+SELECT from_room_id, to_room_id from exit;

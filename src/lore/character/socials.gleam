@@ -52,7 +52,7 @@ fn init(
     |> result.replace_error("Failed to start ets table: 'socials'."),
   )
   use pog.Returned(rows:, ..) <- result.try(
-    sql.socials_get(pog.named_connection(db))
+    sql.socials(pog.named_connection(db))
     |> result.replace_error("Could not get socials from the database!"),
   )
 
