@@ -1,7 +1,7 @@
 //// A module for building responses to received room events.
 //// 
 
-import gleam/dict.{type Dict}
+import gleam/dict
 import gleam/erlang/process.{type Subject}
 import gleam/function
 import gleam/list
@@ -433,7 +433,7 @@ fn send_text(
     _ -> {
       let room_id = room.id
 
-      group_by(output, function.identity)
+      my_list.group_by(output, function.identity)
       |> dict.to_list
       |> list.each(fn(pair) {
         let #(subject, outputs) = pair
@@ -515,19 +515,4 @@ fn send_event(
       Nil
     }
   }
-}
-
-// Groups items in the list.
-// Similar to `list.group`, but the values are mapped.
-// Note: in this case, the value list for each key will be reversed, which
-// is desirable for this module's use.
-// 
-fn group_by(list: List(a), group_fun: fn(a) -> #(k, v)) -> Dict(k, List(v)) {
-  list.fold(list, dict.new(), fn(acc, x) {
-    let #(key, val) = group_fun(x)
-    case dict.get(acc, key) {
-      Ok(list) -> dict.insert(acc, key, [val, ..list])
-      Error(Nil) -> dict.insert(acc, key, [val])
-    }
-  })
 }

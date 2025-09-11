@@ -2,6 +2,7 @@
 //// 
 
 import gleam/bool
+import gleam/dict.{type Dict}
 import gleam/list.{Continue, Stop}
 import gleam/pair
 
@@ -108,4 +109,18 @@ pub fn at(list: List(a), index: Int) -> Result(a, Nil) {
     [first, ..] if index < 1 -> Ok(first)
     [_, ..rest] -> at(rest, index - 1)
   }
+}
+
+// Groups items in the list.
+// Similar to `list.group`, but the values are mapped.
+// Note: the lists are reversed.
+// 
+pub fn group_by(list: List(a), group_fun: fn(a) -> #(k, v)) -> Dict(k, List(v)) {
+  list.fold(list, dict.new(), fn(acc, x) {
+    let #(key, val) = group_fun(x)
+    case dict.get(acc, key) {
+      Ok(list) -> dict.insert(acc, key, [val, ..list])
+      Error(Nil) -> dict.insert(acc, key, [val])
+    }
+  })
 }
