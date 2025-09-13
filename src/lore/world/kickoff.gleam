@@ -10,6 +10,7 @@ import gleam/otp/actor
 import gleam/otp/static_supervisor
 import gleam/otp/supervision.{worker}
 import gleam/result
+import gleam/string
 import lore/world
 import lore/world/items
 import lore/world/mapper
@@ -26,7 +27,7 @@ pub fn supervised(
   // Each zone gets a supervisor
   use zones <- result.try(
     load_zones(system_tables.db)
-    |> result.replace_error(actor.InitFailed("Unable to load zones from db.")),
+    |> result.map_error(fn(error) { actor.InitFailed(string.inspect(error)) }),
   )
 
   zones
@@ -87,7 +88,7 @@ fn load_zones(
 
       world.RoomExit(
         id: world.Id(id),
-        keyword: world.string_to_direction(exit.keyword),
+        keyword: string_to_direction(exit.keyword),
         from_room_id: world.Id(exit.from_room_id),
         to_room_id: world.Id(exit.to_room_id),
         door:,
@@ -119,4 +120,16 @@ fn load_zones(
     world.Zone(id: world.Id(zone.zone_id), name: zone.name, rooms:)
   })
   |> Ok
+}
+
+fn string_to_direction(exit_keyword: String) -> world.Direction {
+  case exit_keyword {
+    "north" -> world.North
+    "south" -> world.South
+    "east" -> world.East
+    "west" -> world.West
+    "up" -> world.Up
+    "down" -> world.Down
+    custom -> world.CustomExit(custom)
+  }
 }
