@@ -314,7 +314,7 @@ fn go(
     whitespace(),
   ))
   // If parsed, we know direction is valid
-  let valid_direction = to_direction(command)
+  let valid_direction = world.string_to_direction(command)
   party.return(Command(verb: verb, data: valid_direction))
 }
 
@@ -367,19 +367,7 @@ fn direction() -> Parser(world.Direction, e) {
     ]),
   )
 
-  party.return(to_direction(valid_direction))
-}
-
-fn to_direction(exit_keyword: String) -> world.Direction {
-  case exit_keyword {
-    "n" | "north" -> world.North
-    "s" | "south" -> world.South
-    "e" | "east" -> world.East
-    "w" | "west" -> world.West
-    "u" | "up" -> world.Up
-    "d" | "down" -> world.Down
-    custom -> world.CustomExit(custom)
-  }
+  party.return(world.string_to_direction(valid_direction))
 }
 
 fn at() -> Parser(#(Argument, String), e) {

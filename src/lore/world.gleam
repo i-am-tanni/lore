@@ -28,13 +28,12 @@ pub type ChatChannel {
 }
 
 pub type Zone {
-  Zone(id: Id(Zone), name: String, rooms: List(Room), items: List(Item))
+  Zone(id: Id(Zone), name: String, rooms: List(Room))
 }
 
 pub type Room {
   Room(
     id: Id(Room),
-    template_id: Id(RoomTemplate),
     zone_id: Id(Zone),
     symbol: String,
     x: Int,
@@ -185,5 +184,17 @@ pub fn direction_to_string(direction: Direction) -> String {
     Up -> "up"
     Down -> "down"
     CustomExit(custom) -> custom
+  }
+}
+
+pub fn string_to_direction(exit_keyword: String) -> Direction {
+  case exit_keyword {
+    "n" | "north" -> North
+    "s" | "south" -> South
+    "e" | "east" -> East
+    "w" | "west" -> West
+    "u" | "up" -> Up
+    "d" | "down" -> Down
+    custom -> CustomExit(custom)
   }
 }

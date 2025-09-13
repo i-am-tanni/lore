@@ -49,7 +49,9 @@ pub fn main() {
         database_name,
       ))
       |> static_supervisor.add(system_tables.supervised(system_tables))
-      |> static_supervisor.add(kickoff.supervised(system_tables))
+      |> static_supervisor.add(
+        supervision.supervisor(fn() { kickoff.supervised(system_tables) }),
+      )
       |> static_supervisor.add(telnet_supervised(server_ip, port, system_tables))
       |> static_supervisor.start()
       |> result.map_error(StartError),
