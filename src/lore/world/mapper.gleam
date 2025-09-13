@@ -34,9 +34,7 @@ type MapEdge {
 
 type Digraph
 
-type Vertex
-
-type Edge
+type DoNotLeak
 
 //
 // Constants
@@ -270,10 +268,10 @@ fn neighbors(
 fn digraph_new() -> Digraph
 
 @external(erlang, "digraph", "add_vertex")
-fn digraph_add_vertex(graph: Digraph, key: a) -> Vertex
+fn digraph_add_vertex(graph: Digraph, key: a) -> DoNotLeak
 
 @external(erlang, "digraph", "add_edge")
-fn digraph_add_edge(graph: Digraph, a: a, b: a) -> Edge
+fn digraph_add_edge(graph: Digraph, a: a, b: a) -> DoNotLeak
 
 @external(erlang, "digraph", "del_path")
 fn digraph_del_path(graph: Digraph, a: a, b: a) -> Nil
