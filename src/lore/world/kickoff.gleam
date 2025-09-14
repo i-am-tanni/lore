@@ -35,7 +35,7 @@ pub fn supervised(
     static_supervisor.add(acc, zone_supervised(zone, system_tables))
   })
   |> static_supervisor.add(
-    worker(fn() { mapper.start(system_tables.mapper, zones) }),
+    worker(fn() { mapper.start(system_tables.mapper, system_tables.db) }),
   )
   |> static_supervisor.add(
     worker(fn() { items.start(system_tables.items, system_tables.db) }),

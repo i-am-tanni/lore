@@ -13,6 +13,8 @@ import gleam/string
 import gleam/string_tree.{type StringTree}
 import logging
 import lore/world.{type Id, type Room}
+import lore/world/sql
+import pog
 
 pub type Message {
   RenderMiniMap(caller: process.Subject(List(StringTree)), room_id: Id(Room))
@@ -85,24 +87,9 @@ pub fn render_mini_map(
 
 pub fn start(
   name: process.Name(Message),
-  zones: List(world.Zone),
+  db: process.Name(pog.Message),
 ) -> Result(actor.Started(process.Subject(Message)), actor.StartError) {
-  let nodes =
-    list.flat_map(zones, fn(zone) {
-      list.map(zone.rooms, fn(room) {
-        let world.Room(id:, symbol:, x:, y:, z:, ..) = room
-        MapNode(id:, symbol:, x:, y:, z:)
-      })
-    })
-
-  let edges = {
-    use zone <- list.flat_map(zones)
-    use room <- list.flat_map(zone.rooms)
-    use exit <- list.map(room.exits)
-    MapEdge(from: exit.from_room_id, to: exit.to_room_id)
-  }
-
-  actor.new_with_initialiser(100, fn(self) { init(self, nodes, edges) })
+  actor.new_with_initialiser(100, fn(self) { init(self, db) })
   |> actor.named(name)
   |> actor.on_message(recv)
   |> actor.start
@@ -110,24 +97,40 @@ pub fn start(
 
 fn init(
   self: process.Subject(Message),
-  nodes: List(MapNode),
-  edges: List(MapEdge),
+  db: process.Name(pog.Message),
 ) -> Result(actor.Initialised(State, Message, process.Subject(Message)), String) {
-  let graph = digraph_new()
-  list.each(nodes, fn(node) { digraph_add_vertex(graph, node.id) })
-  list.each(edges, fn(edge) { digraph_add_edge(graph, edge.from, edge.to) })
+  let result = {
+    let db = pog.named_connection(db)
+    use pog.Returned(rows: nodes, ..) <- result.try(sql.map_nodes(db))
+    use pog.Returned(rows: edges, ..) <- result.try(sql.map_edges(db))
 
-  let nodes =
-    list.map(nodes, fn(node) { #(node.id, node) })
-    |> dict.from_list()
+    let nodes =
+      list.map(nodes, fn(node) {
+        let sql.MapNodesRow(room_id:, symbol:, x:, y:, z:) = node
+        MapNode(id: world.Id(room_id), symbol:, x:, y:, z:)
+      })
 
-  let selector = process.new_selector() |> process.select(self)
+    let edges =
+      list.map(edges, fn(edge) {
+        let sql.MapEdgesRow(from_room_id:, to_room_id:) = edge
+        MapEdge(from: world.Id(from_room_id), to: world.Id(to_room_id))
+      })
 
-  State(graph:, nodes:)
-  |> actor.initialised
-  |> actor.selecting(selector)
-  |> actor.returning(self)
-  |> Ok
+    let graph = digraph_new()
+    list.each(nodes, fn(node) { digraph_add_vertex(graph, node.id) })
+    list.each(edges, fn(edge) { digraph_add_edge(graph, edge.from, edge.to) })
+
+    let nodes = list.map(nodes, fn(node) { #(node.id, node) }) |> dict.from_list
+    let selector = process.new_selector() |> process.select(self)
+
+    State(graph:, nodes:)
+    |> actor.initialised
+    |> actor.selecting(selector)
+    |> actor.returning(self)
+    |> Ok
+  }
+
+  result.map_error(result, string.inspect)
 }
 
 fn recv(state: State, msg: Message) -> actor.Next(State, Message) {
