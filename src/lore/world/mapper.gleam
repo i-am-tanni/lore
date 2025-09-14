@@ -71,7 +71,7 @@ const uncharted = [
   " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ",
 ]
 
-/// Generates a 5x5 map where `<>` is the player's position
+/// Generates a 5x5 map where `@` is the player's position
 /// 
 pub fn render_mini_map(
   name: process.Name(Message),
@@ -157,7 +157,6 @@ fn recv(state: State, msg: Message) -> actor.Next(State, Message) {
   actor.continue(state)
 }
 
-// Render a 5x5 mini-map where each map symbol is a character pair
 fn mini_map(state: State, room_id: Id(Room)) -> List(StringTree) {
   let State(nodes:, graph:) = state
   let result = {
