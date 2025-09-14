@@ -186,15 +186,3 @@ pub fn direction_to_string(direction: Direction) -> String {
     CustomExit(custom) -> custom
   }
 }
-
-pub fn string_to_direction(exit_keyword: String) -> Direction {
-  case exit_keyword {
-    "n" | "north" -> North
-    "s" | "south" -> South
-    "e" | "east" -> East
-    "w" | "west" -> West
-    "u" | "up" -> Up
-    "d" | "down" -> Down
-    custom -> CustomExit(custom)
-  }
-}
