@@ -232,7 +232,7 @@ fn neighbors(
 
         // for each room, get list of neighbor ids and filter unvisited
         // on this z-plane
-        let neighbors: List(MapNode) =
+        let neighbors =
           {
             use room_id <- list.flat_map(visiting)
             use neighbor_id <- list.filter_map(out_neighbors(graph, room_id))
@@ -248,10 +248,10 @@ fn neighbors(
           }
           |> list.unique()
 
-        let to_visit: List(Id(Room)) =
-          list.map(neighbors, fn(vertex) { vertex.id })
+        // list of ids next to visit
+        let visiting = list.map(neighbors, fn(vertex) { vertex.id })
 
-        #(DepthFirstSearch(visiting: to_visit, visited:), neighbors)
+        #(DepthFirstSearch(visiting:, visited:), neighbors)
       }
 
       _else_nothing_left_to_visit -> #(acc, [])
