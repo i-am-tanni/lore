@@ -221,10 +221,6 @@ fn neighbors(
   z_coord: Int,
   origin: Id(Room),
 ) -> List(MapNode) {
-  // init accumulator is a tuple pair #(a, b) where:
-  // - (a) is a list of vertexes to visit keyed by room_id
-  // - (b) is a set of previously visited rooms
-  //
   let init = DepthFirstSearch(visiting: [origin], visited: set.new())
   // for each iteration (depth) up to the max depth
   list.map_fold(list.range(0, max_depth), init, fn(acc, _) {
