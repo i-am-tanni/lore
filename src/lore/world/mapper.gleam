@@ -30,10 +30,6 @@ type MapNode {
   MapNode(id: Id(Room), symbol: String, x: Int, y: Int, z: Int)
 }
 
-type MapEdge {
-  MapEdge(from: Id(Room), to: Id(Room))
-}
-
 type Digraph
 
 type DoNotLeak
@@ -110,15 +106,14 @@ fn init(
         MapNode(id: world.Id(room_id), symbol:, x:, y:, z:)
       })
 
-    let edges =
-      list.map(edges, fn(edge) {
-        let sql.MapEdgesRow(from_room_id:, to_room_id:) = edge
-        MapEdge(from: world.Id(from_room_id), to: world.Id(to_room_id))
-      })
-
     let graph = digraph_new()
+
     list.each(nodes, fn(node) { digraph_add_vertex(graph, node.id) })
-    list.each(edges, fn(edge) { digraph_add_edge(graph, edge.from, edge.to) })
+
+    list.each(edges, fn(edge) {
+      let sql.MapEdgesRow(from_room_id:, to_room_id:) = edge
+      digraph_add_edge(graph, world.Id(from_room_id), world.Id(to_room_id))
+    })
 
     let nodes = list.map(nodes, fn(node) { #(node.id, node) }) |> dict.from_list
     let selector = process.new_selector() |> process.select(self)
