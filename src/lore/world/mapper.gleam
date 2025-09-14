@@ -209,6 +209,10 @@ fn mini_map(state: State, room_id: Id(Room)) -> List(StringTree) {
   |> list.map(string_tree.from_strings)
 }
 
+type DepthFirstSearch {
+  DepthFirstSearch(visiting: List(Id(Room)), visited: Set(Id(Room)))
+}
+
 // Depth first search neighbor ids.
 //
 fn neighbors(
@@ -221,12 +225,11 @@ fn neighbors(
   // - (a) is a list of vertexes to visit keyed by room_id
   // - (b) is a set of previously visited rooms
   //
-  let visiting: List(Id(Room)) = [origin]
-  let visited: Set(Id(Room)) = set.new()
+  let init = DepthFirstSearch(visiting: [origin], visited: set.new())
   // for each iteration (depth) up to the max depth
-  list.map_fold(list.range(0, max_depth), #(visiting, visited), fn(acc, _) {
+  list.map_fold(list.range(0, max_depth), init, fn(acc, _) {
     case acc {
-      #(visiting, visited) if visiting != [] -> {
+      DepthFirstSearch(visiting:, visited:) if visiting != [] -> {
         // first, update visited so the current visiting members are visited
         // only once.
         let visited = set.union(set.from_list(visiting), visited)
@@ -252,7 +255,7 @@ fn neighbors(
         let to_visit: List(Id(Room)) =
           list.map(neighbors, fn(vertex) { vertex.id })
 
-        #(#(to_visit, visited), neighbors)
+        #(DepthFirstSearch(visiting: to_visit, visited:), neighbors)
       }
 
       _else_nothing_left_to_visit -> #(acc, [])
