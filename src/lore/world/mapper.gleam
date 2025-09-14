@@ -225,42 +225,45 @@ fn neighbors(
   // - (a) is a list of vertexes to visit keyed by room_id
   // - (b) is a set of previously visited rooms
   //
-  let init = DepthFirstSearch(visiting: [origin], visited: set.new())
   // for each iteration (depth) up to the max depth
-  list.map_fold(list.range(0, max_depth), init, fn(acc, _) {
-    case acc {
-      DepthFirstSearch(visiting:, visited:) if visiting != [] -> {
-        // first, update visited so the current visiting members are visited
-        // only once.
-        let visited = set.union(set.from_list(visiting), visited)
+  list.map_fold(
+    list.range(0, max_depth),
+    DepthFirstSearch(visiting: [origin], visited: set.new()),
+    fn(acc, _) {
+      case acc {
+        DepthFirstSearch(visiting:, visited:) if visiting != [] -> {
+          // first, update visited so the current visiting members are visited
+          // only once.
+          let visited = set.union(set.from_list(visiting), visited)
 
-        // for each room, get list of neighbor ids and filter unvisited
-        // on this z-plane
-        let neighbors: List(MapNode) =
-          {
-            use room_id <- list.flat_map(visiting)
-            use neighbor_id <- list.filter_map(out_neighbors(graph, room_id))
-            use vertex <- result.try(dict.get(nodes, neighbor_id))
-            // reject if neighbor_id is on a different z-plane or already 
-            // visited.
-            use <- bool.guard(
-              vertex.z != z_coord || set.contains(visited, neighbor_id),
-              Error(Nil),
-            )
-            // ...else add to the list of nodes to visit the next iteration
-            Ok(vertex)
-          }
-          |> list.unique()
+          // for each room, get list of neighbor ids and filter unvisited
+          // on this z-plane
+          let neighbors: List(MapNode) =
+            {
+              use room_id <- list.flat_map(visiting)
+              use neighbor_id <- list.filter_map(out_neighbors(graph, room_id))
+              use vertex <- result.try(dict.get(nodes, neighbor_id))
+              // reject if neighbor_id is on a different z-plane or already 
+              // visited.
+              use <- bool.guard(
+                vertex.z != z_coord || set.contains(visited, neighbor_id),
+                Error(Nil),
+              )
+              // ...else add to the list of nodes to visit the next iteration
+              Ok(vertex)
+            }
+            |> list.unique()
 
-        let to_visit: List(Id(Room)) =
-          list.map(neighbors, fn(vertex) { vertex.id })
+          let to_visit: List(Id(Room)) =
+            list.map(neighbors, fn(vertex) { vertex.id })
 
-        #(DepthFirstSearch(visiting: to_visit, visited:), neighbors)
+          #(DepthFirstSearch(visiting: to_visit, visited:), neighbors)
+        }
+
+        _else_nothing_left_to_visit -> #(acc, [])
       }
-
-      _else_nothing_left_to_visit -> #(acc, [])
-    }
-  })
+    },
+  )
   |> pair.second()
   // each member is the list of neighbors for each iteration of the loop
   // and we'll flatten to get a list of all neighbors
