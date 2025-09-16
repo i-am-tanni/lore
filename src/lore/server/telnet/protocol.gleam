@@ -28,7 +28,7 @@ import lore/world/system_tables
 
 const max_input_buffer_size = 1024
 
-// Any messages received too quickly are dropped
+// Any inputs received too quickly are dropped
 const rate_limit_in_ms = 200
 
 // constants for telnet out of band communication
@@ -73,6 +73,8 @@ pub type ProtocolError {
   /// 
   InputBufferOverflow
 
+  /// Drop inputs that exceed rate_limit_in_ms
+  /// 
   RateLimitExceeded
 }
 
