@@ -10,10 +10,13 @@ import gleam/erlang/process.{type Selector, type Subject}
 import gleam/function.{tap}
 import gleam/list
 import gleam/option.{type Option, Some}
+import gleam/order
 import gleam/otp/actor
 import gleam/result
 import gleam/set.{type Set}
 import gleam/string_tree
+import gleam/time/duration
+import gleam/time/timestamp
 import glisten.{Packet, User}
 import glisten/tcp
 import logging
@@ -24,6 +27,9 @@ import lore/world/event.{type CharacterMessage}
 import lore/world/system_tables
 
 const max_input_buffer_size = 1024
+
+// Any messages received too quickly are dropped
+const rate_limit_in_ms = 200
 
 // constants for telnet out of band communication
 
@@ -66,6 +72,8 @@ pub type ProtocolError {
   /// too much memory.
   /// 
   InputBufferOverflow
+
+  RateLimitExceeded
 }
 
 pub type State {
@@ -83,6 +91,7 @@ pub type State {
     conn: glisten.Connection(character.Outgoing),
     ip_address: String,
     buffer: BitArray,
+    last_message_received: timestamp.Timestamp,
     options: Set(TelnetOption),
     window_size: WindowSize,
     endpoint: Subject(CharacterMessage),
@@ -135,6 +144,7 @@ pub fn init(
       conn: conn,
       ip_address: ip_address,
       buffer: <<>>,
+      last_message_received: timestamp.system_time(),
       options: set.new(),
       newline: False,
       endpoint: reception,
@@ -185,6 +195,11 @@ pub fn recv(
       log_error("Input is Unreadable", state.ip_address)
       shutdown(conn)
     }
+    Error(RateLimitExceeded) -> {
+      // Drop any messages that exceed the rate limit
+      State(..state, last_message_received: timestamp.system_time())
+      |> glisten.continue
+    }
   }
 }
 
@@ -201,14 +216,21 @@ fn initial_iacs(conn: glisten.Connection(a)) {
 }
 
 fn handle_packet(state: State, stream: BitArray) -> Result(State, ProtocolError) {
-  let parse_result =
+  use telnet.Parsed(options:, lines:, buffer:) <- result.try(
     telnet.parse(bit_array.append(state.buffer, stream))
-    |> result.replace_error(InputUnreadable)
-
-  use telnet.Parsed(options:, lines:, buffer:) <- result.try(parse_result)
+    |> result.replace_error(InputUnreadable),
+  )
   use <- bool.guard(
     bit_array.byte_size(buffer) > max_input_buffer_size,
     Error(InputBufferOverflow),
+  )
+  use <- bool.guard(
+    lines != []
+      && state.last_message_received
+    |> timestamp.add(duration.milliseconds(rate_limit_in_ms))
+    |> timestamp.compare(timestamp.system_time())
+      == order.Gt,
+    Error(RateLimitExceeded),
   )
 
   let subnegotiations =
@@ -219,7 +241,10 @@ fn handle_packet(state: State, stream: BitArray) -> Result(State, ProtocolError)
       }
     })
 
-  list.fold(lines, State(..state, buffer: buffer), fn(acc, line) {
+  let state =
+    State(..state, buffer:, last_message_received: timestamp.system_time())
+
+  list.fold(lines, state, fn(acc, line) {
     acc
     |> handle_options(options)
     |> handle_subnegotiations(subnegotiations)
