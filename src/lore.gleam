@@ -23,7 +23,6 @@ pub fn main() {
   let start_result = {
     use server_ip <- result.try(env_var("SERVER_IP"))
     use port <- result.try(env_var("PORT"))
-    let port = string_to_int(port)
     use database_name <- result.try(env_var("DB_NAME"))
 
     logging.configure()
@@ -52,7 +51,11 @@ pub fn main() {
       |> static_supervisor.add(
         supervision.supervisor(fn() { kickoff.supervised(system_tables) }),
       )
-      |> static_supervisor.add(telnet_supervised(server_ip, port, system_tables))
+      |> static_supervisor.add(telnet_supervised(
+        server_ip,
+        string_to_int(port),
+        system_tables,
+      ))
       |> static_supervisor.start()
       |> result.map_error(StartError),
     )
@@ -61,8 +64,7 @@ pub fn main() {
 
   case start_result {
     Ok(#(server_ip, port)) -> {
-      let start_msg =
-        "Server started! " <> server_ip <> ":" <> int.to_string(port)
+      let start_msg = "Server started! " <> server_ip <> ":" <> port
 
       logging.log(logging.Info, start_msg)
       process.sleep_forever()
