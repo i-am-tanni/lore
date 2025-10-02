@@ -40,25 +40,24 @@ pub fn main() {
         socials: process.new_name("socials"),
       )
 
-    use _ <- result.try(
-      static_supervisor.new(static_supervisor.OneForOne)
-      |> static_supervisor.add(start_database_connection(
-        system_tables.db,
-        database_name,
-      ))
-      |> static_supervisor.add(system_tables.supervised(system_tables))
-      |> static_supervisor.add(
-        supervision.supervisor(fn() { kickoff.supervised(system_tables) }),
-      )
-      |> static_supervisor.add(telnet_supervised(
-        server_ip,
-        string_to_int(port),
-        system_tables,
-      ))
-      |> static_supervisor.start()
-      |> result.map_error(StartError),
+    static_supervisor.new(static_supervisor.OneForOne)
+    |> static_supervisor.add(start_database_connection(
+      system_tables.db,
+      server_ip,
+      database_name,
+    ))
+    |> static_supervisor.add(system_tables.supervised(system_tables))
+    |> static_supervisor.add(
+      supervision.supervisor(fn() { kickoff.supervised(system_tables) }),
     )
-    Ok(#(server_ip, port))
+    |> static_supervisor.add(telnet_supervised(
+      server_ip,
+      string_to_int(port),
+      system_tables,
+    ))
+    |> static_supervisor.start()
+    |> result.map_error(StartError)
+    |> result.replace(#(server_ip, port))
   }
 
   case start_result {
@@ -91,11 +90,12 @@ fn telnet_supervised(
 
 pub fn start_database_connection(
   pool_name: process.Name(pog.Message),
+  server_ip: String,
   database_name: String,
 ) {
   let pool_child =
     pog.default_config(pool_name)
-    |> pog.host("127.0.0.1")
+    |> pog.host(server_ip)
     |> pog.database(database_name)
     |> pog.pool_size(15)
     |> pog.supervised
