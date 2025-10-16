@@ -25,22 +25,21 @@ import pog
 pub fn supervisor(
   system_tables: system_tables.Lookup,
 ) -> Result(actor.Started(static_supervisor.Supervisor), actor.StartError) {
-  let supervisor = static_supervisor.new(static_supervisor.OneForOne)
-  // Each zone gets a supervisor
   use zones <- result.try(
     load_zones(system_tables.db)
     |> result.map_error(fn(error) { actor.InitFailed(string.inspect(error)) }),
   )
 
-  zones
-  |> list.fold(supervisor, fn(acc, zone) {
+  static_supervisor.new(static_supervisor.OneForOne)
+  |> static_supervisor.add(
+    worker(fn() { items.start(system_tables.items, system_tables.db) }),
+  )
+  // Each zone gets a supervisor
+  |> list.fold(zones, _, fn(acc, zone) {
     static_supervisor.add(acc, zone_supervised(zone, system_tables))
   })
   |> static_supervisor.add(
     worker(fn() { mapper.start(system_tables.mapper, system_tables.db) }),
-  )
-  |> static_supervisor.add(
-    worker(fn() { items.start(system_tables.items, system_tables.db) }),
   )
   |> static_supervisor.start
 }
