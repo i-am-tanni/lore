@@ -17,7 +17,7 @@ pub fn init(conn: Conn, flash: SpawnFlash) -> Conn {
 
       conn
       |> conn.put_character(update)
-      |> conn.event(event.Rejoin)
+      |> conn.event(event.RejoinRoom)
     }
 
     Ok(_) -> conn

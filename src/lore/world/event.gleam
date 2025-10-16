@@ -89,7 +89,7 @@ pub type SpawnMobile {
   /// 
   SpawnMobile(
     endpoint: Option(process.Subject(Outgoing)),
-    character: world.MobileInternal,
+    mobile: world.MobileInternal,
   )
 }
 
@@ -169,7 +169,7 @@ pub type CharacterToRoomEvent {
   MoveArrive(MoveArriveData)
   ItemGet(keyword: String)
   ItemDrop(item_instance: world.ItemInstance)
-  Rejoin
+  RejoinRoom
   DoorToggle(DoorToggleData)
   DoorUpdateEnd(DoorUpdateData)
   RoomCommunication(RoomCommunicationData)

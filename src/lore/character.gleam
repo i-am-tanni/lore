@@ -7,6 +7,7 @@ import gleam/erlang/process.{type Subject}
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
+import gleam/otp/factory_supervisor
 import gleam/result
 import gleam/set.{type Set}
 import gleam/string
@@ -117,13 +118,26 @@ fn init_reception(
   |> Ok
 }
 
+/// Spawns a character supervised by the MobFactory. 
+/// The MobFactory will then call start_character().
+/// 
+pub fn spawn_supervised(
+  name: process.Name(system_tables.MobFactoryMessage),
+  endpoint: Option(process.Subject(Outgoing)),
+  mobile: world.MobileInternal,
+) -> Result(actor.Started(Subject(CharacterMessage)), actor.StartError) {
+  name
+  |> factory_supervisor.get_by_name
+  |> factory_supervisor.start_child(event.SpawnMobile(endpoint:, mobile:))
+}
+
 /// Starts a new character
 /// 
 pub fn start_character(
   data: event.SpawnMobile,
   system_tables system_tables: system_tables.Lookup,
 ) -> Result(actor.Started(Subject(CharacterMessage)), actor.StartError) {
-  let init = init_character(_, data.endpoint, data.character, system_tables)
+  let init = init_character(_, data.endpoint, data.mobile, system_tables)
 
   actor.new_with_initialiser(100, init)
   |> actor.on_message(handle_message)

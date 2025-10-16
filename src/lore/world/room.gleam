@@ -85,7 +85,7 @@ fn route_from_character(
     event.MoveArrive(data) -> move_event.arrive(builder, event, data)
     event.Look -> look_event.room_look(builder, event)
     event.LookAt(data) -> look_event.look_at(builder, event, data)
-    event.Rejoin -> move_event.rejoin(builder, event)
+    event.RejoinRoom -> move_event.rejoin(builder, event)
     event.DoorToggle(data) -> door_event.request(builder, event, data)
     event.DoorUpdateEnd(data) -> door_event.update(builder, event, data)
     event.RoomCommunication(data) -> comm_event.broadcast(builder, event, data)
