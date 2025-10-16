@@ -2,10 +2,12 @@
 //// into processes.
 //// 
 
+import gleam/bool
 import gleam/dict
 import gleam/erlang/process
 import gleam/list
 import gleam/option.{None, Some}
+import gleam/order
 import gleam/otp/actor
 import gleam/otp/static_supervisor
 import gleam/otp/supervision.{worker}
@@ -20,7 +22,7 @@ import lore/world/system_tables
 import lore/world/zone
 import pog
 
-pub fn supervised(
+pub fn supervisor(
   system_tables: system_tables.Lookup,
 ) -> Result(actor.Started(static_supervisor.Supervisor), actor.StartError) {
   let supervisor = static_supervisor.new(static_supervisor.OneForOne)
@@ -100,7 +102,11 @@ fn load_zones(
     list.map(rooms, fn(room) {
       let sql.RoomsRow(symbol:, x:, y:, z:, name:, description:, ..) = room
       let id = world.Id(room.room_id)
-      let exits = dict.get(exits, id) |> result.unwrap([])
+      let exits =
+        dict.get(exits, id)
+        |> result.unwrap([])
+        |> list.sort(fn(a, b) { direction_order(a.keyword, b.keyword) })
+
       world.Room(
         id:,
         zone_id: world.Id(room.zone_id),
@@ -131,5 +137,26 @@ fn string_to_direction(exit_keyword: String) -> world.Direction {
     "up" -> world.Up
     "down" -> world.Down
     custom -> world.CustomExit(custom)
+  }
+}
+
+fn direction_order(a: world.Direction, b: world.Direction) -> order.Order {
+  use <- bool.guard(a == b, order.Eq)
+  use <- bool.guard(a == world.North, order.Gt)
+  case direction_to_int(a) > direction_to_int(b) {
+    True -> order.Gt
+    False -> order.Lt
+  }
+}
+
+fn direction_to_int(direction: world.Direction) -> Int {
+  case direction {
+    world.North -> 1
+    world.South -> 2
+    world.East -> 3
+    world.West -> 4
+    world.Up -> 5
+    world.Down -> 6
+    world.CustomExit(_) -> 7
   }
 }

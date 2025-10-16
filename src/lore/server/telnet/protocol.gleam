@@ -23,7 +23,7 @@ import logging
 import lore/character
 import lore/server/output
 import lore/server/telnet.{Do, Dont, Will, Wont}
-import lore/world/event.{type CharacterMessage}
+import lore/world/event.{type CharacterMessage, type Outgoing}
 import lore/world/system_tables
 
 const max_input_buffer_size = 1024
@@ -90,7 +90,7 @@ pub type State {
   /// API, etc.
   /// 
   State(
-    conn: glisten.Connection(character.Outgoing),
+    conn: glisten.Connection(Outgoing),
     ip_address: String,
     buffer: BitArray,
     last_message_received: timestamp.Timestamp,
@@ -125,9 +125,9 @@ pub type TelnetOption {
 /// starts a new character actor for the player with the initial controller.
 /// 
 pub fn init(
-  conn: glisten.Connection(character.Outgoing),
+  conn: glisten.Connection(Outgoing),
   system_tables: system_tables.Lookup,
-) -> #(State, Option(Selector(character.Outgoing))) {
+) -> #(State, Option(Selector(Outgoing))) {
   let assert Ok(glisten.ConnectionInfo(ip_address:, ..)) =
     glisten.get_client_info(conn)
 
@@ -166,14 +166,14 @@ pub fn init(
 /// 
 pub fn recv(
   state: State,
-  msg: glisten.Message(character.Outgoing),
-  conn: glisten.Connection(character.Outgoing),
-) -> glisten.Next(State, glisten.Message(character.Outgoing)) {
+  msg: glisten.Message(Outgoing),
+  conn: glisten.Connection(Outgoing),
+) -> glisten.Next(State, glisten.Message(Outgoing)) {
   let result = case msg {
     Packet(msg) -> handle_packet(state, msg)
-    User(character.PushText(text)) -> Ok(push_text(state, text))
-    User(character.Reassign(subject:)) -> Ok(State(..state, endpoint: subject))
-    User(character.Halt(pid)) -> {
+    User(event.PushText(text)) -> Ok(push_text(state, text))
+    User(event.Reassign(subject:)) -> Ok(State(..state, endpoint: subject))
+    User(event.Halt(pid)) -> {
       case process.subject_owner(state.endpoint) {
         // shutdown if this would orphan the protocol from the endpoint
         Ok(endpoint) if pid == endpoint -> Ok(State(..state, continue: False))
@@ -363,8 +363,8 @@ fn push(conn: glisten.Connection(a), data: BytesTree) -> Nil {
 
 // terminate connection, self, and character
 fn shutdown(
-  conn: glisten.Connection(character.Outgoing),
-) -> glisten.Next(State, glisten.Message(character.Outgoing)) {
+  conn: glisten.Connection(Outgoing),
+) -> glisten.Next(State, glisten.Message(Outgoing)) {
   let _ = tcp.close(conn.socket)
   glisten.stop()
 }

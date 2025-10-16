@@ -2,18 +2,26 @@
 //// 
 
 import gleam/erlang/process
+import gleam/otp/factory_supervisor
 import gleam/otp/static_supervisor.{add}
 import gleam/otp/supervision.{worker}
 import lore/character/character_registry
 import lore/character/socials
 import lore/character/users
 import lore/world/communication
+import lore/world/event
 import lore/world/items
 import lore/world/mapper
 import lore/world/room/presence
 import lore/world/room/room_registry
 import lore/world/zone/zone_registry
 import pog
+
+pub type MobFactoryMessage =
+  factory_supervisor.Message(
+    event.SpawnMobile,
+    process.Subject(event.CharacterMessage),
+  )
 
 /// Record for looking up a registry name created at runtime.
 /// 
@@ -29,6 +37,8 @@ pub type Lookup {
   /// - Users: Get connected user information
   /// - Mapper: Generate ascii maps
   /// - Items: A table for exposing item data by id
+  /// - Socials: A table for canned emotes
+  /// - Mob Factory: The supervisor for spawning mobiles
   /// 
   Lookup(
     db: process.Name(pog.Message),
@@ -41,6 +51,7 @@ pub type Lookup {
     mapper: process.Name(mapper.Message),
     items: process.Name(items.Message),
     socials: process.Name(socials.Message),
+    mob_factory: process.Name(MobFactoryMessage),
   )
 }
 

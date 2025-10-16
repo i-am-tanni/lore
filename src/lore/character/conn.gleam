@@ -1,5 +1,5 @@
 //// A response builder for a request received by a character.
-//// Requests can be input from the portal, events from the world, notifications
+//// Requests can be input from the endpoint, events from the world, notifications
 //// that the character is off-cooldown, etc.
 //// 
 //// The outgoing response is expressed as a list of renders, events, and 
@@ -438,8 +438,9 @@ fn process_actions(conn: Conn, actions: List(event.Action)) -> Conn {
         True ->
           case perform(conn, next) {
             Ok(conn) -> process_actions(conn, rest)
-            // In the case of being able to act BUT failing the conditions, 
-            // clear the action queue and cancel any active global cooldown.
+            // In the case of being free to act BUT failing the conditions, 
+            // clear the action queue as the rest of the chain is likely
+            // dependent.
             Error(_reason) -> Conn(..conn, actions: [], cooldown: FreeToAct)
           }
 

@@ -55,10 +55,13 @@ pub fn render_report(
 ) -> View {
   let witness_id = witness.id
   case occurance, actee {
+    // if no victim
     ReportBasic(..), _ | ReportAdvanced(..), None ->
-      case witness_id == actor.id {
-        True -> report_simple_stringify(occurance.self, actor)
-        False -> report_simple_stringify(occurance.witness, actor)
+      case witness_id {
+        _ if witness_id == actor.id ->
+          report_simple_stringify(occurance.self, actor)
+
+        _ -> report_simple_stringify(occurance.witness, actor)
       }
 
     ReportAdvanced(victim:, self:, witness:), Some(actee) ->

@@ -28,7 +28,7 @@ pub type Controller {
 
 pub type LoginFlash {
   /// Score determines if a connection is terminated due to bad behavior
-  LoginFlash(stage: LoginStage, score: Int, name: String, portal: process.Pid)
+  LoginFlash(stage: LoginStage, score: Int, name: String, endpoint: process.Pid)
 }
 
 pub type CharacterFlash {

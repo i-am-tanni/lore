@@ -2,12 +2,14 @@ import envoy
 import gleam/erlang/process
 import gleam/io
 import gleam/otp/actor
+import gleam/otp/factory_supervisor
 import gleam/otp/static_supervisor
 import gleam/otp/supervision
 import gleam/result
 import gleam/string
 import glisten
 import logging
+import lore/character
 import lore/server/telnet/protocol
 import lore/world/kickoff
 import lore/world/system_tables
@@ -38,6 +40,7 @@ pub fn main() {
         users: process.new_name("users"),
         items: process.new_name("items"),
         socials: process.new_name("socials"),
+        mob_factory: process.new_name("mob_factory"),
       )
 
     static_supervisor.new(static_supervisor.OneForOne)
@@ -47,8 +50,9 @@ pub fn main() {
       database_name,
     ))
     |> static_supervisor.add(system_tables.supervised(system_tables))
+    |> static_supervisor.add(mob_factory_supervised(system_tables))
     |> static_supervisor.add(
-      supervision.supervisor(fn() { kickoff.supervised(system_tables) }),
+      supervision.supervisor(fn() { kickoff.supervisor(system_tables) }),
     )
     |> static_supervisor.add(telnet_supervised(
       server_ip,
@@ -112,3 +116,9 @@ fn env_var(name: String) -> Result(String, ServerStartError) {
 
 @external(erlang, "erlang", "binary_to_integer")
 fn string_to_int(string: String) -> Int
+
+fn mob_factory_supervised(system_tables: system_tables.Lookup) {
+  factory_supervisor.worker_child(character.start_character(_, system_tables))
+  |> factory_supervisor.named(system_tables.mob_factory)
+  |> factory_supervisor.supervised
+}

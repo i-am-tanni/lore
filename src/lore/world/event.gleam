@@ -33,10 +33,6 @@ pub type Priority {
   Low
 }
 
-pub type NoReply {
-  NoReply
-}
-
 pub fn is_priority_gt(a: Priority, b: Priority) -> Bool {
   compare_priority(a, b) == order.Gt
 }
@@ -84,6 +80,28 @@ pub type Action {
 /// 
 pub type Done {
   Done
+}
+
+/// A type provided to the mob factory to spawn a mobile
+/// 
+pub type SpawnMobile {
+  /// The endpoint is the (optional) connection controlling the character
+  /// 
+  SpawnMobile(
+    endpoint: Option(process.Subject(Outgoing)),
+    character: world.MobileInternal,
+  )
+}
+
+/// Outgoing messages from the character to a connection.
+/// 
+pub type Outgoing {
+  /// A text transmission to be pushed to the socket.
+  PushText(List(output.Text))
+  /// A signal that communicates connection should be terminated.
+  Halt(process.Pid)
+  /// Reassigns connection to a new character.
+  Reassign(subject: Subject(CharacterMessage))
 }
 
 /// This is a request that is received by the character process

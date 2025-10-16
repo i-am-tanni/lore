@@ -57,7 +57,7 @@ fn find_nth_loop(
   }
 }
 
-pub fn find_amount(
+pub fn filter_take(
   in list: List(a),
   up_to num_elements: Int,
   one_that is_desired: fn(a) -> Bool,
@@ -79,7 +79,7 @@ pub fn find_with_most_keywords(
   // this is basically a list.max_until() that early returns on a perfect score
   list.fold_until(list, #(0, Error(Nil)), fn(acc, x) {
     let score = list.count(keywords, match_fun(x, _))
-    // eary return on a perfect score
+    // early return on a perfect score
     use <- bool.lazy_guard(score == perfect_score, fn() {
       Stop(#(perfect_score, Ok(x)))
     })

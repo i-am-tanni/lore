@@ -15,7 +15,7 @@ import pog
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type DoorsRow {
-  DoorsRow(door_id: Int, access_state: AccessState)
+  DoorsRow(door_id: Int, access_state: AccessState, is_active: Bool)
 }
 
 /// Runs the `doors` query
@@ -30,10 +30,11 @@ pub fn doors(
   let decoder = {
     use door_id <- decode.field(0, decode.int)
     use access_state <- decode.field(1, access_state_decoder())
-    decode.success(DoorsRow(door_id:, access_state:))
+    use is_active <- decode.field(2, decode.bool)
+    decode.success(DoorsRow(door_id:, access_state:, is_active:))
   }
 
-  "SELECT * from door;"
+  "SELECT * from door WHERE is_active = TRUE;"
   |> pog.query
   |> pog.returning(decoder)
   |> pog.execute(db)
@@ -79,7 +80,14 @@ pub fn exits(
     ))
   }
 
-  "SELECT * from exit;"
+  "SELECT 
+  exit_id, 
+  keyword, 
+  from_room_id,
+  to_room_id, 
+  door_id
+FROM exit
+WHERE is_active = TRUE;"
   |> pog.query
   |> pog.returning(decoder)
   |> pog.execute(db)

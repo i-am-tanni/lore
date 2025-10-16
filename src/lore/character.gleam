@@ -1,5 +1,5 @@
 //// An actor for a player or non-player.
-//// Receives input from the portal and events from the world, then processes
+//// Receives input from the endpoint and events from the world, then processes
 //// them in request-response cycle.
 //// 
 
@@ -21,7 +21,7 @@ import lore/character/pronoun
 import lore/server/output
 import lore/world.{Id, Player}
 import lore/world/communication
-import lore/world/event.{type CharacterMessage}
+import lore/world/event.{type CharacterMessage, type Outgoing}
 import lore/world/room/room_registry
 import lore/world/system_tables
 
@@ -32,7 +32,7 @@ type State {
   State(
     character: world.MobileInternal,
     controller: Controller,
-    portal: Option(Subject(Outgoing)),
+    endpoint: Option(Subject(Outgoing)),
     self: Subject(CharacterMessage),
     cooldown: conn.GlobalCooldown,
     actions: List(event.Action),
@@ -42,33 +42,22 @@ type State {
   )
 }
 
-/// Outgoing messages from the character to a connection.
-/// 
-pub type Outgoing {
-  /// A text transmission to be pushed to the socket.
-  PushText(List(output.Text))
-  /// A signal that communicates connection should be terminated.
-  Halt(process.Pid)
-  /// Reassigns connection to a new character.
-  Reassign(subject: Subject(event.CharacterMessage))
-}
-
 /// 
 // Action queue data is held in this struct temporarily before constructing the 
 // next State.
-type ActionsSummary {
-  ActionsSummary(cooldown: conn.GlobalCooldown, actions: List(event.Action))
+type ActionSummary {
+  ActionSummary(cooldown: conn.GlobalCooldown, actions: List(event.Action))
 }
 
 /// When a connection is received, this starts the login sequence.
 /// 
 pub fn start_reception(
-  portal: Subject(Outgoing),
+  endpoint: Subject(Outgoing),
   system_tables: system_tables.Lookup,
 ) -> Result(actor.Started(Subject(CharacterMessage)), actor.StartError) {
   logging.log(logging.Info, "Player process started")
 
-  let init = init_reception(_, portal, system_tables)
+  let init = init_reception(_, endpoint, system_tables)
 
   actor.new_with_initialiser(1000, init)
   |> actor.on_message(handle_message)
@@ -77,22 +66,22 @@ pub fn start_reception(
 
 fn init_reception(
   self: process.Subject(CharacterMessage),
-  portal: Subject(Outgoing),
+  endpoint: Subject(Outgoing),
   system_tables: system_tables.Lookup,
 ) -> Result(
   actor.Initialised(State, CharacterMessage, Subject(CharacterMessage)),
   String,
 ) {
-  use portal_pid <- result.try(
-    process.subject_owner(portal)
-    |> result.replace_error("Portal has no associated pid."),
+  use endpoint_pid <- result.try(
+    process.subject_owner(endpoint)
+    |> result.replace_error("endpoint has no associated pid."),
   )
   let login_controller =
     controller.LoginFlash(
       score: 120,
       name: "",
       stage: controller.LoginName,
-      portal: portal_pid,
+      endpoint: endpoint_pid,
     )
     |> controller.Login
 
@@ -111,8 +100,8 @@ fn init_reception(
     )
 
   State(
-    portal: Some(portal),
     self:,
+    endpoint: Some(endpoint),
     character: dummy_character,
     controller: login_controller,
     cooldown: conn.FreeToAct,
@@ -131,19 +120,19 @@ fn init_reception(
 /// Starts a new character
 /// 
 pub fn start_character(
-  portal: Option(Subject(Outgoing)),
-  character: world.MobileInternal,
+  data: event.SpawnMobile,
   system_tables system_tables: system_tables.Lookup,
 ) -> Result(actor.Started(Subject(CharacterMessage)), actor.StartError) {
-  let initialiser = init_character(_, portal, character, system_tables)
-  actor.new_with_initialiser(100, initialiser)
+  let init = init_character(_, data.endpoint, data.character, system_tables)
+
+  actor.new_with_initialiser(100, init)
   |> actor.on_message(handle_message)
   |> actor.start
 }
 
 fn init_character(
   self: process.Subject(CharacterMessage),
-  portal: Option(Subject(Outgoing)),
+  endpoint: Option(Subject(Outgoing)),
   character: world.MobileInternal,
   system_tables: system_tables.Lookup,
 ) -> Result(
@@ -158,7 +147,7 @@ fn init_character(
 
   State(
     self:,
-    portal:,
+    endpoint:,
     character:,
     controller: spawn_controller,
     cooldown: conn.FreeToAct,
@@ -242,30 +231,33 @@ fn handle_message(
 // process a response to a request that was built up by the conn builder
 //
 fn handle_response(response: conn.Response, state: State) -> State {
-  // send output if there is a portal and something to send
+  // send output if there is a endpoint and something to send
   push_text(state, response.output)
 
   // Handle any change over in character
   let #(halt, reassign_endpoint) = case response.next_character {
     Some(character) -> {
       let assert Ok(actor.Started(data: new_subject, ..)) =
-        start_character(state.portal, character, state.system_tables)
+        start_character(
+          event.SpawnMobile(state.endpoint, character),
+          state.system_tables,
+        )
       #(True, Some(new_subject))
     }
 
     None -> #(response.halt, response.reassign_endpoint)
   }
 
-  // Handle any messages to be sent to the portal
-  case state.portal {
-    Some(portal) -> {
+  // Handle any messages to be sent to the endpoint
+  case state.endpoint {
+    Some(endpoint) -> {
       case reassign_endpoint {
-        Some(subject) -> process.send(portal, Reassign(subject))
+        Some(subject) -> process.send(endpoint, event.Reassign(subject))
         None -> Nil
       }
 
       case halt {
-        True -> process.send(portal, Halt(process.self()))
+        True -> process.send(endpoint, event.Halt(process.self()))
         False -> Nil
       }
     }
@@ -292,7 +284,7 @@ fn handle_response(response: conn.Response, state: State) -> State {
   let _ = push_events(response.events, character.room_id, system_tables.room)
 
   // Get cooldown status and updated action queue information
-  let ActionsSummary(cooldown:, actions:) = update_actions(response, state)
+  let ActionSummary(cooldown:, actions:) = update_actions(response, state)
 
   let #(is_controller_updated, controller) = case response.next_controller {
     Some(next) -> #(True, next)
@@ -302,7 +294,7 @@ fn handle_response(response: conn.Response, state: State) -> State {
   let updated_state =
     State(
       self: state.self,
-      portal: state.portal,
+      endpoint: state.endpoint,
       controller:,
       character:,
       cooldown:,
@@ -319,10 +311,11 @@ fn handle_response(response: conn.Response, state: State) -> State {
   }
 }
 
-// Pushes text to the portal assuming one is available
+// Pushes text to the endpoint assuming one is available
 fn push_text(state: State, output: List(output.Text)) -> Nil {
-  case state.portal {
-    Some(portal) if output != [] -> actor.send(portal, PushText(output))
+  case state.endpoint {
+    Some(endpoint) if output != [] ->
+      actor.send(endpoint, event.PushText(output))
     _ -> Nil
   }
 }
@@ -367,18 +360,18 @@ fn update_controller(state: State, next_controller: Controller) -> State {
 
 // returns updated action queue information based on response
 //
-fn update_actions(response: conn.Response, state: State) -> ActionsSummary {
+fn update_actions(response: conn.Response, state: State) -> ActionSummary {
   let response_actions = response.actions
 
   case is_cooldown_match(response.cooldown, state.cooldown) {
     // If there was no change in coooldown status and no response actions
     // return state values..
     True if response_actions == [] ->
-      ActionsSummary(cooldown: state.cooldown, actions: state.actions)
+      ActionSummary(cooldown: state.cooldown, actions: state.actions)
 
     // ..else if there WERE response actions
     True ->
-      ActionsSummary(
+      ActionSummary(
         cooldown: state.cooldown,
         actions: list.append(state.actions, response_actions),
       )
@@ -386,7 +379,7 @@ fn update_actions(response: conn.Response, state: State) -> ActionsSummary {
     // ..else if cooldown status changed,
     // override action queue with actions from response
     False ->
-      ActionsSummary(cooldown: response.cooldown, actions: response_actions)
+      ActionSummary(cooldown: response.cooldown, actions: response_actions)
   }
 }
 

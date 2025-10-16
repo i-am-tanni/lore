@@ -1,1 +1,1 @@
-SELECT * from door;
+SELECT * from door WHERE is_active = TRUE;
