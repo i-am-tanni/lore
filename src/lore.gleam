@@ -51,6 +51,8 @@ pub fn main() {
     ))
     |> static_supervisor.add(system_tables.supervised(system_tables))
     |> static_supervisor.add(mob_factory_supervised(system_tables))
+    // kickoff is as a lazy function b/c its dependent on the system tables
+    // being available.
     |> static_supervisor.add(
       supervision.supervisor(fn() { kickoff.supervisor(system_tables) }),
     )

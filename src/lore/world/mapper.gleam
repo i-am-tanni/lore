@@ -12,7 +12,7 @@ import gleam/set.{type Set}
 import gleam/string
 import gleam/string_tree.{type StringTree}
 import logging
-import lore/world.{type Id, type Room}
+import lore/world.{type Id, type Room, Id}
 import lore/world/sql
 import pog
 
@@ -103,7 +103,7 @@ fn init(
     let nodes =
       list.map(nodes, fn(node) {
         let sql.MapNodesRow(room_id:, symbol:, x:, y:, z:) = node
-        MapNode(id: world.Id(room_id), symbol:, x:, y:, z:)
+        MapNode(id: Id(room_id), symbol:, x:, y:, z:)
       })
 
     let graph = digraph_new()
@@ -112,7 +112,7 @@ fn init(
 
     list.each(edges, fn(edge) {
       let sql.MapEdgesRow(from_room_id:, to_room_id:) = edge
-      digraph_add_edge(graph, world.Id(from_room_id), world.Id(to_room_id))
+      digraph_add_edge(graph, Id(from_room_id), Id(to_room_id))
     })
 
     let nodes = list.map(nodes, fn(node) { #(node.id, node) }) |> dict.from_list
