@@ -1,13 +1,12 @@
 //// An actor for a player or non-player.
 //// Receives input from the endpoint and events from the world, then processes
 //// them in request-response cycle.
-//// 
+////
 
 import gleam/erlang/process.{type Subject}
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
-import gleam/otp/factory_supervisor
 import gleam/result
 import gleam/set.{type Set}
 import gleam/string
@@ -43,15 +42,15 @@ type State {
   )
 }
 
-/// 
-// Action queue data is held in this struct temporarily before constructing the 
+///
+// Action queue data is held in this struct temporarily before constructing the
 // next State.
 type ActionSummary {
   ActionSummary(cooldown: conn.GlobalCooldown, actions: List(event.Action))
 }
 
 /// When a connection is received, this starts the login sequence.
-/// 
+///
 pub fn start_reception(
   endpoint: Subject(Outgoing),
   system_tables: system_tables.Lookup,
@@ -118,21 +117,8 @@ fn init_reception(
   |> Ok
 }
 
-/// Spawns a character supervised by the MobFactory. 
-/// The MobFactory will then call start_character().
-/// 
-pub fn spawn_supervised(
-  name: process.Name(system_tables.MobFactoryMessage),
-  endpoint: Option(process.Subject(Outgoing)),
-  mobile: world.MobileInternal,
-) -> Result(actor.Started(Subject(CharacterMessage)), actor.StartError) {
-  name
-  |> factory_supervisor.get_by_name
-  |> factory_supervisor.start_child(event.SpawnMobile(endpoint:, mobile:))
-}
-
 /// Starts a new character
-/// 
+///
 pub fn start_character(
   data: event.SpawnMobile,
   system_tables system_tables: system_tables.Lookup,
@@ -234,6 +220,12 @@ fn handle_message(
       }
 
     event.Chat(data) -> on_controller_message(state, controller.Chat(data))
+
+    event.ServerRequestedShutdown ->
+      new_conn(state)
+      |> conn.terminate
+      |> conn.to_response
+      |> handle_response(state)
   }
 
   case state.continue {

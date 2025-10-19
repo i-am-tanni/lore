@@ -1,6 +1,6 @@
 //// This module contains the code to run the sql queries defined in
 //// `./src/lore/world/sql`.
-//// > 🐿️ This module was generated automatically using v4.4.1 of
+//// > 🐿️ This module was generated automatically using v4.4.2 of
 //// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ////
 
@@ -11,7 +11,7 @@ import pog
 /// A row you get from running the `doors` query
 /// defined in `./src/lore/world/sql/doors.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.1 of the
+/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type DoorsRow {
@@ -21,7 +21,7 @@ pub type DoorsRow {
 /// Runs the `doors` query
 /// defined in `./src/lore/world/sql/doors.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.1 of
+/// > 🐿️ This function was generated automatically using v4.4.2 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn doors(
@@ -34,7 +34,8 @@ pub fn doors(
     decode.success(DoorsRow(door_id:, access_state:, is_active:))
   }
 
-  "SELECT * from door WHERE is_active = TRUE;"
+  "SELECT * from door WHERE is_active = TRUE;
+"
   |> pog.query
   |> pog.returning(decoder)
   |> pog.execute(db)
@@ -43,7 +44,7 @@ pub fn doors(
 /// A row you get from running the `exits` query
 /// defined in `./src/lore/world/sql/exits.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.1 of the
+/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type ExitsRow {
@@ -59,7 +60,7 @@ pub type ExitsRow {
 /// Runs the `exits` query
 /// defined in `./src/lore/world/sql/exits.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.1 of
+/// > 🐿️ This function was generated automatically using v4.4.2 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn exits(
@@ -80,14 +81,15 @@ pub fn exits(
     ))
   }
 
-  "SELECT 
-  exit_id, 
-  keyword, 
+  "SELECT
+  exit_id,
+  keyword,
   from_room_id,
-  to_room_id, 
+  to_room_id,
   door_id
 FROM exit
-WHERE is_active = TRUE;"
+WHERE is_active = TRUE;
+"
   |> pog.query
   |> pog.returning(decoder)
   |> pog.execute(db)
@@ -96,7 +98,7 @@ WHERE is_active = TRUE;"
 /// A row you get from running the `items` query
 /// defined in `./src/lore/world/sql/items.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.1 of the
+/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type ItemsRow {
@@ -112,7 +114,7 @@ pub type ItemsRow {
 /// Runs the `items` query
 /// defined in `./src/lore/world/sql/items.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.1 of
+/// > 🐿️ This function was generated automatically using v4.4.2 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn items(
@@ -127,7 +129,8 @@ pub fn items(
     decode.success(ItemsRow(item_id:, name:, short:, long:, keywords:))
   }
 
-  "SELECT * from item;"
+  "SELECT * from item;
+"
   |> pog.query
   |> pog.returning(decoder)
   |> pog.execute(db)
@@ -136,7 +139,7 @@ pub fn items(
 /// A row you get from running the `map_edges` query
 /// defined in `./src/lore/world/sql/map_edges.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.1 of the
+/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type MapEdgesRow {
@@ -146,7 +149,7 @@ pub type MapEdgesRow {
 /// Runs the `map_edges` query
 /// defined in `./src/lore/world/sql/map_edges.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.1 of
+/// > 🐿️ This function was generated automatically using v4.4.2 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn map_edges(
@@ -167,7 +170,7 @@ pub fn map_edges(
 /// A row you get from running the `map_nodes` query
 /// defined in `./src/lore/world/sql/map_nodes.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.1 of the
+/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type MapNodesRow {
@@ -177,7 +180,7 @@ pub type MapNodesRow {
 /// Runs the `map_nodes` query
 /// defined in `./src/lore/world/sql/map_nodes.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.1 of
+/// > 🐿️ This function was generated automatically using v4.4.2 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn map_nodes(
@@ -198,10 +201,97 @@ pub fn map_nodes(
   |> pog.execute(db)
 }
 
+/// A row you get from running the `mob_spawns` query
+/// defined in `./src/lore/world/sql/mob_spawns.sql`.
+///
+/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub type MobSpawnsRow {
+  MobSpawnsRow(
+    mob_spawn_id: Int,
+    spawn_group_id: Int,
+    mobile_id: Int,
+    room_id: Int,
+  )
+}
+
+/// Runs the `mob_spawns` query
+/// defined in `./src/lore/world/sql/mob_spawns.sql`.
+///
+/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub fn mob_spawns(
+  db: pog.Connection,
+) -> Result(pog.Returned(MobSpawnsRow), pog.QueryError) {
+  let decoder = {
+    use mob_spawn_id <- decode.field(0, decode.int)
+    use spawn_group_id <- decode.field(1, decode.int)
+    use mobile_id <- decode.field(2, decode.int)
+    use room_id <- decode.field(3, decode.int)
+    decode.success(MobSpawnsRow(
+      mob_spawn_id:,
+      spawn_group_id:,
+      mobile_id:,
+      room_id:,
+    ))
+  }
+
+  "SELECT * from mob_spawn;
+"
+  |> pog.query
+  |> pog.returning(decoder)
+  |> pog.execute(db)
+}
+
+/// A row you get from running the `mobile_by_id` query
+/// defined in `./src/lore/world/sql/mobile_by_id.sql`.
+///
+/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub type MobileByIdRow {
+  MobileByIdRow(
+    mobile_id: Int,
+    room_id: Int,
+    name: String,
+    short: String,
+    keywords: List(String),
+  )
+}
+
+/// Runs the `mobile_by_id` query
+/// defined in `./src/lore/world/sql/mobile_by_id.sql`.
+///
+/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub fn mobile_by_id(
+  db: pog.Connection,
+  arg_1: Int,
+) -> Result(pog.Returned(MobileByIdRow), pog.QueryError) {
+  let decoder = {
+    use mobile_id <- decode.field(0, decode.int)
+    use room_id <- decode.field(1, decode.int)
+    use name <- decode.field(2, decode.string)
+    use short <- decode.field(3, decode.string)
+    use keywords <- decode.field(4, decode.list(decode.string))
+    decode.success(MobileByIdRow(mobile_id:, room_id:, name:, short:, keywords:))
+  }
+
+  "SELECT * from mobile where mobile_id = $1;
+"
+  |> pog.query
+  |> pog.parameter(pog.int(arg_1))
+  |> pog.returning(decoder)
+  |> pog.execute(db)
+}
+
 /// A row you get from running the `rooms` query
 /// defined in `./src/lore/world/sql/rooms.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.1 of the
+/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type RoomsRow {
@@ -220,7 +310,7 @@ pub type RoomsRow {
 /// Runs the `rooms` query
 /// defined in `./src/lore/world/sql/rooms.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.1 of
+/// > 🐿️ This function was generated automatically using v4.4.2 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn rooms(
@@ -247,7 +337,8 @@ pub fn rooms(
     ))
   }
 
-  "SELECT * from room;"
+  "SELECT * from room;
+"
   |> pog.query
   |> pog.returning(decoder)
   |> pog.execute(db)
@@ -256,7 +347,7 @@ pub fn rooms(
 /// A row you get from running the `rooms_by_zone_id` query
 /// defined in `./src/lore/world/sql/rooms_by_zone_id.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.1 of the
+/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type RoomsByZoneIdRow {
@@ -275,7 +366,7 @@ pub type RoomsByZoneIdRow {
 /// Runs the `rooms_by_zone_id` query
 /// defined in `./src/lore/world/sql/rooms_by_zone_id.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.1 of
+/// > 🐿️ This function was generated automatically using v4.4.2 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn rooms_by_zone_id(
@@ -304,7 +395,8 @@ pub fn rooms_by_zone_id(
   }
 
   "SELECT * from room
-WHERE zone_id = $1"
+WHERE zone_id = $1
+"
   |> pog.query
   |> pog.parameter(pog.int(arg_1))
   |> pog.returning(decoder)
@@ -314,7 +406,7 @@ WHERE zone_id = $1"
 /// A row you get from running the `socials` query
 /// defined in `./src/lore/world/sql/socials.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.1 of the
+/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type SocialsRow {
@@ -333,7 +425,7 @@ pub type SocialsRow {
 /// Runs the `socials` query
 /// defined in `./src/lore/world/sql/socials.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.1 of
+/// > 🐿️ This function was generated automatically using v4.4.2 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn socials(
@@ -360,8 +452,53 @@ pub fn socials(
     ))
   }
 
-  "SELECT command, char_auto, char_no_arg, char_found, others_auto, others_found, others_no_arg, vict_found 
-FROM social"
+  "SELECT command, char_auto, char_no_arg, char_found, others_auto, others_found, others_no_arg, vict_found
+FROM social
+"
+  |> pog.query
+  |> pog.returning(decoder)
+  |> pog.execute(db)
+}
+
+/// A row you get from running the `spawn_groups` query
+/// defined in `./src/lore/world/sql/spawn_groups.sql`.
+///
+/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub type SpawnGroupsRow {
+  SpawnGroupsRow(
+    spawn_group_id: Int,
+    reset_freq: Int,
+    is_enabled: Bool,
+    is_despawn_on_reset: Bool,
+  )
+}
+
+/// Runs the `spawn_groups` query
+/// defined in `./src/lore/world/sql/spawn_groups.sql`.
+///
+/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub fn spawn_groups(
+  db: pog.Connection,
+) -> Result(pog.Returned(SpawnGroupsRow), pog.QueryError) {
+  let decoder = {
+    use spawn_group_id <- decode.field(0, decode.int)
+    use reset_freq <- decode.field(1, decode.int)
+    use is_enabled <- decode.field(2, decode.bool)
+    use is_despawn_on_reset <- decode.field(3, decode.bool)
+    decode.success(SpawnGroupsRow(
+      spawn_group_id:,
+      reset_freq:,
+      is_enabled:,
+      is_despawn_on_reset:,
+    ))
+  }
+
+  "SELECT * FROM spawn_group;
+"
   |> pog.query
   |> pog.returning(decoder)
   |> pog.execute(db)
@@ -370,7 +507,7 @@ FROM social"
 /// A row you get from running the `zones` query
 /// defined in `./src/lore/world/sql/zones.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.1 of the
+/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type ZonesRow {
@@ -380,7 +517,7 @@ pub type ZonesRow {
 /// Runs the `zones` query
 /// defined in `./src/lore/world/sql/zones.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.1 of
+/// > 🐿️ This function was generated automatically using v4.4.2 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn zones(
@@ -402,7 +539,7 @@ pub fn zones(
 
 /// Corresponds to the Postgres `access_state` enum.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.1 of the
+/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type AccessState {

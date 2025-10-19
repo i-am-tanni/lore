@@ -1,6 +1,6 @@
 //// A process for loading zones into memory and then spinning them up
 //// into processes.
-//// 
+////
 
 import gleam/bool
 import gleam/dict
@@ -13,7 +13,7 @@ import gleam/otp/static_supervisor
 import gleam/otp/supervision.{worker}
 import gleam/result
 import gleam/string
-import lore/world
+import lore/world.{Id}
 import lore/world/items
 import lore/world/mapper
 import lore/world/room
@@ -49,10 +49,10 @@ fn zone_supervised(
   system_tables: system_tables.Lookup,
 ) -> supervision.ChildSpecification(static_supervisor.Supervisor) {
   static_supervisor.new(static_supervisor.OneForOne)
-  |> static_supervisor.add(worker(fn() { zone.start(zone, system_tables) }))
   |> list.fold(zone.rooms, _, fn(acc, room) {
     static_supervisor.add(acc, worker(fn() { room.start(room, system_tables) }))
   })
+  |> static_supervisor.add(worker(fn() { zone.start(zone, system_tables) }))
   |> static_supervisor.supervised
 }
 
@@ -64,6 +64,8 @@ fn load_zones(
   use pog.Returned(rows: rooms, ..) <- result.try(sql.rooms(db))
   use pog.Returned(rows: doors, ..) <- result.try(sql.doors(db))
   use pog.Returned(rows: exits, ..) <- result.try(sql.exits(db))
+  use pog.Returned(rows: mob_spawns, ..) <- result.try(sql.mob_spawns(db))
+  use pog.Returned(rows: spawn_groups, ..) <- result.try(sql.spawn_groups(db))
 
   let doors =
     list.map(doors, fn(door) {
@@ -121,8 +123,49 @@ fn load_zones(
       )
     })
 
+  let mob_spawns =
+    list.fold(mob_spawns, dict.new(), fn(acc, spawn) {
+      let sql.MobSpawnsRow(mob_spawn_id:, spawn_group_id:, mobile_id:, room_id:) =
+        spawn
+
+      let mob_spawn =
+        world.MobSpawn(
+          spawn_id: Id(mob_spawn_id),
+          mobile_id: Id(mobile_id),
+          room_id: Id(room_id),
+        )
+      case dict.get(acc, spawn_group_id) {
+        Ok(list) -> dict.insert(acc, spawn_group_id, [mob_spawn, ..list])
+        Error(Nil) -> dict.insert(acc, spawn_group_id, [mob_spawn])
+      }
+    })
+
+  let spawn_groups =
+    list.map(spawn_groups, fn(group) {
+      let sql.SpawnGroupsRow(
+        spawn_group_id:,
+        reset_freq:,
+        is_enabled:,
+        is_despawn_on_reset:,
+      ) = group
+
+      world.SpawnGroup(
+        id: Id(spawn_group_id),
+        reset_freq:,
+        is_enabled:,
+        is_despawn_on_reset:,
+        members: dict.get(mob_spawns, spawn_group_id) |> result.unwrap([]),
+        instances: [],
+      )
+    })
+
   list.map(zones, fn(zone) {
-    world.Zone(id: world.Id(zone.zone_id), name: zone.name, rooms:)
+    world.Zone(
+      id: world.Id(zone.zone_id),
+      name: zone.name,
+      rooms:,
+      spawn_groups:,
+    )
   })
   |> Ok
 }

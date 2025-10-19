@@ -1,11 +1,11 @@
 //// Events are the primary means by which messages are passed between
 //// characters, rooms, zones, which are running concurrently to one another.
-//// 
+////
 //// Message == a Wrapper for types a process can receive
 //// - CharacterMessage
 //// - RoomMessage
 //// - ZoneMessage
-//// 
+////
 //// Event is an Event type
 
 import gleam/erlang/process.{type Subject}
@@ -18,7 +18,7 @@ import lore/world.{
 }
 
 /// This type is the primary means by which units of concurrency (Mobiles,
-/// Rooms, Zones, etc.) communicate. The event represents the incoming 
+/// Rooms, Zones, etc.) communicate. The event represents the incoming
 /// event and response represents the type the sender is expecting to receive
 /// back.
 ///
@@ -60,12 +60,12 @@ fn priority_to_int(priority: Priority) -> Int {
 /// A lazy CharacterToRoomEvent that consumes time to perform.
 /// Condition is required to pass in order to perform. Examples:
 /// - For crafts, does the character have the requisite components?
-/// - Is the character in the right position to perform the action? 
-/// 
+/// - Is the character in the right position to perform the action?
+///
 pub type Action {
   /// Priority determines cancellability of the current action.
   /// Delay determines the cooldown time in ms after the action is performed.
-  /// 
+  ///
   Action(
     id: StringId(Action),
     condition: fn(world.MobileInternal) -> Result(world.MobileInternal, String),
@@ -75,18 +75,18 @@ pub type Action {
   )
 }
 
-/// A type that returns the completion status of an event sent via 
+/// A type that returns the completion status of an event sent via
 /// `process.call`.
-/// 
+///
 pub type Done {
   Done
 }
 
 /// A type provided to the mob factory to spawn a mobile
-/// 
+///
 pub type SpawnMobile {
   /// The endpoint is the (optional) connection controlling the character
-  /// 
+  ///
   SpawnMobile(
     endpoint: Option(process.Subject(Outgoing)),
     mobile: world.MobileInternal,
@@ -94,7 +94,7 @@ pub type SpawnMobile {
 }
 
 /// Outgoing messages from the character to a connection.
-/// 
+///
 pub type Outgoing {
   /// A text transmission to be pushed to the socket.
   PushText(List(output.Text))
@@ -106,23 +106,26 @@ pub type Outgoing {
 
 /// This is a request that is received by the character process
 /// to be turned into a response via a Conn builder.
-/// 
+///
 pub type CharacterMessage {
   /// Text input is received from a connection
-  /// 
+  ///
   UserSentCommand(text: String)
-  /// A message received form a room will be checked to confirm that the 
+  /// A message received form a room will be checked to confirm that the
   /// character is in the room the event was received from, otherwise it will
   /// be automatically discarded.
-  /// 
+  ///
   RoomSent(received: FromRoom, from: Id(Room))
-  /// A timed signal sent by the character themself to trigger the next action 
+  /// A timed signal sent by the character themself to trigger the next action
   /// in the queue.
-  /// 
+  ///
   CooldownExpired(id: StringId(Action))
   /// A notification was received
-  /// 
+  ///
   Chat(ChatData)
+  /// Server wants the character to despawn or otherwise halt
+  ///
+  ServerRequestedShutdown
 }
 
 pub type FromRoom {
@@ -131,7 +134,7 @@ pub type FromRoom {
 }
 
 /// The wrapper type for messages that can be received by a Room.
-/// 
+///
 pub type RoomMessage {
   CharacterToRoom(event: Event(CharacterToRoomEvent, CharacterMessage))
   RoomToRoom(event: Event(RoomToRoomEvent, RoomMessage))
@@ -141,13 +144,13 @@ pub type RoomMessage {
 }
 
 /// A wrapper type for messages that can be received by a Zone.
-/// 
+///
 pub type ZoneMessage {
   RoomToZone(event: Event(ZoneEvent, RoomMessage))
 }
 
 /// An event that a character can receive
-/// 
+///
 pub type CharacterEvent {
   MoveNotifyArrive(NotifyArriveData)
   MoveNotifyDepart(NotifyDepartData)
@@ -176,13 +179,13 @@ pub type CharacterToRoomEvent {
 }
 
 /// The zone polls the desination room whether it accepts or rejects the move.
-/// 
+///
 pub type PollEvent {
   MovePoll(character: Mobile)
 }
 
 /// An event that occurs synchronously between rooms via a call from the zone.
-/// 
+///
 pub type InterRoomEvent {
   MoveDepart(MoveDepartData)
   DoorUpdateBegin(DoorUpdateData)
@@ -261,10 +264,10 @@ pub type ChatData {
 }
 
 /// Zones are a sync point for inter-room events like movement and doors.
-/// 
+///
 pub type ZoneEvent {
   /// Polls the destination room and syncs the move commit upon approval
-  /// 
+  ///
   MoveKickoff(MoveKickoffData)
   DoorSync(DoorSyncData)
 }
@@ -280,8 +283,8 @@ pub type MoveKickoffData {
 }
 
 /// Data sent to the zone for the purpose of syncing matching door sides in two
-/// different rooms together. 
-/// 
+/// different rooms together.
+///
 pub type DoorSyncData {
   DoorSyncData(
     from: Subject(CharacterMessage),

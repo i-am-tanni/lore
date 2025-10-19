@@ -221,6 +221,7 @@ pub fn put_flash(conn: Conn, flash: Controller) -> Result(Conn, Nil) {
 /// Renders text without a newline.
 /// 
 pub fn render(conn: Conn, view: View) -> Conn {
+  use <- bool.guard(!conn.is_player, conn)
   let text = output.Text(text: view.to_string_tree(view), newline: False)
   Conn(..conn, output: [text, ..conn.output])
 }
@@ -228,6 +229,7 @@ pub fn render(conn: Conn, view: View) -> Conn {
 /// Renders text with a newline.
 /// 
 pub fn renderln(conn: Conn, view: View) -> Conn {
+  use <- bool.guard(!conn.is_player, conn)
   let text = output.Text(text: view.to_string_tree(view), newline: True)
   Conn(..conn, output: [text, ..conn.output])
 }

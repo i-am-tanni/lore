@@ -25,7 +25,7 @@ pub fn recv(
     controller.RoomToCharacter(event) if is_player ->
       events.route_player(conn, event)
 
-    controller.RoomToCharacter(_) -> conn
+    controller.RoomToCharacter(event) -> events.route_npc(conn, event)
 
     controller.Chat(data) if is_player ->
       conn

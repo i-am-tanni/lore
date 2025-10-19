@@ -1,14 +1,20 @@
 import gleam/erlang/process.{type Subject}
+import gleam/list
 import gleam/otp/actor
 import lore/world.{type Zone}
 import lore/world/event.{type ZoneMessage, RoomToZone}
 import lore/world/system_tables
 import lore/world/zone/events/door_event
 import lore/world/zone/events/move_event
+import lore/world/zone/spawner
 import lore/world/zone/zone_registry
 
 pub type State {
-  State(zone: Zone, system_tables: system_tables.Lookup)
+  State(
+    zone: Zone,
+    system_tables: system_tables.Lookup,
+    spawn_groups: List(world.SpawnGroup),
+  )
 }
 
 pub fn start(
@@ -29,7 +35,10 @@ fn init(
 
   zone_registry.register(system_tables.zone, zone.id, self)
 
-  State(zone, system_tables)
+  let spawn_groups =
+    list.map(zone.spawn_groups, spawner.reset_group(_, system_tables))
+
+  State(zone:, system_tables:, spawn_groups:)
   |> actor.initialised()
   |> actor.returning(self)
   |> Ok

@@ -7,13 +7,13 @@ import lore/character/pronoun
 pub type RoomTemplate
 
 /// An id from the database.
-/// 
+///
 pub type Id(a) {
   Id(Int)
 }
 
 /// An id generated during runtime.
-/// 
+///
 pub type StringId(a) {
   StringId(String)
 }
@@ -28,7 +28,12 @@ pub type ChatChannel {
 }
 
 pub type Zone {
-  Zone(id: Id(Zone), name: String, rooms: List(Room))
+  Zone(
+    id: Id(Zone),
+    name: String,
+    rooms: List(Room),
+    spawn_groups: List(SpawnGroup),
+  )
 }
 
 pub type Room {
@@ -77,7 +82,7 @@ pub type AccessState {
 }
 
 /// Public mobile data relating to a mobile instance.
-/// 
+///
 pub type Mobile {
   Mobile(
     id: StringId(Mobile),
@@ -91,7 +96,7 @@ pub type Mobile {
 }
 
 /// Private internal mobile data.
-/// 
+///
 pub type MobileInternal {
   MobileInternal(
     id: StringId(Mobile),
@@ -130,19 +135,38 @@ pub type Load {
 }
 
 /// An instance of an item. Uses a flyweight pattern to retrieve data.
-/// 
+///
 pub type ItemInstance {
   ItemInstance(id: StringId(ItemInstance), keywords: List(String), item: Load)
 }
 
+pub type SpawnGroup {
+  /// - is_despawn_on_reset: determines if the spawn group will despawn all
+  /// active instances on reset or whether it will only spawn inactives
+  /// - reset_freq: in milliseconds, how often the spawn group will reset
+  ///
+  SpawnGroup(
+    id: Id(SpawnGroup),
+    members: List(Spawn),
+    instances: List(#(Id(Spawn), StringId(Mobile))),
+    reset_freq: Int,
+    is_enabled: Bool,
+    is_despawn_on_reset: Bool,
+  )
+}
+
+pub type Spawn {
+  MobSpawn(spawn_id: Id(Spawn), mobile_id: Id(Npc), room_id: Id(Room))
+}
+
 /// Generates random 32 bit base-16 encoded string identifier.
-/// 
+///
 /// ## Example
 /// ```gleam
 /// id.generate()
 /// // -> 3D40AD6B
 /// ```
-/// 
+///
 pub fn generate_id() -> StringId(a) {
   list.range(1, 4)
   |> list.map(fn(_) { <<int.random(256)>> })
@@ -162,7 +186,7 @@ pub type ErrorRoomRequest {
 }
 
 /// An error type defining all the ways a move from one room to another can fail
-/// 
+///
 pub type ErrorMove {
   Unauthorized
   DoorNotOpen(direction: Direction, state: AccessState)
@@ -185,4 +209,17 @@ pub fn direction_to_string(direction: Direction) -> String {
     Down -> "down"
     CustomExit(custom) -> custom
   }
+}
+
+pub fn test_npc() -> MobileInternal {
+  MobileInternal(
+    id: StringId("1F"),
+    room_id: Id(1),
+    template_id: Npc(Id(99)),
+    name: "A silly test NPC",
+    keywords: ["silly", "test", "npc"],
+    pronouns: pronoun.Masculine,
+    short: "A test npc is standing here.",
+    inventory: [],
+  )
 }

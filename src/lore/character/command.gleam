@@ -19,6 +19,7 @@ import lore/character/view/error_view
 import lore/character/view/item_view
 import lore/world
 import lore/world/event
+import lore/world/mob_factory
 import lore/world/system_tables
 import party.{type Parser, any_char, char, string}
 
@@ -37,6 +38,7 @@ type Verb {
   Who
   Get
   Drop
+  Spawn
   Inventory
 }
 
@@ -103,6 +105,7 @@ fn parser(conn: Conn) -> Parser(Conn, e) {
       inventory_command,
       no_args(Inventory, "inventory", ["i", "inv"]),
     ),
+    command(conn, spawn_command, no_args(Spawn, "spawn", [])),
     command(conn, quit_command, no_args(Quit, "quit", ["q"])),
     social(conn),
   ])
@@ -242,6 +245,12 @@ fn drop_command(conn: Conn, command: Command(Verb, String)) -> Conn {
 fn who_command(conn: Conn, _command: Command(Verb, Nil)) -> Conn {
   let system_tables.Lookup(users:, ..) = conn.system_tables(conn)
   conn.render(conn, character_view.who_list(users.players_logged_in(users)))
+}
+
+fn spawn_command(conn: Conn, _command: Command(Verb, Nil)) -> Conn {
+  let system_tables.Lookup(mob_factory:, ..) = conn.system_tables(conn)
+  let _ = mob_factory.start_child(mob_factory, world.test_npc())
+  conn
 }
 
 pub fn social(conn: Conn) -> Parser(Conn, e) {

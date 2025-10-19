@@ -119,7 +119,7 @@ fn env_var(name: String) -> Result(String, ServerStartError) {
 @external(erlang, "erlang", "binary_to_integer")
 fn string_to_int(string: String) -> Int
 
-fn mob_factory_supervised(system_tables: system_tables.Lookup) {
+pub fn mob_factory_supervised(system_tables: system_tables.Lookup) {
   factory_supervisor.worker_child(character.start_character(_, system_tables))
   |> factory_supervisor.named(system_tables.mob_factory)
   |> factory_supervisor.supervised

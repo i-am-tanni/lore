@@ -21,6 +21,7 @@ pub fn route_player(
       conn
       |> conn.renderln(error_view.room_request_error(reason))
       |> conn.prompt()
+
     event.MoveNotifyArrive(data) -> move_event.notify_arrive(conn, event, data)
     event.MoveNotifyDepart(data) -> move_event.notify_depart(conn, event, data)
     event.MoveCommit(data) -> move_event.move_commit(conn, event, data)
@@ -30,6 +31,31 @@ pub fn route_player(
     event.ItemGetNotify(item) -> item_event.get(conn, event, item)
     event.ItemDropNotify(item) -> item_event.drop(conn, event, item)
     event.ItemInspect(item) -> item_event.look_at(conn, item)
+    event.MobileInspectRequest(by: requester) ->
+      conn.character_event(
+        conn,
+        event.MobileInspectResponse(conn.get_character(conn)),
+        send: requester,
+      )
+
+    event.MobileInspectResponse(character:) ->
+      conn
+      |> conn.renderln(character_view.look_at(character))
+      |> conn.prompt()
+  }
+}
+
+pub fn route_npc(conn: Conn, event: Event(CharacterEvent, RoomMessage)) -> Conn {
+  case event.data {
+    event.ActFailed(_) -> conn
+    event.MoveNotifyArrive(_) -> conn
+    event.MoveNotifyDepart(_) -> conn
+    event.MoveCommit(data) -> move_event.move_commit(conn, event, data)
+    event.DoorNotify(_) -> conn
+    event.Communication(_) -> conn
+    event.ItemGetNotify(item) -> item_event.get(conn, event, item)
+    event.ItemDropNotify(item) -> item_event.drop(conn, event, item)
+    event.ItemInspect(_) -> conn
     event.MobileInspectRequest(by: requester) ->
       conn.character_event(
         conn,
