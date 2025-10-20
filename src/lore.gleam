@@ -51,8 +51,7 @@ pub fn main() {
     ))
     |> static_supervisor.add(system_tables.supervised(system_tables))
     |> static_supervisor.add(mob_factory_supervised(system_tables))
-    // kickoff is as a lazy function b/c its dependent on the system tables
-    // being available.
+    // kickoff is a lazy function b/c its dependent on the db being available
     |> static_supervisor.add(
       supervision.supervisor(fn() { kickoff.supervisor(system_tables) }),
     )
@@ -116,11 +115,11 @@ fn env_var(name: String) -> Result(String, ServerStartError) {
   |> result.replace_error(MissingEnvVar(name))
 }
 
-@external(erlang, "erlang", "binary_to_integer")
-fn string_to_int(string: String) -> Int
-
 pub fn mob_factory_supervised(system_tables: system_tables.Lookup) {
   factory_supervisor.worker_child(character.start_character(_, system_tables))
   |> factory_supervisor.named(system_tables.mob_factory)
   |> factory_supervisor.supervised
 }
+
+@external(erlang, "erlang", "binary_to_integer")
+fn string_to_int(string: String) -> Int
