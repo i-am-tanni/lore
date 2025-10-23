@@ -24,6 +24,6 @@ connection at `src/lore/server/telnet/protocol.gleam`.
 - ✅ Postgres
 - ✅ Socials
 - ✅ Mobile spawns
+- ✅ Item spawns
 - ⬜ Basic Combat
 - ⬜ Spawn groups with resets
-- ⬜ Item spawns

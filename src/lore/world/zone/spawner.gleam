@@ -199,7 +199,7 @@ fn generate_item(
   |> Ok()
 }
 
-// reject any members of list
+// reject any members of list b in list a
 fn reject_spawn_ids(
   spawns: List(world.MobSpawn),
   rejects: List(Id(world.MobSpawn)),
