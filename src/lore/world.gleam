@@ -216,16 +216,3 @@ pub fn direction_to_string(direction: Direction) -> String {
     CustomExit(custom) -> custom
   }
 }
-
-pub fn test_npc() -> MobileInternal {
-  MobileInternal(
-    id: StringId("1F"),
-    room_id: Id(1),
-    template_id: Npc(Id(99)),
-    name: "A silly test NPC",
-    keywords: ["silly", "test", "npc"],
-    pronouns: pronoun.Masculine,
-    short: "A test npc is standing here.",
-    inventory: [],
-  )
-}

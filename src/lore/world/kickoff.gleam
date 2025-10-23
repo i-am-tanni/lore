@@ -180,12 +180,7 @@ fn load_zones(
     })
 
   list.map(zones, fn(zone) {
-    world.Zone(
-      id: world.Id(zone.zone_id),
-      name: zone.name,
-      rooms:,
-      spawn_groups:,
-    )
+    world.Zone(id: Id(zone.zone_id), name: zone.name, rooms:, spawn_groups:)
   })
   |> Ok
 }
