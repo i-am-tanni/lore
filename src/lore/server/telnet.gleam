@@ -1,15 +1,15 @@
 //// A library for parsing telnet streams.
-//// 
-//// Original Copyright (c) 2019 Eric Oestrich: 
+////
+//// Original Copyright (c) 2019 Eric Oestrich:
 //// [[Source]](https://github.com/oestrich/telnet-elixir)
 //// [[MIT License]](https://github.com/oestrich/telnet-elixir?tab=MIT-1-ov-file#readme)
-//// 
+////
 //// Ported to Gleam and modified.
-//// 
+////
 //// TCP is a byte stream protocol. We could receive a single character or
 //// multiple lines of text. In addition, we have out of band information
 //// that can be communicated via an IAC byte.
-//// 
+////
 
 import gleam/bit_array
 import gleam/bytes_tree.{type BytesTree}
@@ -20,37 +20,37 @@ import gleam/string
 
 /// Types that can be parsed out of a telnet stream. Anything which is not
 /// text is considered out-of-band.
-/// 
+///
 pub type TelnetCommand {
   /// Offer a telnet option
-  /// 
+  ///
   Will(Int)
   /// Communicate a telnet option is not available
-  /// 
+  ///
   Wont(Int)
   /// Request a telnet option
-  /// 
+  ///
   Do(Int)
   /// Decline a telnet option
-  /// 
+  ///
   Dont(Int)
   /// Send a command with no effect
-  /// 
+  ///
   NoOperation
   /// Text provided in-band
-  /// 
+  ///
   Text(BitArray)
   /// Unknown option received
-  /// 
+  ///
   Unknown
   /// Subnegotiation
-  /// 
+  ///
   Sub(Subnegotiation)
 }
 
 pub type Subnegotiation {
   /// Negotiate About Window Size
-  /// 
+  ///
   Naws(width: Int, height: Int)
 }
 
@@ -64,9 +64,9 @@ pub type ParseError {
   SubNegotiationEndNotFound
 }
 
-/// Output returned by the parser result. Buffer is any incomplete data to be 
+/// Output returned by the parser result. Buffer is any incomplete data to be
 /// prepended to the next packet.
-/// 
+///
 pub type Parsed {
   Parsed(options: List(TelnetCommand), lines: List(String), buffer: BitArray)
 }
@@ -74,7 +74,7 @@ pub type Parsed {
 // interpret as command: marks beginning of out-of-band data
 const iac = 255
 
-// subnegotiation begin: mark sending or receiving subnegotiation out-of-band 
+// subnegotiation begin: mark sending or receiving subnegotiation out-of-band
 // (non-text) data
 const sb = 250
 
@@ -111,7 +111,7 @@ const ascii_del = 127
 /// Capture any text and completed telnet commands. Stash any incompleted
 /// telnet commands that may be split between separate packets, then
 /// buffer and prepend any split information to the next packet received.
-/// 
+///
 pub fn parse(stream: BitArray) -> Result(Parsed, ParseError) {
   use #(parsed, leftover) <- result.try(parse_loop(stream, None, [], stream))
 
@@ -278,7 +278,7 @@ fn is_text(x: TelnetCommand) -> Bool {
 // Returns a pair with a list of full lines as string and any incomplete lines
 // as a bitarray.
 // Warning! Reverses the list which is intended behavior.
-// 
+//
 fn partition_lines(text: List(BitArray)) -> #(List(String), BitArray) {
   partition_lines_loop(
     text,
@@ -367,7 +367,7 @@ fn partition_lines_loop(
 fn has_newline(text: BitArray) -> Bool {
   case text {
     <<>> -> False
-    <<"\r\n", _:bits>> | <<"\n", _:bits>> | <<"\n\r", _:bits>> -> True
+    <<"\r\n", _:bits>> | <<"\n\r", _:bits>> | <<"\n", _:bits>> -> True
     <<_:size(8), rest:bits>> -> has_newline(rest)
     _ -> False
   }

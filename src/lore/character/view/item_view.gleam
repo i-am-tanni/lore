@@ -19,7 +19,7 @@ pub fn inventory(
     })
     |> list.map(fn(item) { string_tree.from_strings(["  ", item.name]) })
 
-  case list.length(items) > 0 {
+  case items != [] {
     True ->
       [string_tree.from_string("You are carrying:"), ..items]
       |> string_tree.join("\n")

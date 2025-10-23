@@ -18,7 +18,7 @@ pub type PerspectiveSimple {
 /// - Leaf - wraps a single string
 /// - Leaves - wraps a list of strings
 /// - Tree - wraps a StringTree
-/// 
+///
 pub type View {
   /// A single string.
   Leaf(String)
@@ -39,9 +39,9 @@ pub type View {
 /// - $N - Victim name
 /// - $E - Victim he / she
 /// - $M - Victim him / her
-/// - $S - Victim his / her 
+/// - $S - Victim his / her
 /// - $MSELF - Victim himself, herself
-/// 
+///
 pub type Report {
   ReportBasic(self: String, witness: String)
   ReportAdvanced(self: String, witness: String, victim: String)
@@ -125,20 +125,20 @@ fn report_simple_loop(
         bytes_tree.append_string(acc, pronouns.his),
       )
 
-    // him / hers type pronouns
-    <<"$m", rest:bits>> ->
-      report_simple_loop(
-        rest,
-        subject,
-        bytes_tree.append_string(acc, pronouns.him),
-      )
-
     // himself / herself type pronouns
     <<"$mself", rest:bits>> ->
       report_simple_loop(
         rest,
         subject,
         bytes_tree.append_string(acc, pronouns.himself),
+      )
+
+    // him / hers type pronouns
+    <<"$m", rest:bits>> ->
+      report_simple_loop(
+        rest,
+        subject,
+        bytes_tree.append_string(acc, pronouns.him),
       )
 
     <<x:8, rest:bits>> ->
@@ -206,20 +206,20 @@ fn report_advanced_loop(
         bytes_tree.append_string(acc, subject_pronouns.his),
       )
 
-    <<"$m", rest:bits>> ->
-      report_advanced_loop(
-        rest,
-        subject,
-        victim,
-        bytes_tree.append_string(acc, subject_pronouns.him),
-      )
-
     <<"$mself", rest:bits>> ->
       report_advanced_loop(
         rest,
         subject,
         victim,
         bytes_tree.append_string(acc, subject_pronouns.himself),
+      )
+
+    <<"$m", rest:bits>> ->
+      report_advanced_loop(
+        rest,
+        subject,
+        victim,
+        bytes_tree.append_string(acc, subject_pronouns.him),
       )
 
     <<"$N", rest:bits>> ->
@@ -246,20 +246,20 @@ fn report_advanced_loop(
         bytes_tree.append_string(acc, victim_pronouns.his),
       )
 
-    <<"$M", rest:bits>> ->
-      report_advanced_loop(
-        rest,
-        subject,
-        victim,
-        bytes_tree.append_string(acc, victim_pronouns.him),
-      )
-
     <<"$MSELF", rest:bits>> ->
       report_advanced_loop(
         rest,
         subject,
         victim,
         bytes_tree.append_string(acc, victim_pronouns.himself),
+      )
+
+    <<"$M", rest:bits>> ->
+      report_advanced_loop(
+        rest,
+        subject,
+        victim,
+        bytes_tree.append_string(acc, victim_pronouns.him),
       )
 
     <<x:8, rest:bits>> ->
@@ -270,7 +270,7 @@ fn report_advanced_loop(
 }
 
 /// Converts a View to a StringTree
-/// 
+///
 pub fn to_string_tree(view: View) -> StringTree {
   case view {
     Leaf(string) -> string_tree.from_string(string)
@@ -296,7 +296,7 @@ pub fn perspective_simple(
 
 /// Splits a string into a list of strings where each string in the list
 /// will not exceed the given line length and no words are broken up.
-/// 
+///
 pub fn word_wrap(s: String, line_length: Int) -> List(String) {
   word_wrap_loop(
     process: bit_array.from_string(s),
@@ -317,7 +317,7 @@ fn word_wrap_loop(
   not_to_exceed line_length: Int,
 ) -> List(String) {
   case text, acc, curr_line, curr_word {
-    // if there is no more text to process, migrates any remaining framgments 
+    // if there is no more text to process, migrates any remaining framgments
     // to the current / next line and returns the accumulator
     <<>>, lines, [], [] ->
       lines
@@ -335,7 +335,7 @@ fn word_wrap_loop(
       )
 
     <<>>, lines, curr_line, curr_word ->
-      // Since there's nothing left to process, push the current word to the 
+      // Since there's nothing left to process, push the current word to the
       // stack.
       //
       push_word(<<>>, lines, curr_line, curr_word, num_graphemes, line_length)
@@ -352,7 +352,7 @@ fn word_wrap_loop(
       )
 
     <<" ", rest:bits>>, lines, curr_line, curr_word ->
-      // If space is encounted, the current word is complete. Push onto the 
+      // If space is encounted, the current word is complete. Push onto the
       // stack.
       push_word(rest, lines, curr_line, curr_word, num_graphemes, line_length)
 
@@ -375,7 +375,7 @@ fn word_wrap_loop(
 // Pushes a word onto the current line as long as it fits.
 // If it doesn't fit, attempt a hyphenation and push the remainder onto a new
 // line.
-// ..else, push the current line to the accumulator and start a new line with 
+// ..else, push the current line to the accumulator and start a new line with
 // the given word.
 //
 fn push_word(
@@ -396,7 +396,7 @@ fn push_word(
       // if the line_length is exceeded, attempt to hyphenate
       case hyphenate(word, with: num_graphemes, not_to_exceed: line_length) {
         // if a hyphenation is possible, push the hyphenated segement to the
-        // current line, and then push that line to the accumulator. Then 
+        // current line, and then push that line to the accumulator. Then
         // start a new line with the remainding word fragment.
         Ok(#(take, remainder)) -> {
           let line = list.reverse([take, ..curr_line])
