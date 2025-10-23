@@ -1,16 +1,24 @@
+//// SpawnGroups are essentially encounters that can reset on a timer.
+////
+
 import gleam/bool
 import gleam/list
 import gleam/otp/actor
 import gleam/pair
 import gleam/result.{try}
+import gleam/set
 import lore/character/character_registry
 import lore/character/pronoun
+import lore/character/users
 import lore/world.{
   type Id, type Mobile, type Npc, type Room, type SpawnGroup, Id, MobSpawn,
   SpawnGroup,
 }
 import lore/world/event
+import lore/world/items
 import lore/world/mob_factory
+import lore/world/room/presence
+import lore/world/room/room_registry
 import lore/world/sql
 import lore/world/system_tables
 import pog
@@ -27,17 +35,46 @@ pub fn reset_group(
 ) -> SpawnGroup {
   use <- bool.guard(!group.is_enabled, group)
   case group.is_despawn_on_reset {
-    True -> reset_with_despawn(group, system_tables)
-    False -> reset(group, system_tables)
+    True ->
+      group
+      |> reset_mobs_with_despawn(system_tables)
+      |> reset_items(system_tables)
+
+    False ->
+      group
+      |> reset_mobs(system_tables)
+      |> reset_items(system_tables)
   }
 }
 
-fn reset(group: SpawnGroup, system_tables: system_tables.Lookup) -> SpawnGroup {
+pub fn reset_items(
+  group: SpawnGroup,
+  system_tables: system_tables.Lookup,
+) -> SpawnGroup {
+  let item_instances =
+    list.filter_map(group.item_members, fn(member) {
+      use item <- try(generate_item(member.item_id, system_tables))
+      use room_subject <- try(room_registry.whereis(
+        system_tables.room,
+        member.room_id,
+      ))
+      actor.send(room_subject, event.SpawnItem(item))
+      #(member.spawn_id, item.id)
+      |> Ok
+    })
+
+  SpawnGroup(..group, item_instances:)
+}
+
+fn reset_mobs(
+  group: SpawnGroup,
+  system_tables: system_tables.Lookup,
+) -> SpawnGroup {
   let registry = system_tables.character
-  let SpawnGroup(instances:, members:, ..) = group
+  let SpawnGroup(mob_instances:, mob_members:, ..) = group
 
   let active_instances =
-    list.filter_map(instances, fn(instance) {
+    list.filter_map(mob_instances, fn(instance) {
       let #(_, instance_id) = instance
       use _ <- try(character_registry.whereis(registry, instance_id))
       Ok(instance)
@@ -45,54 +82,79 @@ fn reset(group: SpawnGroup, system_tables: system_tables.Lookup) -> SpawnGroup {
 
   let active_spawn_ids = list.map(active_instances, pair.first)
 
-  let instances =
-    // filter for inactive spawns
-    list.filter(members, fn(member) {
-      !list.contains(active_spawn_ids, member.spawn_id)
-    })
-    // then spawn inactives
-    |> list.filter_map(fn(spawn) {
-      let MobSpawn(spawn_id:, mobile_id:, room_id:) = spawn
-      let db = pog.named_connection(system_tables.db)
-      use mobile <- try(generate_mobile(db, mobile_id, in: room_id))
-      use _ <- try(
-        mob_factory.start_child(system_tables.mob_factory, mobile)
-        |> result.map_error(NotStarted),
-      )
-      Ok(#(spawn_id, mobile.id))
-    })
+  let mob_instances =
+    mob_members
+    |> reject_spawn_ids(active_spawn_ids)
+    |> spawn_mobs(system_tables)
     |> list.append(active_instances)
 
-  SpawnGroup(..group, instances:)
+  SpawnGroup(..group, mob_instances:)
 }
 
-fn reset_with_despawn(
+fn reset_mobs_with_despawn(
   group: SpawnGroup,
   system_tables: system_tables.Lookup,
 ) -> SpawnGroup {
-  let registry = system_tables.character
-  let SpawnGroup(instances:, members:, ..) = group
+  let character_registry = system_tables.character
+  let presence = system_tables.presence
+  let SpawnGroup(mob_instances:, mob_members:, ..) = group
+
+  // Instance must be in a room depopulated of players to despawn
+  let rooms_occupied_by_player = {
+    users.players_logged_in(system_tables.users)
+    |> list.filter_map(fn(user) {
+      use room_id <- try(presence.lookup(presence, user.id))
+      Ok(room_id)
+    })
+    |> set.from_list
+  }
+
+  let #(cannot_despawn, can_despawn) =
+    list.partition(mob_instances, fn(instance) {
+      let #(_, instance_id) = instance
+      case presence.lookup(presence, instance_id) {
+        Ok(room_id) -> set.contains(rooms_occupied_by_player, room_id)
+        Error(Nil) -> False
+      }
+    })
 
   // despawn instances
-  list.each(instances, fn(instance) {
+  list.each(can_despawn, fn(instance) {
     let #(_, instance_id) = instance
-    use subject <- try(character_registry.whereis(registry, instance_id))
+    use subject <- try(character_registry.whereis(
+      character_registry,
+      instance_id,
+    ))
     Ok(actor.send(subject, event.ServerRequestedShutdown))
   })
 
-  let instances =
-    list.filter_map(members, fn(spawn) {
-      let MobSpawn(spawn_id:, mobile_id:, room_id:) = spawn
-      let db = pog.named_connection(system_tables.db)
-      use mobile <- try(generate_mobile(db, mobile_id, in: room_id))
-      use _ <- try(
-        mob_factory.start_child(system_tables.mob_factory, mobile)
-        |> result.map_error(NotStarted),
-      )
-      Ok(#(spawn_id, mobile.id))
-    })
+  let cannot_despawn_ids = list.map(cannot_despawn, pair.first)
 
-  SpawnGroup(..group, instances:)
+  let mob_instances =
+    mob_members
+    |> reject_spawn_ids(cannot_despawn_ids)
+    |> spawn_mobs(system_tables)
+    |> list.append(cannot_despawn)
+
+  SpawnGroup(..group, mob_instances:)
+}
+
+fn spawn_mobs(
+  to_spawn: List(world.MobSpawn),
+  system_tables: system_tables.Lookup,
+) -> List(#(Id(world.MobSpawn), world.StringId(Mobile))) {
+  let db = pog.named_connection(system_tables.db)
+  let mob_factory = system_tables.mob_factory
+
+  list.filter_map(to_spawn, fn(spawn) {
+    let MobSpawn(spawn_id:, mobile_id:, room_id:) = spawn
+    use mobile <- try(generate_mobile(db, mobile_id, in: room_id))
+    use _ <- try(
+      mob_factory.start_child(mob_factory, mobile)
+      |> result.map_error(NotStarted),
+    )
+    Ok(#(spawn_id, mobile.id))
+  })
 }
 
 fn generate_mobile(
@@ -122,4 +184,30 @@ fn to_mobile(row: sql.MobileByIdRow, room_id: Id(Room)) -> world.MobileInternal 
     short: row.short,
     inventory: [],
   )
+}
+
+fn generate_item(
+  item_id: Id(world.Item),
+  system_tables: system_tables.Lookup,
+) -> Result(world.ItemInstance, Nil) {
+  use item <- try(items.load(system_tables.items, item_id))
+  world.ItemInstance(
+    id: world.generate_id(),
+    item: world.Loading(item_id),
+    keywords: item.keywords,
+  )
+  |> Ok()
+}
+
+// reject any members of list
+fn reject_spawn_ids(
+  spawns: List(world.MobSpawn),
+  rejects: List(Id(world.MobSpawn)),
+) -> List(world.MobSpawn) {
+  case rejects != [] {
+    True ->
+      list.filter(spawns, fn(spawn) { !list.contains(rejects, spawn.spawn_id) })
+
+    False -> spawns
+  }
 }

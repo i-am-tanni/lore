@@ -1,6 +1,6 @@
 /// An actor for a room process, which serves as a synchronization point
 /// for physical actions and tracks the room state.
-/// 
+///
 import gleam/erlang/process.{type Subject}
 import gleam/list
 import gleam/otp/actor
@@ -24,7 +24,7 @@ pub type State {
 }
 
 /// Starts a room and registers it.
-/// 
+///
 pub fn start(
   room: Room,
   system_tables: system_tables.Lookup,
@@ -68,7 +68,11 @@ fn recv(state: State, msg: RoomMessage) -> actor.Next(State, RoomMessage) {
       let update = world.Room(..room, characters:)
       State(..state, room: update)
     }
-    _ -> state
+    event.SpawnItem(item_instance) -> {
+      let world.Room(items:, ..) as room = state.room
+      State(..state, room: world.Room(..room, items: [item_instance, ..items]))
+    }
+    event.RoomToRoom(..) -> state
   }
 
   actor.continue(state)

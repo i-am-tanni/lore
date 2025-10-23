@@ -1,5 +1,5 @@
 //// Tracks users logged in, connections, disconnections.
-//// 
+////
 
 import gleam/bool
 import gleam/dict.{type Dict}
@@ -15,14 +15,14 @@ import lore/world/communication
 
 /// A message received by the registry process to insert the room subject
 /// into the cache keyed by the room instance id.
-/// 
+///
 pub type Message {
   /// Insert is called when a character logs in.
-  /// 
+  ///
   Insert(pid: process.Pid, id: StringId(Mobile), user: User)
 
   /// Deregister the subject when a character process goes down.
-  /// 
+  ///
   Down(process.Down)
 }
 
@@ -35,11 +35,11 @@ type State {
 }
 
 pub type User {
-  User(name: String)
+  User(name: String, id: StringId(Mobile))
 }
 
 /// Starts the character subject registry.
-/// 
+///
 pub fn start(
   table_name: process.Name(Message),
   comms: process.Name(communication.Message),
@@ -51,7 +51,7 @@ pub fn start(
 }
 
 /// Registers a list of character subjects keyed by their mobile id
-/// 
+///
 pub fn insert(
   table_name: process.Name(Message),
   connection_pid: process.Pid,
@@ -63,8 +63,8 @@ pub fn insert(
 }
 
 /// Returns the subject given a registered character instance id.
-/// 
-pub fn players_logged_in(table_name: process.Name(Message)) -> List(user) {
+///
+pub fn players_logged_in(table_name: process.Name(Message)) -> List(User) {
   table.to_list(table_name)
   |> list.map(pair.second)
 }

@@ -1,1 +1,2 @@
-SELECT * from door WHERE is_active = TRUE;
+SELECT door_id, access_state FROM door
+WHERE is_active = TRUE;

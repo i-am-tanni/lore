@@ -1,8 +1,10 @@
 SELECT
-  exit_id,
-  keyword,
-  from_room_id,
-  to_room_id,
-  door_id
-FROM exit
-WHERE is_active = TRUE;
+  e.exit_id,
+  e.keyword,
+  e.from_room_id,
+  e.to_room_id,
+  d.door_id
+FROM exit as e
+LEFT JOIN door_side as d
+  ON e.exit_id = d.exit_id
+WHERE e.is_active = TRUE;

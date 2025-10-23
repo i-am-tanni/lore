@@ -65,6 +65,7 @@ fn load_zones(
   use pog.Returned(rows: doors, ..) <- result.try(sql.doors(db))
   use pog.Returned(rows: exits, ..) <- result.try(sql.exits(db))
   use pog.Returned(rows: mob_spawns, ..) <- result.try(sql.mob_spawns(db))
+  use pog.Returned(rows: item_spawns, ..) <- result.try(sql.item_spawns(db))
   use pog.Returned(rows: spawn_groups, ..) <- result.try(sql.spawn_groups(db))
 
   let doors =
@@ -140,6 +141,23 @@ fn load_zones(
       }
     })
 
+  let item_spawns =
+    list.fold(item_spawns, dict.new(), fn(acc, spawn) {
+      let sql.ItemSpawnsRow(item_spawn_id:, spawn_group_id:, item_id:, room_id:) =
+        spawn
+
+      let item_spawn =
+        world.ItemSpawn(
+          spawn_id: Id(item_spawn_id),
+          item_id: Id(item_id),
+          room_id: Id(room_id),
+        )
+      case dict.get(acc, spawn_group_id) {
+        Ok(list) -> dict.insert(acc, spawn_group_id, [item_spawn, ..list])
+        Error(Nil) -> dict.insert(acc, spawn_group_id, [item_spawn])
+      }
+    })
+
   let spawn_groups =
     list.map(spawn_groups, fn(group) {
       let sql.SpawnGroupsRow(
@@ -154,8 +172,10 @@ fn load_zones(
         reset_freq:,
         is_enabled:,
         is_despawn_on_reset:,
-        members: dict.get(mob_spawns, spawn_group_id) |> result.unwrap([]),
-        instances: [],
+        mob_members: dict.get(mob_spawns, spawn_group_id) |> result.unwrap([]),
+        item_members: dict.get(item_spawns, spawn_group_id) |> result.unwrap([]),
+        mob_instances: [],
+        item_instances: [],
       )
     })
 

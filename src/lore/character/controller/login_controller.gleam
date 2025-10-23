@@ -66,7 +66,7 @@ fn login_name(conn: Conn, flash: LoginFlash, text: String) -> Conn {
         )
 
       let system_tables.Lookup(users:, ..) = conn.system_tables(conn)
-      users.insert(users, flash.endpoint, id, users.User(name:))
+      users.insert(users, flash.endpoint, id, users.User(name:, id:))
 
       conn
       |> conn.put_character(update)

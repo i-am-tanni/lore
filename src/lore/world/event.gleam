@@ -82,6 +82,8 @@ pub type Done {
   Done
 }
 
+pub type NoReply
+
 /// A type provided to the mob factory to spawn a mobile
 ///
 pub type SpawnMobile {
@@ -141,6 +143,7 @@ pub type RoomMessage {
   PollRoom(event: Event(PollEvent, world.Vote(world.ErrorRoomRequest)))
   InterRoom(event: Event(InterRoomEvent, Done))
   MobileCleanup(id: StringId(Mobile))
+  SpawnItem(item: world.ItemInstance)
 }
 
 /// A wrapper type for messages that can be received by a Zone.

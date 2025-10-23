@@ -147,16 +147,22 @@ pub type SpawnGroup {
   ///
   SpawnGroup(
     id: Id(SpawnGroup),
-    members: List(Spawn),
-    instances: List(#(Id(Spawn), StringId(Mobile))),
+    mob_members: List(MobSpawn),
+    mob_instances: List(#(Id(MobSpawn), StringId(Mobile))),
+    item_members: List(ItemSpawn),
+    item_instances: List(#(Id(ItemSpawn), StringId(ItemInstance))),
     reset_freq: Int,
     is_enabled: Bool,
     is_despawn_on_reset: Bool,
   )
 }
 
-pub type Spawn {
-  MobSpawn(spawn_id: Id(Spawn), mobile_id: Id(Npc), room_id: Id(Room))
+pub type MobSpawn {
+  MobSpawn(spawn_id: Id(MobSpawn), mobile_id: Id(Npc), room_id: Id(Room))
+}
+
+pub type ItemSpawn {
+  ItemSpawn(spawn_id: Id(ItemSpawn), item_id: Id(Item), room_id: Id(Room))
 }
 
 /// Generates random 32 bit base-16 encoded string identifier.

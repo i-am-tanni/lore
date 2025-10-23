@@ -15,7 +15,7 @@ import pog
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type DoorsRow {
-  DoorsRow(door_id: Int, access_state: AccessState, is_active: Bool)
+  DoorsRow(door_id: Int, access_state: AccessState)
 }
 
 /// Runs the `doors` query
@@ -30,11 +30,11 @@ pub fn doors(
   let decoder = {
     use door_id <- decode.field(0, decode.int)
     use access_state <- decode.field(1, access_state_decoder())
-    use is_active <- decode.field(2, decode.bool)
-    decode.success(DoorsRow(door_id:, access_state:, is_active:))
+    decode.success(DoorsRow(door_id:, access_state:))
   }
 
-  "SELECT * from door WHERE is_active = TRUE;
+  "SELECT door_id, access_state FROM door
+WHERE is_active = TRUE;
 "
   |> pog.query
   |> pog.returning(decoder)
@@ -82,13 +82,59 @@ pub fn exits(
   }
 
   "SELECT
-  exit_id,
-  keyword,
-  from_room_id,
-  to_room_id,
-  door_id
-FROM exit
-WHERE is_active = TRUE;
+  e.exit_id,
+  e.keyword,
+  e.from_room_id,
+  e.to_room_id,
+  d.door_id
+FROM exit as e
+LEFT JOIN door_side as d
+  ON e.exit_id = d.exit_id
+WHERE e.is_active = TRUE;
+"
+  |> pog.query
+  |> pog.returning(decoder)
+  |> pog.execute(db)
+}
+
+/// A row you get from running the `item_spawns` query
+/// defined in `./src/lore/world/sql/item_spawns.sql`.
+///
+/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub type ItemSpawnsRow {
+  ItemSpawnsRow(
+    item_spawn_id: Int,
+    item_id: Int,
+    room_id: Int,
+    spawn_group_id: Int,
+  )
+}
+
+/// Runs the `item_spawns` query
+/// defined in `./src/lore/world/sql/item_spawns.sql`.
+///
+/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub fn item_spawns(
+  db: pog.Connection,
+) -> Result(pog.Returned(ItemSpawnsRow), pog.QueryError) {
+  let decoder = {
+    use item_spawn_id <- decode.field(0, decode.int)
+    use item_id <- decode.field(1, decode.int)
+    use room_id <- decode.field(2, decode.int)
+    use spawn_group_id <- decode.field(3, decode.int)
+    decode.success(ItemSpawnsRow(
+      item_spawn_id:,
+      item_id:,
+      room_id:,
+      spawn_group_id:,
+    ))
+  }
+
+  "SELECT * from item_spawn;
 "
   |> pog.query
   |> pog.returning(decoder)

@@ -1,5 +1,5 @@
 //// An assortment of extra list functions.
-//// 
+////
 
 import gleam/bool
 import gleam/dict.{type Dict}
@@ -7,18 +7,18 @@ import gleam/list.{Continue, Stop}
 import gleam/pair
 
 /// Returns the nth match in the list.
-/// Like the `gleam/list` function `find`, but allows you to elect a match 
+/// Like the `gleam/list` function `find`, but allows you to elect a match
 /// other than the first.
 /// If a negative ordinal is provided, the match is found in reverse order.
-/// 
+///
 /// ## Example
-/// 
+///
 /// ```gleam
 /// type Person{
 ///   Teacher(name: String)
 ///   Student(name: String)
 /// }
-/// 
+///
 /// [Teacher("Sue"), Student("Bob"), Teacher("Beth")]
 /// |> find_nth(2, fn(x){
 ///   case x {
@@ -28,7 +28,7 @@ import gleam/pair
 /// })
 /// // -> Ok(Teacher(name: "Beth"))
 /// ```
-/// 
+///
 pub fn find_nth(
   in list: List(a),
   nth ordinal: Int,
@@ -68,7 +68,7 @@ pub fn filter_take(
 }
 
 /// Returns the result of a find that matches the most keywords.
-/// 
+///
 pub fn find_with_most_keywords(
   in list: List(a),
   with keywords: List(String),
@@ -95,14 +95,14 @@ pub fn find_with_most_keywords(
 }
 
 /// Choose a random member of the list.
-/// 
+///
 pub fn random(list: List(a)) -> Result(a, Nil) {
   list.shuffle(list)
   |> list.first
 }
 
 /// Get member at the given index
-/// 
+///
 pub fn at(list: List(a), index: Int) -> Result(a, Nil) {
   case list {
     [] -> Error(Nil)
@@ -114,7 +114,7 @@ pub fn at(list: List(a), index: Int) -> Result(a, Nil) {
 // Groups items in the list.
 // Similar to `list.group`, but the values are mapped.
 // Note: the lists are reversed.
-// 
+//
 pub fn group_by(list: List(a), group_fun: fn(a) -> #(k, v)) -> Dict(k, List(v)) {
   list.fold(list, dict.new(), fn(acc, x) {
     let #(key, val) = group_fun(x)
