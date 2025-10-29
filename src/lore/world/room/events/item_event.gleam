@@ -14,10 +14,7 @@ pub fn get(
     Ok(instance) ->
       builder
       |> response.item_delete(instance)
-      |> response.broadcast_action(
-        event.acting_character,
-        ItemGetNotify(instance),
-      )
+      |> response.broadcast(event.acting_character, ItemGetNotify(instance))
 
     Error(error) ->
       response.reply_character(builder, event, event.ActFailed(error))
@@ -31,10 +28,7 @@ pub fn drop(
 ) -> response.Builder(CharacterMessage) {
   builder
   |> response.item_insert(item_instance)
-  |> response.broadcast_action(
-    event.acting_character,
-    ItemDropNotify(item_instance),
-  )
+  |> response.broadcast(event.acting_character, ItemDropNotify(item_instance))
 }
 
 fn find_local_item(

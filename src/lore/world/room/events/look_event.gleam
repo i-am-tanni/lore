@@ -1,8 +1,8 @@
+import gleam/list
 import gleam/result
 import lore/character/view
 import lore/character/view/look_view
-import lore/character/view/prompt_view
-import lore/world
+import lore/world.{type Mobile}
 import lore/world/event.{type CharacterMessage, type Event}
 import lore/world/items
 import lore/world/room/response
@@ -30,8 +30,7 @@ pub fn room_look(
   builder
   |> response.renderln(view.blank())
   |> response.renderln(look_view.mini_map(response.mini_map(builder)))
-  |> response.renderln(look_view.room(room, event.acting_character))
-  |> response.render(prompt_view.prompt())
+  |> response.render(look_view.room(room, event.acting_character))
 }
 
 pub fn look_at(
@@ -43,7 +42,7 @@ pub fn look_at(
     use _ <- result.try_recover(
       response.find_local_item(builder, search_term) |> result.map(Item),
     )
-    response.find_local_character(builder, search_term)
+    find_local_character(builder, search_term)
     |> result.map(Mobile)
   }
 
@@ -67,4 +66,13 @@ pub fn look_at(
         event.ActFailed(world.NotFound(search_term)),
       )
   }
+}
+
+fn find_local_character(
+  builder: response.Builder(a),
+  term: String,
+) -> Result(Mobile, world.ErrorRoomRequest) {
+  response.find_local_character(builder, fn(character) {
+    list.any(character.keywords, fn(keyword) { term == keyword })
+  })
 }

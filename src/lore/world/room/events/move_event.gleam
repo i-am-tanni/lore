@@ -1,6 +1,6 @@
 //// Room events relating to character insertion / deletion into a room
 //// (e.g. movement).
-//// 
+////
 
 import gleam/list
 import gleam/option.{None, Some}
@@ -20,7 +20,7 @@ import lore/world/room/response
 import lore/world/system_tables
 
 /// The initial movement request by a character for an exit keyword.
-/// 
+///
 pub fn request(
   builder: response.Builder(CharacterMessage),
   event: Event(CharacterToRoomEvent, CharacterMessage),
@@ -56,7 +56,7 @@ pub fn request(
 }
 
 /// Destination room votes whether to accept the character's move.
-/// 
+///
 pub fn vote(
   context: response.Builder(world.Vote(ErrorRoomRequest)),
   _event: Event(event.PollEvent, world.Vote(ErrorRoomRequest)),
@@ -66,7 +66,7 @@ pub fn vote(
 }
 
 /// Remove departing character from room and notify occupants.
-/// 
+///
 pub fn depart(
   builder: response.Builder(event.Done),
   event: Event(event.InterRoomEvent, event.Done),
@@ -77,22 +77,16 @@ pub fn depart(
   let MoveDepartData(exit_keyword:, subject:) = data
 
   let data = NotifyDepartData(exit_keyword:, acting_character:)
-  let departure =
-    event.new(
-      from: response.self(builder),
-      acting_character:,
-      data: MoveNotifyDepart(data),
-    )
 
   builder
   |> response.character_delete(acting_character)
   |> response.unsubscribe_character(subject)
-  |> response.broadcast(departure)
+  |> response.broadcast(acting_character, MoveNotifyDepart(data))
   |> response.reply(event.Done)
 }
 
 /// Add the arriving character to room and notify occupants.
-/// 
+///
 pub fn arrive(
   builder: response.Builder(CharacterMessage),
   event: Event(event.CharacterToRoomEvent, CharacterMessage),
@@ -116,12 +110,9 @@ pub fn arrive(
     Some(world.RoomExit(keyword:, ..)) -> Some(keyword)
     None -> None
   }
-  let self = response.self(builder)
 
   // We will send occupants an arrival notification
   let data = NotifyArriveData(enter_keyword:, acting_character:)
-  let arrival =
-    event.new(from: self, acting_character:, data: MoveNotifyArrive(data))
 
   // Update presence table
   let system_tables.Lookup(presence:, ..) = response.system_tables(builder)
@@ -130,7 +121,7 @@ pub fn arrive(
 
   let builder =
     builder
-    |> response.broadcast(arrival)
+    |> response.broadcast(acting_character, MoveNotifyArrive(data))
     |> response.character_insert(acting_character)
     |> response.subscribe_character(event.from)
 
@@ -145,12 +136,12 @@ pub fn arrive(
 }
 
 /// Only called if character restarted and needs to resubscribe to the room.
-/// 
+///
 pub fn rejoin(
   builder: response.Builder(CharacterMessage),
   event: Event(event.CharacterToRoomEvent, CharacterMessage),
 ) -> response.Builder(CharacterMessage) {
-  // Check that requester is in the room they believe themselves to be in 
+  // Check that requester is in the room they believe themselves to be in
   // before subscribing them
   let acting_character_id = event.acting_character.id
   let world.Room(characters:, ..) = response.room(builder)

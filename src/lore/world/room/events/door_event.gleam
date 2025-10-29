@@ -1,4 +1,3 @@
-import gleam/erlang/process
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
@@ -56,18 +55,16 @@ pub fn update(
 ) -> response.Builder(a) {
   let event.DoorUpdateData(door_id:, update:, from_room_id:) = data
   let world.Room(id:, exits:, ..) = response.room(builder)
-  let self = response.self(builder)
-  let acting_character = event.acting_character
   let is_subject_observable = from_room_id == id
 
   let #(door_notifications, updated_exits) =
-    list.map_fold(exits, [], fn(acc, exit) {
+    list.map_fold(exits, list.new(), fn(acc, exit) {
       case exit.door {
         Some(door) if door.id == door_id -> {
           let door = world.Door(..door, state: update)
           let event =
             DoorNotifyData(exit:, update:, is_subject_observable:)
-            |> door_update_event(self, acting_character)
+            |> event.DoorNotify
 
           let updated = world.RoomExit(..exit, door: Some(door))
           #([event, ..acc], updated)
@@ -79,23 +76,16 @@ pub fn update(
 
   case door_notifications != [] {
     // if there are updates
-    True ->
-      list.fold(door_notifications, builder, response.broadcast)
+    True -> {
+      let acting_character = event.acting_character
+      list.fold(door_notifications, builder, fn(acc, data) {
+        response.broadcast(acc, acting_character, data)
+      })
       |> response.exits_update(updated_exits)
-
+    }
     // ..else no updates
     False -> builder
   }
-}
-
-fn door_update_event(
-  data: event.DoorNotifyData,
-  self: process.Subject(event.RoomMessage),
-  acting_character: world.Mobile,
-) -> Event(event.CharacterEvent, event.RoomMessage) {
-  data
-  |> event.DoorNotify
-  |> event.new(from: self, acting_character:, data: _)
 }
 
 fn door_error(error: world.ErrorDoor) -> Result(a, ErrorRoomRequest) {

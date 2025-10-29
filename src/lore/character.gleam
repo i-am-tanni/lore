@@ -10,6 +10,7 @@ import gleam/otp/actor
 import gleam/result
 import gleam/set.{type Set}
 import gleam/string
+import gleam/string_tree
 import logging
 import lore/character/character_registry
 import lore/character/conn.{type Conn}
@@ -18,6 +19,8 @@ import lore/character/controller/character_controller
 import lore/character/controller/login_controller
 import lore/character/controller/spawn_controller
 import lore/character/pronoun
+import lore/character/view
+import lore/character/view/prompt_view
 import lore/server/output
 import lore/world.{Id, Player}
 import lore/world/communication
@@ -97,6 +100,9 @@ fn init_reception(
       short: "",
       pronouns: pronoun.Feminine,
       inventory: [],
+      is_in_combat: False,
+      hp: 20,
+      hp_max: 20,
     )
 
   State(
@@ -175,7 +181,18 @@ fn handle_message(
     event.RoomSent(received:, from:) if from == state.character.room_id ->
       case received {
         event.RoomSentText(text) -> {
-          push_text(state, text)
+          // Append prompt and push text to socket
+          let prompt =
+            prompt_view.prompt(state.character)
+            |> view.to_string_tree
+            |> output.Text(text: _, newline: False)
+
+          text
+          |> list.append([
+            output.Text(text: string_tree.new(), newline: True),
+            prompt,
+          ])
+          |> push_text(state, _)
           state
         }
 

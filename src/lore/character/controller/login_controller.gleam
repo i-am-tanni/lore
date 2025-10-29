@@ -63,6 +63,9 @@ fn login_name(conn: Conn, flash: LoginFlash, text: String) -> Conn {
           pronouns: pronoun.Feminine,
           short: name <> " is standing here.",
           inventory: [],
+          is_in_combat: False,
+          hp: 20,
+          hp_max: 20,
         )
 
       let system_tables.Lookup(users:, ..) = conn.system_tables(conn)

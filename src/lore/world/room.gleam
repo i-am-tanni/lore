@@ -6,6 +6,7 @@ import gleam/list
 import gleam/otp/actor
 import lore/world.{type Room}
 import lore/world/event.{type Event, type RoomMessage}
+import lore/world/room/events/combat_event
 import lore/world/room/events/comm_event
 import lore/world/room/events/door_event
 import lore/world/room/events/item_event
@@ -95,6 +96,7 @@ fn route_from_character(
     event.RoomCommunication(data) -> comm_event.broadcast(builder, event, data)
     event.ItemGet(data) -> item_event.get(builder, event, data)
     event.ItemDrop(data) -> item_event.drop(builder, event, data)
+    event.CombatRequest(data) -> combat_event.request(builder, event, data)
   }
 
   let update =

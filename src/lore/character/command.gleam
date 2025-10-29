@@ -38,6 +38,7 @@ type Verb {
   Get
   Drop
   Inventory
+  Kill
 }
 
 type DoorVerb {
@@ -89,7 +90,7 @@ fn parser(conn: Conn) -> Parser(Conn, e) {
     command(conn, move_command, go("west", ["w"])),
     command(conn, move_command, go("up", ["u"])),
     command(conn, move_command, go("down", ["d"])),
-    command(conn, who_command, no_args(Who, "who", [])),
+    command(conn, kill_command, with_args(Kill, "kill", ["k"], word)),
     command(conn, room_comms, with_args(Say, "say", [], say_args)),
     command(conn, room_comms, with_args(Whisper, "whisper", [], whisper_args)),
     command(conn, room_comms, with_args(Emote, "emote", [], emote_text)),
@@ -103,6 +104,7 @@ fn parser(conn: Conn) -> Parser(Conn, e) {
       inventory_command,
       no_args(Inventory, "inventory", ["i", "inv"]),
     ),
+    command(conn, who_command, no_args(Who, "who", [])),
     command(conn, quit_command, no_args(Quit, "quit", ["q"])),
     social(conn),
   ])
@@ -235,6 +237,31 @@ fn drop_command(conn: Conn, command: Command(Verb, String)) -> Conn {
     Error(Nil) ->
       conn
       |> conn.renderln(error_view.not_carrying_error())
+      |> conn.prompt()
+  }
+}
+
+fn kill_command(conn: Conn, command: Command(Verb, String)) -> Conn {
+  let self = conn.get_character(conn)
+  let search_term = command.data
+  let is_auto = case search_term {
+    "self" -> True
+    search_term ->
+      list.any(self.keywords, fn(keyword) { search_term == keyword })
+  }
+
+  case !is_auto {
+    True ->
+      event.CombatRequestData(
+        victim: event.Keyword(command.data),
+        dam_roll: world.random(8),
+      )
+      |> act.kill
+      |> conn.action(conn, _)
+
+    False ->
+      conn
+      |> conn.renderln(error_view.cannot_target_self())
       |> conn.prompt()
   }
 }

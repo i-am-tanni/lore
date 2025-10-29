@@ -22,10 +22,7 @@ pub fn recv(
 ) -> Conn {
   let is_player = conn.is_player(conn)
   case request {
-    controller.RoomToCharacter(event) if is_player ->
-      events.route_player(conn, event)
-
-    controller.RoomToCharacter(event) -> events.route_npc(conn, event)
+    controller.RoomToCharacter(event) -> events.route_player(conn, event)
 
     controller.Chat(data) if is_player ->
       conn

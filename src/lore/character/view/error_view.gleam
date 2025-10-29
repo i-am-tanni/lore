@@ -12,9 +12,9 @@ pub fn room_request_error(error: world.ErrorRoomRequest) -> View {
       ["There is no exit ", direction_to_string(direction), "."]
       |> view.Leaves
 
-    world.CharacterLookupFailed(keyword:) ->
-      ["Unable to find character ", keyword]
-      |> view.Leaves
+    world.CharacterLookupFailed ->
+      "That character doesn't seem to be here."
+      |> view.Leaf
 
     world.ItemLookupFailed(keyword:) ->
       ["Unable to find item: ", keyword]
@@ -30,6 +30,8 @@ pub fn room_request_error(error: world.ErrorRoomRequest) -> View {
 
     world.NotFound(keyword) ->
       ["Unable to find '", keyword, "'."] |> view.Leaves
+
+    world.PvpForbidden -> "You cannot attack other players." |> view.Leaf
   }
 }
 
@@ -40,9 +42,6 @@ pub fn not_carrying_error() -> View {
 fn move_error(error: world.ErrorMove) -> View {
   case error {
     world.Unauthorized -> "You lack the permissions to enter." |> view.Leaf
-
-    world.DoorNotOpen(state:, ..) ->
-      ["That door is ", access_to_string(state), "."] |> view.Leaves
   }
 }
 
@@ -55,6 +54,10 @@ fn door_error(error: world.ErrorDoor) -> View {
       ["There is no door ", direction_to_string(direction), "."] |> view.Leaves
     world.DoorClosed -> "The door is closed." |> view.Leaf
   }
+}
+
+pub fn cannot_target_self() {
+  "That would be unwise." |> view.Leaf
 }
 
 fn direction_to_string(direction: world.Direction) -> String {

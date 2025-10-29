@@ -14,6 +14,12 @@ pub type PerspectiveSimple {
   Witness
 }
 
+pub type PerpsectiveAdvanced {
+  ActingCharacter
+  Victim
+  Observer
+}
+
 /// A wrapper type for different types of string output renders.
 /// - Leaf - wraps a single string
 /// - Leaves - wraps a list of strings

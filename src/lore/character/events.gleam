@@ -6,6 +6,7 @@ import lore/character/events/item_event
 import lore/character/events/move_event
 import lore/character/view
 import lore/character/view/character_view
+import lore/character/view/combat_view
 import lore/character/view/communication_view
 import lore/character/view/door_view
 import lore/character/view/error_view
@@ -31,31 +32,35 @@ pub fn route_player(
     event.ItemGetNotify(item) -> item_event.get(conn, event, item)
     event.ItemDropNotify(item) -> item_event.drop(conn, event, item)
     event.ItemInspect(item) -> item_event.look_at(conn, item)
-    event.MobileInspectRequest(by: requester) ->
-      conn.character_event(
-        conn,
-        event.MobileInspectResponse(conn.get_character(conn)),
-        send: requester,
-      )
+    event.CombatCommit(data) -> {
+      let self = conn.get_character(conn)
+      let victim = data.victim
+      let is_victim = victim.id == self.id
+      let attacker = event.acting_character
 
-    event.MobileInspectResponse(character:) ->
-      conn
-      |> conn.renderln(character_view.look_at(character))
-      |> conn.prompt()
-  }
-}
+      let conn = case is_victim {
+        True -> {
+          conn
+          |> conn.put_character(world.MobileInternal(..self, hp: victim.hp))
+        }
 
-pub fn route_npc(conn: Conn, event: Event(CharacterEvent, RoomMessage)) -> Conn {
-  case event.data {
-    event.ActFailed(_) -> conn
-    event.MoveNotifyArrive(_) -> conn
-    event.MoveNotifyDepart(_) -> conn
-    event.MoveCommit(data) -> move_event.move_commit(conn, event, data)
-    event.DoorNotify(_) -> conn
-    event.Communication(_) -> conn
-    event.ItemGetNotify(item) -> item_event.get(conn, event, item)
-    event.ItemDropNotify(item) -> item_event.drop(conn, event, item)
-    event.ItemInspect(_) -> conn
+        False -> conn
+      }
+
+      let conn = case is_victim && !conn.is_player(conn) {
+        True ->
+          event.CombatRequestData(
+            victim: event.SearchId(attacker.id),
+            dam_roll: world.random(4),
+          )
+          |> event.CombatRequest
+          |> conn.event(conn, _)
+
+        False -> conn
+      }
+
+      notify(conn, event, data, combat_view.notify)
+    }
     event.MobileInspectRequest(by: requester) ->
       conn.character_event(
         conn,

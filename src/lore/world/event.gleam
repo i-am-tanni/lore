@@ -165,6 +165,7 @@ pub type CharacterEvent {
   ItemInspect(item: world.ItemInstance)
   MobileInspectRequest(by: Subject(CharacterMessage))
   MobileInspectResponse(character: world.MobileInternal)
+  CombatCommit(CombatCommitData)
   ActFailed(world.ErrorRoomRequest)
 }
 
@@ -179,6 +180,7 @@ pub type CharacterToRoomEvent {
   DoorToggle(DoorToggleData)
   DoorUpdateEnd(DoorUpdateData)
   RoomCommunication(RoomCommunicationData)
+  CombatRequest(CombatRequestData)
 }
 
 /// The zone polls the desination room whether it accepts or rejects the move.
@@ -266,6 +268,10 @@ pub type ChatData {
   ChatData(channel: world.ChatChannel, username: String, text: String)
 }
 
+pub type CombatCommitData {
+  CombatCommitData(victim: world.Mobile, damage: Int)
+}
+
 /// Zones are a sync point for inter-room events like movement and doors.
 ///
 pub type ZoneEvent {
@@ -296,6 +302,15 @@ pub type DoorSyncData {
     to_room_id: Id(Room),
     update: world.AccessState,
   )
+}
+
+pub type SearchTerm(a) {
+  Keyword(String)
+  SearchId(StringId(a))
+}
+
+pub type CombatRequestData {
+  CombatRequestData(victim: SearchTerm(Mobile), dam_roll: Int)
 }
 
 pub fn new(

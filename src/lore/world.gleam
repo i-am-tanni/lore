@@ -49,6 +49,8 @@ pub type Room {
     exits: List(RoomExit),
     characters: List(Mobile),
     items: List(ItemInstance),
+    round_queue: List(CombatPollData),
+    next_round_queue: List(CombatPollData),
   )
 }
 
@@ -92,21 +94,31 @@ pub type Mobile {
     keywords: List(String),
     pronouns: pronoun.PronounChoice,
     short: String,
+    is_in_combat: Bool,
+    hp: Int,
+    hp_max: Int,
   )
 }
 
 /// Private internal mobile data.
 ///
 pub type MobileInternal {
+  /// ## Private fields
+  /// - hp
+  /// - hp_max
+  /// - inventory
   MobileInternal(
     id: StringId(Mobile),
     room_id: Id(Room),
     template_id: TemplateId,
     name: String,
     keywords: List(String),
+    inventory: List(ItemInstance),
     pronouns: pronoun.PronounChoice,
     short: String,
-    inventory: List(ItemInstance),
+    hp: Int,
+    hp_max: Int,
+    is_in_combat: Bool,
   )
 }
 
@@ -157,12 +169,22 @@ pub type SpawnGroup {
   )
 }
 
+/// Data related to spawning a mobile by a SpawnGroup
+///
 pub type MobSpawn {
   MobSpawn(spawn_id: Id(MobSpawn), mobile_id: Id(Npc), room_id: Id(Room))
 }
 
+/// Data related to spawning an item by a SpawnGroup
+///
 pub type ItemSpawn {
   ItemSpawn(spawn_id: Id(ItemSpawn), item_id: Id(Item), room_id: Id(Room))
+}
+
+/// An unfired combat event queued by the room.
+///
+pub type CombatPollData {
+  CombatPollData(victim_id: StringId(Mobile), dam_roll: Int)
 }
 
 /// Generates random 32 bit base-16 encoded string identifier.
@@ -184,18 +206,16 @@ pub fn generate_id() -> StringId(a) {
 pub type ErrorRoomRequest {
   UnknownExit(direction: Direction)
   RoomLookupFailed(room_id: Id(Room))
-  CharacterLookupFailed(keyword: String)
+  CharacterLookupFailed
   ItemLookupFailed(keyword: String)
   MoveErr(ErrorMove)
   DoorErr(ErrorDoor)
   NotFound(keyword: String)
+  PvpForbidden
 }
 
-/// An error type defining all the ways a move from one room to another can fail
-///
 pub type ErrorMove {
   Unauthorized
-  DoorNotOpen(direction: Direction, state: AccessState)
 }
 
 pub type ErrorDoor {
@@ -214,5 +234,49 @@ pub fn direction_to_string(direction: Direction) -> String {
     Up -> "up"
     Down -> "down"
     CustomExit(custom) -> custom
+  }
+}
+
+/// Returns a random number between 1 and max
+///
+pub fn random(max: Int) -> Int {
+  int.random(max - 1) + 1
+}
+
+/// This prevents leaking private character information via events.
+///
+pub fn trim_character(character: MobileInternal) -> Mobile {
+  let MobileInternal(
+    id:,
+    room_id:,
+    template_id:,
+    name:,
+    keywords:,
+    pronouns:,
+    short:,
+    hp:,
+    hp_max:,
+    is_in_combat:,
+    ..,
+  ) = character
+
+  Mobile(
+    id:,
+    room_id:,
+    template_id:,
+    name:,
+    keywords:,
+    pronouns:,
+    short:,
+    is_in_combat:,
+    hp:,
+    hp_max:,
+  )
+}
+
+pub fn is_player(mobile: Mobile) -> Bool {
+  case mobile.template_id {
+    Player(_) -> True
+    Npc(_) -> False
   }
 }

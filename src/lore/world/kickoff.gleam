@@ -121,6 +121,8 @@ fn load_zones(
         items: [],
         characters: [],
         exits:,
+        round_queue: [],
+        next_round_queue: [],
       )
     })
 

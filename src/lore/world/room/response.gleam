@@ -1,5 +1,5 @@
 //// A module for building responses to received room events.
-//// 
+////
 
 import gleam/dict
 import gleam/erlang/process.{type Subject}
@@ -28,7 +28,7 @@ import lore/world/zone/zone_registry
 /// A builder for a response to a room event.
 /// Brings in context from the event (caller & acting_character) and the room
 /// data.
-/// 
+///
 pub opaque type Builder(a) {
   Builder(
     room: world.Room,
@@ -44,7 +44,7 @@ pub opaque type Builder(a) {
 }
 
 /// A completed response to an request received by the room.
-/// 
+///
 pub opaque type Response(a) {
   Response(
     events: List(EventToSend(a)),
@@ -57,42 +57,42 @@ pub opaque type Response(a) {
 
 /// Events are queued and processed after the response is fully built.
 /// Events are tagged by recipient.
-/// 
+///
 pub type EventToSend(a) {
   /// Reply to the author of an event asychronously.
-  /// 
+  ///
   Reply(to: Subject(a), message: a)
   /// Send an event to an individual character.
-  /// 
+  ///
   ToCharacter(
     subject: Subject(CharacterMessage),
     event: Event(CharacterEvent, RoomMessage),
   )
   /// Send an event to an individual character when the subject is unknown
-  /// 
+  ///
   ToCharacterId(id: StringId(Mobile), event: Event(CharacterEvent, RoomMessage))
 
   /// Broadcast an event to all subscribers in the room channel
-  /// 
+  ///
   Broadcast(channel: Channel, event: Event(CharacterEvent, RoomMessage))
 
   /// A subscription to channel messages
-  /// 
+  ///
   Subscribe(channel: Channel, subscriber: communication.Subscriber)
 
   /// Unsubscribe from channel messages
-  /// 
+  ///
   Unsubscribe(channel: Channel, subscriber: communication.Subscriber)
 
   ToRoom(id: Id(world.Room), event: Event(RoomToRoomEvent, RoomMessage))
   /// Send an event to the zone.
-  /// 
+  ///
   ToZone(id: Id(Zone), event: Event(event.ZoneEvent, RoomMessage))
 }
 
 /// Create a new response builder.
 /// Arguments are the context for the builder.
-/// 
+///
 pub fn new(
   room: world.Room,
   caller: Subject(a),
@@ -116,13 +116,13 @@ pub fn new(
 /// - `room` data
 /// - 'caller' - i.e. the mailbox of who sent the event
 /// - `acting_character` - the character information of the event sender
-/// 
+///
 pub fn room(builder: Builder(a)) -> world.Room {
   builder.room
 }
 
 /// Returns room subject.
-/// 
+///
 pub fn self(builder: Builder(a)) -> Subject(RoomMessage) {
   builder.self
 }
@@ -132,13 +132,13 @@ pub fn system_tables(builder: Builder(a)) -> system_tables.Lookup {
 }
 
 /// Get the mini_map via a call
-/// 
+///
 pub fn mini_map(builder: Builder(a)) {
   mapper.render_mini_map(builder.system_tables.mapper, builder.room.id)
 }
 
 /// Finds a local exit based on the given boolean function.
-/// 
+///
 pub fn find_local_exit(
   builder: Builder(a),
   matcher: fn(RoomExit) -> Bool,
@@ -147,21 +147,17 @@ pub fn find_local_exit(
 }
 
 /// Finds a local character based on the given boolean function.
-/// 
+///
 pub fn find_local_character(
   builder: Builder(a),
-  search_term: String,
+  search_fun: fn(Mobile) -> Bool,
 ) -> Result(Mobile, world.ErrorRoomRequest) {
-  {
-    use character <- my_list.find_nth(builder.room.characters, 0)
-    use keyword <- list.any(character.keywords)
-    search_term == keyword
-  }
-  |> result.replace_error(world.CharacterLookupFailed(search_term))
+  my_list.find_nth(builder.room.characters, 0, search_fun)
+  |> result.replace_error(world.CharacterLookupFailed)
 }
 
 /// Finds a local item based on the given boolean function.
-/// 
+///
 pub fn find_local_item(
   builder: Builder(a),
   search_term: String,
@@ -175,7 +171,7 @@ pub fn find_local_item(
 }
 
 /// Finds a local items based on the given boolean function.
-/// 
+///
 pub fn find_local_items(
   builder: Builder(a),
   up_to amount: Int,
@@ -188,13 +184,13 @@ pub fn find_local_items(
 
 /// Queue an event to the queue to be fired off in order when response is
 /// completed.
-/// 
+///
 pub fn event(builder: Builder(a), event: EventToSend(a)) -> Builder(a) {
   Builder(..builder, events: [event, ..builder.events])
 }
 
 /// Queues a zone event
-/// 
+///
 pub fn zone_event(
   builder: Builder(a),
   event: Event(ZoneEvent, RoomMessage),
@@ -204,12 +200,12 @@ pub fn zone_event(
 }
 
 /// Queues a character event
-/// 
+///
 pub fn character_event(
   builder: Builder(a),
   event: CharacterEvent,
-  acting_character: world.Mobile,
-  recipient: world.StringId(Mobile),
+  from acting_character: world.Mobile,
+  to recipient: world.StringId(Mobile),
 ) -> Builder(a) {
   let event_to_send =
     event.Event(from: builder.self, acting_character:, data: event)
@@ -219,13 +215,13 @@ pub fn character_event(
 }
 
 /// Respond directly to the caller of the event.
-/// 
+///
 pub fn reply(builder: Builder(a), msg: a) -> Builder(a) {
   Builder(..builder, events: [Reply(builder.caller, msg), ..builder.events])
 }
 
 /// Respond to the character that generated the room request.
-/// 
+///
 pub fn reply_character(
   builder: Builder(CharacterMessage),
   event: Event(event.CharacterToRoomEvent, CharacterMessage),
@@ -240,7 +236,7 @@ pub fn reply_character(
 }
 
 /// Convert the response builder to a response to be processed by the room.
-/// 
+///
 pub fn build(builder: Builder(a)) -> Response(a) {
   Response(
     events: list.reverse(builder.events),
@@ -252,10 +248,10 @@ pub fn build(builder: Builder(a)) -> Response(a) {
   )
 }
 
-/// Queue a CharacterEvent to be broadcasted to all subscribers of the room
+/// Queue an Event to be broadcasted to all subscribers of the room
 /// channel. This is useful for witnessed events.
-/// 
-pub fn broadcast(
+///
+pub fn broadcast_event(
   builder: Builder(a),
   event event: Event(CharacterEvent, RoomMessage),
 ) -> Builder(a) {
@@ -263,7 +259,10 @@ pub fn broadcast(
   Builder(..builder, events: [queued_event, ..builder.events])
 }
 
-pub fn broadcast_action(
+/// Queue a CharacterEvent to be broadcasted to all subscribers of the room
+/// channel. This is useful for witnessed events.
+///
+pub fn broadcast(
   builder: Builder(a),
   acting_character: world.Mobile,
   event: CharacterEvent,
@@ -276,7 +275,7 @@ pub fn broadcast_action(
 }
 
 /// Subscribe to room events
-/// 
+///
 pub fn subscribe_character(
   builder: Builder(a),
   subject: Subject(CharacterMessage),
@@ -298,7 +297,7 @@ pub fn unsubscribe_character(
 }
 
 /// Render text back to the subject of the event.
-/// 
+///
 pub fn render(
   builder: Builder(CharacterMessage),
   view: View,
@@ -307,7 +306,7 @@ pub fn render(
 }
 
 /// Render text back to the subject of the event and append with a newline.
-/// 
+///
 pub fn renderln(
   builder: Builder(CharacterMessage),
   view: View,
@@ -316,7 +315,7 @@ pub fn renderln(
 }
 
 /// Render text to a subject.
-/// 
+///
 pub fn render_to(
   builder: Builder(a),
   to subject: Subject(CharacterMessage),
@@ -327,7 +326,7 @@ pub fn render_to(
 }
 
 /// Render text to a subject with a newline.
-/// 
+///
 pub fn renderln_to(
   builder: Builder(a),
   to subject: Subject(CharacterMessage),
@@ -344,37 +343,64 @@ pub fn exits_update(
   Builder(..builder, update_exits: Some(exits))
 }
 
-/// Insert a character into the room. 
-/// 
+/// Insert a character into the room.
+///
 pub fn character_insert(
   builder: Builder(a),
   character: world.Mobile,
 ) -> Builder(a) {
-  let characters = builder.room.characters
+  let characters = case builder.update_characters {
+    Some(updated) -> updated
+    None -> builder.room.characters
+  }
   Builder(..builder, update_characters: Some([character, ..characters]))
 }
 
 /// Delete a character from the room.
-/// 
+///
 pub fn character_delete(
   builder: Builder(a),
   character: world.Mobile,
 ) -> Builder(a) {
-  let characters = builder.room.characters
+  let characters = case builder.update_characters {
+    Some(updated) -> updated
+    None -> builder.room.characters
+  }
   let mobile_id = character.id
   let filtered = list.filter(characters, fn(mobile) { mobile.id != mobile_id })
   Builder(..builder, update_characters: Some(filtered))
 }
 
+/// Updates a character in the room.
+///
+pub fn character_update(
+  builder: Builder(a),
+  updated_character: world.Mobile,
+) -> Builder(a) {
+  let characters = case builder.update_characters {
+    Some(updated) -> updated
+    None -> builder.room.characters
+  }
+  let update =
+    list.map(characters, fn(mobile) {
+      case mobile.id == updated_character.id {
+        True -> updated_character
+        False -> mobile
+      }
+    })
+
+  Builder(..builder, update_characters: Some(update))
+}
+
 /// Insert an item into the room.
-/// 
+///
 pub fn item_insert(builder: Builder(a), item: ItemInstance) -> Builder(a) {
   let items = builder.room.items
   Builder(..builder, update_items: Some([item, ..items]))
 }
 
 /// Delete an item from the room.
-/// 
+///
 pub fn item_delete(builder: Builder(a), item: ItemInstance) -> Builder(a) {
   let items = builder.room.items
   let instance_id = item.id
@@ -383,7 +409,7 @@ pub fn item_delete(builder: Builder(a), item: ItemInstance) -> Builder(a) {
 }
 
 /// Process a response to a RoomEvent and commit staged state changes.
-/// 
+///
 pub fn handle_response(
   response: Response(a),
   room: world.Room,

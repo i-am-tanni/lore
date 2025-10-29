@@ -1,13 +1,15 @@
 import lore/world
 import lore/world/event.{type Action, Action}
 
+const min_delay = 500
+
 pub fn move(direction: world.Direction) -> Action {
   Action(
     event: event.MoveRequest(direction),
     id: world.generate_id(),
     condition: no_conditions,
     priority: event.Medium,
-    delay: 500,
+    delay: min_delay,
   )
 }
 
@@ -17,7 +19,7 @@ pub fn toggle_door(data: event.DoorToggleData) -> Action {
     id: world.generate_id(),
     condition: no_conditions,
     priority: event.Medium,
-    delay: 500,
+    delay: min_delay,
   )
 }
 
@@ -27,7 +29,7 @@ pub fn communicate(data: event.RoomCommunicationData) -> Action {
     id: world.generate_id(),
     condition: no_conditions,
     priority: event.Medium,
-    delay: 500,
+    delay: min_delay,
   )
 }
 
@@ -37,7 +39,7 @@ pub fn item_get(keyword: String) -> Action {
     id: world.generate_id(),
     condition: no_conditions,
     priority: event.Medium,
-    delay: 500,
+    delay: min_delay,
   )
 }
 
@@ -47,7 +49,17 @@ pub fn item_drop(item_instance: world.ItemInstance) -> Action {
     id: world.generate_id(),
     condition: no_conditions,
     priority: event.Medium,
-    delay: 500,
+    delay: min_delay,
+  )
+}
+
+pub fn kill(data: event.CombatRequestData) -> Action {
+  Action(
+    event: event.CombatRequest(data),
+    id: world.generate_id(),
+    condition: no_conditions,
+    priority: event.Medium,
+    delay: min_delay,
   )
 }
 
