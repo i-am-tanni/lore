@@ -50,8 +50,7 @@ pub fn request(
 
   case result {
     Ok(move_kickoff) -> response.zone_event(builder, move_kickoff)
-    Error(reason) ->
-      response.reply_character(builder, event, event.ActFailed(reason))
+    Error(reason) -> response.reply_character(builder, event.ActFailed(reason))
   }
 }
 

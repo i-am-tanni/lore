@@ -16,8 +16,7 @@ pub fn get(
       |> response.item_delete(instance)
       |> response.broadcast(event.acting_character, ItemGetNotify(instance))
 
-    Error(error) ->
-      response.reply_character(builder, event, event.ActFailed(error))
+    Error(error) -> response.reply_character(builder, event.ActFailed(error))
   }
 }
 

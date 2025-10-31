@@ -43,8 +43,7 @@ pub fn request(
   case result {
     Ok(door_sync) -> response.zone_event(builder, door_sync)
 
-    Error(reason) ->
-      response.reply_character(builder, event, event.ActFailed(reason))
+    Error(reason) -> response.reply_character(builder, event.ActFailed(reason))
   }
 }
 

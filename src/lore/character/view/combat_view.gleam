@@ -1,25 +1,24 @@
 import gleam/int
+import gleam/list
+import gleam/result.{try}
+import gleam/string_tree
 import lore/character/view.{type View}
 import lore/character/view/character_view
 import lore/world
 import lore/world/event
 
 type Perspective {
-  Self
+  Attacker
   Victim
   Witness
 }
 
-pub fn notify(
-  self: world.MobileInternal,
-  attacker: world.Mobile,
-  data: event.CombatCommitData,
-) -> View {
-  let event.CombatCommitData(victim:, damage:) = data
+pub fn notify(self: world.MobileInternal, data: event.CombatCommitData) -> View {
+  let event.CombatCommitData(victim:, attacker:, damage:) = data
   let victim_hp_max = victim.hp_max
 
   case perspective(self, attacker, data.victim) {
-    Self -> [
+    Attacker -> [
       "Your strike ",
       damage_feedback(damage, victim_hp_max),
       " ",
@@ -46,16 +45,62 @@ pub fn notify(
   |> view.Leaves
 }
 
+pub fn round_report(
+  self: world.MobileInternal,
+  participants: List(world.Mobile),
+  commits: List(world.CombatPollData),
+) -> View {
+  list.filter_map(commits, fn(commit) {
+    let world.CombatPollData(attacker_id:, victim_id:, dam_roll:) = commit
+    use attacker <- try(list.find(participants, id_match(_, attacker_id)))
+    use victim <- try(list.find(participants, id_match(_, victim_id)))
+    let commit = event.CombatCommitData(attacker:, victim:, damage: dam_roll)
+    Ok(notify(self, commit))
+  })
+  |> view.join("\n")
+}
+
+pub fn round_summary(
+  self: world.MobileInternal,
+  participants: List(world.Mobile),
+) -> View {
+  let self_id = self.id
+  let participants = list.filter(participants, id_match(_, self_id))
+  let prelude =
+    [
+      "You ",
+      health_feedback_1p(self),
+    ]
+    |> string_tree.from_strings
+
+  let rest =
+    list.map(participants, fn(participant) {
+      [
+        character_view.name(participant),
+        " ",
+        health_feedback_3p(participant),
+      ]
+      |> string_tree.from_strings()
+    })
+
+  string_tree.join([prelude, ..rest], "\n")
+  |> view.Tree
+}
+
 fn perspective(
   self: world.MobileInternal,
   acting_character: world.Mobile,
   victim: world.Mobile,
 ) -> Perspective {
   case self.id {
-    self if self == acting_character.id -> Self
+    self if self == acting_character.id -> Attacker
     self if self == victim.id -> Victim
     _ -> Witness
   }
+}
+
+fn id_match(a: world.Mobile, id: world.StringId(world.Mobile)) -> Bool {
+  a.id == id
 }
 
 fn damage_feedback(damage: Int, victim_hp_max: Int) -> String {
@@ -91,5 +136,33 @@ fn damage_feedback(damage: Int, victim_hp_max: Int) -> String {
     _ if dam_percent <= 400 -> "VAPORIZES"
     _ if dam_percent <= 500 -> "ATOMIZES"
     _ -> "does UNSPEAKABLE things to"
+  }
+}
+
+fn health_feedback_1p(mobile: world.MobileInternal) -> String {
+  let hp_percent = 100 * mobile.hp / mobile.hp_max
+  case hp_percent {
+    _ if hp_percent >= 100 -> "are in excellent condition."
+    _ if hp_percent >= 90 -> "have a few scratches."
+    _ if hp_percent >= 75 -> "have some small wounds and bruises."
+    _ if hp_percent >= 50 -> "have quite a few wounds."
+    _ if hp_percent >= 30 -> "have some big nasty wounds and scratches."
+    _ if hp_percent >= 15 -> "look pretty hurt."
+    _ if hp_percent >= 0 -> "are in awful condition."
+    _ -> "are bleeding to death."
+  }
+}
+
+fn health_feedback_3p(mobile: world.Mobile) -> String {
+  let hp_percent = 100 * mobile.hp / mobile.hp_max
+  case hp_percent {
+    _ if hp_percent >= 100 -> "is in excellent condition."
+    _ if hp_percent >= 90 -> "has a few scratches."
+    _ if hp_percent >= 75 -> "has some small wounds and bruises."
+    _ if hp_percent >= 50 -> "has quite a few wounds."
+    _ if hp_percent >= 30 -> "has some big nasty wounds and scratches."
+    _ if hp_percent >= 15 -> "looks pretty hurt."
+    _ if hp_percent >= 0 -> "is in awful condition."
+    _ -> "is bleeding to death."
   }
 }

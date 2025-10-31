@@ -83,8 +83,7 @@ fn route_from_character(
   state: State,
   event: Event(event.CharacterToRoomEvent, event.CharacterMessage),
 ) -> State {
-  let State(room:, system_tables:, self:) = state
-  let builder = response.new(room, event.from, self, system_tables)
+  let builder = to_builder(state, event)
   let builder = case event.data {
     event.MoveRequest(data) -> move_event.request(builder, event, data)
     event.MoveArrive(data) -> move_event.arrive(builder, event, data)
@@ -101,8 +100,8 @@ fn route_from_character(
 
   let update =
     builder
-    |> response.build()
-    |> response.handle_response(room, system_tables)
+    |> response.build
+    |> response.handle_response(state.room)
 
   State(..state, room: update)
 }
@@ -111,8 +110,7 @@ fn route_from_zone(
   state: State,
   event: Event(event.InterRoomEvent, event.Done),
 ) -> State {
-  let State(room:, system_tables:, self:) = state
-  let builder = response.new(room, event.from, self, system_tables)
+  let builder = to_builder(state, event)
 
   let update =
     case event.data {
@@ -121,8 +119,8 @@ fn route_from_zone(
         door_event.update(builder, event, data)
         |> response.reply(event.Done)
     }
-    |> response.build()
-    |> response.handle_response(room, system_tables)
+    |> response.build
+    |> response.handle_response(state.room)
 
   State(..state, room: update)
 }
@@ -131,14 +129,18 @@ fn poll_room(
   state: State,
   event: Event(event.PollEvent, world.Vote(world.ErrorRoomRequest)),
 ) -> State {
-  let State(room:, system_tables:, self:) = state
-  let builder = response.new(room, event.from, self, system_tables)
+  let builder = to_builder(state, event)
 
   case event.data {
     event.MovePoll(data) -> move_event.vote(builder, event, data)
   }
-  |> response.build()
-  |> response.handle_response(room, system_tables)
+  |> response.build
+  |> response.handle_response(state.room)
 
   state
+}
+
+fn to_builder(state: State, event: Event(b, c)) -> response.Builder(c) {
+  let State(room:, system_tables:, self:) = state
+  response.new(room, event.from, self, event.acting_character, system_tables)
 }

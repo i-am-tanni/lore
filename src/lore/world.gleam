@@ -50,7 +50,6 @@ pub type Room {
     characters: List(Mobile),
     items: List(ItemInstance),
     round_queue: List(CombatPollData),
-    next_round_queue: List(CombatPollData),
   )
 }
 
@@ -184,7 +183,11 @@ pub type ItemSpawn {
 /// An unfired combat event queued by the room.
 ///
 pub type CombatPollData {
-  CombatPollData(victim_id: StringId(Mobile), dam_roll: Int)
+  CombatPollData(
+    victim_id: StringId(Mobile),
+    attacker_id: StringId(Mobile),
+    dam_roll: Int,
+  )
 }
 
 /// Generates random 32 bit base-16 encoded string identifier.

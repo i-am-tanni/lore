@@ -14,12 +14,6 @@ pub type PerspectiveSimple {
   Witness
 }
 
-pub type PerpsectiveAdvanced {
-  ActingCharacter
-  Victim
-  Observer
-}
-
 /// A wrapper type for different types of string output renders.
 /// - Leaf - wraps a single string
 /// - Leaves - wraps a list of strings
@@ -34,6 +28,41 @@ pub type View {
   Tree(StringTree)
   /// Placeholder for generating newlines
   Blank
+}
+
+pub fn concat(views: List(View)) -> View {
+  concat_loop(views, string_tree.new())
+}
+
+fn concat_loop(views: List(View), acc: StringTree) -> View {
+  case views {
+    [] -> Tree(acc)
+    [Leaf(x), ..rest] -> concat_loop(rest, string_tree.append(acc, x))
+    [Leaves(x), ..rest] ->
+      string_tree.from_strings(x)
+      |> string_tree.append_tree(acc, _)
+      |> concat_loop(rest, _)
+    [Tree(x), ..rest] -> concat_loop(rest, string_tree.append_tree(acc, x))
+    [Blank, ..rest] -> concat_loop(rest, acc)
+  }
+}
+
+pub fn join(views: List(View), delim: String) -> View {
+  join_loop(views, delim, [])
+}
+
+fn join_loop(views: List(View), delim: String, acc: List(StringTree)) -> View {
+  case views {
+    [] -> acc |> list.reverse |> string_tree.join(delim) |> Tree
+    [Leaf(x), ..rest] ->
+      join_loop(rest, delim, [string_tree.from_string(x), ..acc])
+    [Leaves(x), ..rest] -> {
+      let tree = string_tree.from_strings(x)
+      join_loop(rest, delim, [tree, ..acc])
+    }
+    [Tree(x), ..rest] -> join_loop(rest, delim, [x, ..acc])
+    [Blank, ..rest] -> join_loop(rest, delim, acc)
+  }
 }
 
 /// Template varables:

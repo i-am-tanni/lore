@@ -34,6 +34,7 @@ pub opaque type Builder(a) {
     room: world.Room,
     caller: Subject(a),
     self: Subject(RoomMessage),
+    acting_character: world.Mobile,
     system_tables: system_tables.Lookup,
     output: List(#(Subject(CharacterMessage), output.Text)),
     events: List(EventToSend(a)),
@@ -52,6 +53,7 @@ pub opaque type Response(a) {
     update_characters: Option(List(Mobile)),
     update_items: Option(List(ItemInstance)),
     update_exits: Option(List(RoomExit)),
+    system_tables: system_tables.Lookup,
   )
 }
 
@@ -97,12 +99,14 @@ pub fn new(
   room: world.Room,
   caller: Subject(a),
   self: Subject(RoomMessage),
+  acting_character: world.Mobile,
   system_tables: system_tables.Lookup,
 ) -> Builder(a) {
   Builder(
     room:,
     caller:,
     self:,
+    acting_character:,
     system_tables:,
     output: [],
     events: [],
@@ -152,7 +156,12 @@ pub fn find_local_character(
   builder: Builder(a),
   search_fun: fn(Mobile) -> Bool,
 ) -> Result(Mobile, world.ErrorRoomRequest) {
-  my_list.find_nth(builder.room.characters, 0, search_fun)
+  let characters = case builder.update_characters {
+    Some(updates) -> updates
+    None -> builder.room.characters
+  }
+
+  my_list.find_nth(characters, 0, search_fun)
   |> result.replace_error(world.CharacterLookupFailed)
 }
 
@@ -224,11 +233,14 @@ pub fn reply(builder: Builder(a), msg: a) -> Builder(a) {
 ///
 pub fn reply_character(
   builder: Builder(CharacterMessage),
-  event: Event(event.CharacterToRoomEvent, CharacterMessage),
   data: event.CharacterEvent,
 ) -> Builder(CharacterMessage) {
-  let acting_character = event.acting_character
-  let event = event.new(from: builder.self, acting_character:, data:)
+  let event =
+    event.new(
+      from: builder.self,
+      acting_character: builder.acting_character,
+      data:,
+    )
   Builder(..builder, events: [
     ToCharacter(builder.caller, event),
     ..builder.events
@@ -245,6 +257,7 @@ pub fn build(builder: Builder(a)) -> Response(a) {
     update_characters: builder.update_characters,
     update_items: builder.update_items,
     update_exits: builder.update_exits,
+    system_tables: builder.system_tables,
   )
 }
 
@@ -392,6 +405,13 @@ pub fn character_update(
   Builder(..builder, update_characters: Some(update))
 }
 
+pub fn characters_put(
+  builder: Builder(a),
+  updated_characters: List(world.Mobile),
+) -> Builder(a) {
+  Builder(..builder, update_characters: Some(updated_characters))
+}
+
 /// Insert an item into the room.
 ///
 pub fn item_insert(builder: Builder(a), item: ItemInstance) -> Builder(a) {
@@ -408,16 +428,21 @@ pub fn item_delete(builder: Builder(a), item: ItemInstance) -> Builder(a) {
   Builder(..builder, update_items: Some(filtered))
 }
 
+pub fn round_push(
+  builder: Builder(a),
+  combat_data: world.CombatPollData,
+) -> Builder(a) {
+  let room = builder.room
+  let room = world.Room(..room, round_queue: [combat_data, ..room.round_queue])
+  Builder(..builder, room:)
+}
+
 /// Process a response to a RoomEvent and commit staged state changes.
 ///
-pub fn handle_response(
-  response: Response(a),
-  room: world.Room,
-  system_tables: system_tables.Lookup,
-) -> world.Room {
+pub fn handle_response(response: Response(a), room: world.Room) -> world.Room {
   // Send outputs
   send_text(response.output, room)
-  list.each(response.events, send_event(_, room, system_tables))
+  list.each(response.events, send_event(_, room, response.system_tables))
 
   // update room state
   let Response(update_characters:, update_items:, update_exits:, ..) = response

@@ -9,7 +9,7 @@ import gleam/result
 import gleam/string
 import lore/character/act
 import lore/character/conn.{type Conn}
-import lore/character/events/item_event
+import lore/character/events
 import lore/character/socials
 import lore/character/users
 import lore/character/view
@@ -144,7 +144,7 @@ fn look_at_command(conn: Conn, command: Command(Verb, String)) -> Conn {
       |> conn.renderln(character_view.look_at(self))
       |> conn.prompt()
 
-    Ok(Item(item_instance)) -> item_event.look_at(conn, item_instance)
+    Ok(Item(item_instance)) -> events.item_look_at(conn, item_instance)
 
     Error(Nil) -> conn.event(conn, event.LookAt(search_term))
   }
@@ -255,6 +255,7 @@ fn kill_command(conn: Conn, command: Command(Verb, String)) -> Conn {
       event.CombatRequestData(
         victim: event.Keyword(command.data),
         dam_roll: world.random(8),
+        is_round_based: False,
       )
       |> act.kill
       |> conn.action(conn, _)

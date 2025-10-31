@@ -1,17 +1,22 @@
 //// Route the event to the handler given the received event data.
 ////
 
+import gleam/bool
+import gleam/list
+import gleam/result.{try}
 import lore/character/conn.{type Conn}
-import lore/character/events/item_event
-import lore/character/events/move_event
 import lore/character/view
 import lore/character/view/character_view
 import lore/character/view/combat_view
 import lore/character/view/communication_view
 import lore/character/view/door_view
 import lore/character/view/error_view
-import lore/world
+import lore/character/view/item_view
+import lore/character/view/move_view
+import lore/world.{type Id, type Room}
 import lore/world/event.{type CharacterEvent, type Event, type RoomMessage}
+import lore/world/items
+import lore/world/system_tables
 
 pub fn route_player(
   conn: Conn,
@@ -23,44 +28,18 @@ pub fn route_player(
       |> conn.renderln(error_view.room_request_error(reason))
       |> conn.prompt()
 
-    event.MoveNotifyArrive(data) -> move_event.notify_arrive(conn, event, data)
-    event.MoveNotifyDepart(data) -> move_event.notify_depart(conn, event, data)
-    event.MoveCommit(data) -> move_event.move_commit(conn, event, data)
+    event.MoveNotifyArrive(data) -> notify_arrive(conn, event, data)
+    event.MoveNotifyDepart(data) -> notify_depart(conn, event, data)
+    event.MoveCommit(data) -> move_commit(conn, event, data)
     event.DoorNotify(data) -> notify(conn, event, data, door_view.notify)
     event.Communication(data) ->
       notify(conn, event, data, communication_view.notify)
-    event.ItemGetNotify(item) -> item_event.get(conn, event, item)
-    event.ItemDropNotify(item) -> item_event.drop(conn, event, item)
-    event.ItemInspect(item) -> item_event.look_at(conn, item)
-    event.CombatCommit(data) -> {
-      let self = conn.get_character(conn)
-      let victim = data.victim
-      let is_victim = victim.id == self.id
-      let attacker = event.acting_character
-
-      let conn = case is_victim {
-        True -> {
-          conn
-          |> conn.put_character(world.MobileInternal(..self, hp: victim.hp))
-        }
-
-        False -> conn
-      }
-
-      let conn = case is_victim && !conn.is_player(conn) {
-        True ->
-          event.CombatRequestData(
-            victim: event.SearchId(attacker.id),
-            dam_roll: world.random(4),
-          )
-          |> event.CombatRequest
-          |> conn.event(conn, _)
-
-        False -> conn
-      }
-
-      notify(conn, event, data, combat_view.notify)
-    }
+    event.ItemGetNotify(item) -> item_get(conn, event, item)
+    event.ItemDropNotify(item) -> item_drop(conn, event, item)
+    event.ItemInspect(item) -> item_look_at(conn, item)
+    event.CombatCommit(data) -> combat_commit(conn, data)
+    event.CombatRound(participants:, commits:) ->
+      combat_commit_round(conn, participants, commits)
     event.MobileInspectRequest(by: requester) ->
       conn.character_event(
         conn,
@@ -85,4 +64,204 @@ fn notify(
   conn
   |> conn.renderln(view)
   |> conn.prompt()
+}
+
+//
+// Movement
+//
+
+fn move_commit(
+  conn: Conn,
+  _event: Event(CharacterEvent, RoomMessage),
+  to_room_id: Id(Room),
+) -> Conn {
+  // The zone communicates to the character that the move is official,
+  // so the first thing they do is update their room id to the destination room.
+  //
+  let character = conn.get_character(conn)
+  let update = world.MobileInternal(..character, room_id: to_room_id)
+
+  conn
+  |> conn.put_character(update)
+}
+
+fn notify_arrive(
+  conn: Conn,
+  event: Event(CharacterEvent, RoomMessage),
+  data: event.NotifyArriveData,
+) -> Conn {
+  let self = conn.get_character(conn)
+  // Discard if acting_character
+  use <- bool.guard(event.is_from_acting_character(event, self), conn)
+  let event.NotifyArriveData(enter_keyword:, ..) = data
+  conn.renderln(
+    conn,
+    move_view.notify_arrive(event.acting_character, enter_keyword),
+  )
+  |> conn.prompt()
+}
+
+fn notify_depart(
+  conn: Conn,
+  event: Event(CharacterEvent, RoomMessage),
+  data: event.NotifyDepartData,
+) -> Conn {
+  let event.NotifyDepartData(exit_keyword:, ..) = data
+  conn
+  |> conn.renderln(move_view.notify_depart(event.acting_character, exit_keyword))
+  |> conn.prompt()
+}
+
+//
+// Items
+//
+
+fn item_get(
+  conn: Conn,
+  event: Event(CharacterEvent, RoomMessage),
+  item_instance: world.ItemInstance,
+) -> Conn {
+  let result = {
+    use item <- result.try(item_load(conn, item_instance))
+    let self = conn.get_character(conn)
+    case event.is_from_acting_character(event, self) {
+      True -> {
+        let update = [item_instance, ..self.inventory]
+
+        conn
+        |> conn.put_character(world.MobileInternal(..self, inventory: update))
+        |> conn.renderln(item_view.get(self, event.acting_character, item))
+        |> Ok
+      }
+
+      False ->
+        conn.renderln(conn, item_view.get(self, event.acting_character, item))
+        |> Ok
+    }
+  }
+
+  case result {
+    Ok(update) -> conn.prompt(update)
+    Error(Nil) -> conn
+  }
+}
+
+fn item_drop(
+  conn: Conn,
+  event: Event(CharacterEvent, RoomMessage),
+  item_instance: world.ItemInstance,
+) -> Conn {
+  let result = {
+    use item <- result.try(item_load(conn, item_instance))
+    let self = conn.get_character(conn)
+    case event.is_from_acting_character(event, self) {
+      True -> {
+        let update =
+          list.filter(self.inventory, fn(x) { item_instance.id != x.id })
+
+        conn
+        |> conn.put_character(world.MobileInternal(..self, inventory: update))
+        |> conn.renderln(item_view.drop(self, event.acting_character, item))
+        |> Ok
+      }
+
+      False ->
+        conn.renderln(conn, item_view.drop(self, event.acting_character, item))
+        |> Ok
+    }
+  }
+
+  case result {
+    Ok(update) -> conn.prompt(update)
+    Error(Nil) -> conn
+  }
+}
+
+pub fn item_look_at(conn: Conn, item_instance: world.ItemInstance) -> Conn {
+  case item_load(conn, item_instance) {
+    Ok(item) ->
+      conn
+      |> conn.renderln(item_view.inspect(item))
+      |> conn.prompt()
+
+    Error(Nil) -> conn
+  }
+}
+
+fn item_load(
+  conn: Conn,
+  item_instance: world.ItemInstance,
+) -> Result(world.Item, Nil) {
+  let system_tables.Lookup(items:, ..) = conn.system_tables(conn)
+  case item_instance.item {
+    world.Loading(id) -> items.load(items, id)
+    world.Loaded(item) -> Ok(item)
+  }
+}
+
+//
+// Combat
+//
+
+fn combat_commit(conn: Conn, data: event.CombatCommitData) -> Conn {
+  let self = conn.get_character(conn)
+  let victim = data.victim
+  let is_victim = victim.id == self.id
+  let attacker = data.attacker
+
+  let conn = case is_victim {
+    True ->
+      world.MobileInternal(..self, hp: victim.hp)
+      |> conn.put_character(conn, _)
+
+    False -> conn
+  }
+
+  let conn = case is_victim && !conn.is_player(conn) {
+    True ->
+      event.CombatRequestData(
+        victim: event.SearchId(attacker.id),
+        dam_roll: world.random(4),
+        is_round_based: True,
+      )
+      |> event.CombatRequest
+      |> conn.event(conn, _)
+
+    False -> conn
+  }
+
+  conn.renderln(conn, combat_view.notify(self, data))
+}
+
+fn combat_commit_round(
+  conn: Conn,
+  participants: List(world.Mobile),
+  commits: List(world.CombatPollData),
+) -> Conn {
+  let result = {
+    let world.MobileInternal(id: self_id, ..) as self = conn.get_character(conn)
+    use update <- try(
+      list.find(participants, fn(participant) { participant.id == self_id })
+      |> result.map(sync_mobile(_, self)),
+    )
+
+    conn
+    |> conn.put_character(update)
+    |> conn.renderln(combat_view.round_report(update, participants, commits))
+    |> conn.renderln(combat_view.round_summary(update, participants))
+    |> Ok
+  }
+
+  case result {
+    Ok(conn) -> conn
+    _ -> conn
+  }
+}
+
+fn sync_mobile(
+  update: world.Mobile,
+  self: world.MobileInternal,
+) -> world.MobileInternal {
+  let world.Mobile(hp:, is_in_combat:, ..) = update
+  world.MobileInternal(..self, hp:, is_in_combat:)
 }

@@ -166,6 +166,10 @@ pub type CharacterEvent {
   MobileInspectRequest(by: Subject(CharacterMessage))
   MobileInspectResponse(character: world.MobileInternal)
   CombatCommit(CombatCommitData)
+  CombatRound(
+    participants: List(world.Mobile),
+    commits: List(world.CombatPollData),
+  )
   ActFailed(world.ErrorRoomRequest)
 }
 
@@ -269,7 +273,7 @@ pub type ChatData {
 }
 
 pub type CombatCommitData {
-  CombatCommitData(victim: world.Mobile, damage: Int)
+  CombatCommitData(attacker: world.Mobile, victim: world.Mobile, damage: Int)
 }
 
 /// Zones are a sync point for inter-room events like movement and doors.
@@ -310,7 +314,11 @@ pub type SearchTerm(a) {
 }
 
 pub type CombatRequestData {
-  CombatRequestData(victim: SearchTerm(Mobile), dam_roll: Int)
+  CombatRequestData(
+    victim: SearchTerm(Mobile),
+    dam_roll: Int,
+    is_round_based: Bool,
+  )
 }
 
 pub fn new(

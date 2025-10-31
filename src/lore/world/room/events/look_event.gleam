@@ -48,7 +48,7 @@ pub fn look_at(
 
   case result {
     Ok(Item(item_match)) ->
-      response.reply_character(builder, event, event.ItemInspect(item_match))
+      response.reply_character(builder, event.ItemInspect(item_match))
 
     Ok(Mobile(mobile_match)) -> {
       response.character_event(
@@ -62,7 +62,6 @@ pub fn look_at(
     Error(_) ->
       response.reply_character(
         builder,
-        event,
         event.ActFailed(world.NotFound(search_term)),
       )
   }

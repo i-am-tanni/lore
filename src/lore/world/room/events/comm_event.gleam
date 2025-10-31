@@ -40,8 +40,7 @@ pub fn broadcast(
         event.Communication(data),
       )
 
-    Error(reason) ->
-      response.reply_character(builder, event, event.ActFailed(reason))
+    Error(reason) -> response.reply_character(builder, event.ActFailed(reason))
   }
 }
 
