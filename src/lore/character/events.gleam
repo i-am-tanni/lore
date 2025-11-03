@@ -24,7 +24,6 @@ pub fn route_player(
   conn: Conn,
   event: Event(CharacterEvent, RoomMessage),
 ) -> Conn {
-  echo event.data
   case event.data {
     event.ActFailed(reason) ->
       conn
