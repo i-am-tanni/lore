@@ -105,7 +105,7 @@ fn perspective(
 fn damage_feedback(damage: Int, victim_hp_max: Int) -> String {
   let dam_percent = 100 * damage / victim_hp_max
   case dam_percent {
-    _ if dam_percent <= 0 -> "misses"
+    _ if dam_percent <= 0 -> "annoys"
     _ if dam_percent <= 1 -> "tickles"
     _ if dam_percent <= 2 -> "nicks"
     _ if dam_percent <= 3 -> "scuffs"
