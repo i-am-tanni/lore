@@ -49,7 +49,6 @@ pub type Room {
     exits: List(RoomExit),
     characters: List(Mobile),
     items: List(ItemInstance),
-    round_queue: List(CombatPollData),
   )
 }
 
@@ -82,6 +81,11 @@ pub type AccessState {
   Closed
 }
 
+pub type Target {
+  Fighting(StringId(Mobile))
+  NoTarget
+}
+
 /// Public mobile data relating to a mobile instance.
 ///
 pub type Mobile {
@@ -103,8 +107,7 @@ pub type Mobile {
 ///
 pub type MobileInternal {
   /// ## Private fields
-  /// - hp
-  /// - hp_max
+  /// - target
   /// - inventory
   MobileInternal(
     id: StringId(Mobile),
@@ -115,6 +118,7 @@ pub type MobileInternal {
     inventory: List(ItemInstance),
     pronouns: pronoun.PronounChoice,
     short: String,
+    fighting: Target,
     hp: Int,
     hp_max: Int,
     is_in_combat: Bool,

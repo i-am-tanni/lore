@@ -1,19 +1,16 @@
 //// A module for building responses to received room events.
 ////
 
-import gleam/dict
 import gleam/erlang/process.{type Subject}
-import gleam/function
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
-import lore/character/character_registry
 import lore/character/view.{type View}
 import lore/server/my_list
 import lore/server/output
 import lore/world.{
   type Id, type ItemInstance, type Mobile, type RoomExit, type StringId,
-  type Zone, Room,
+  type Zone,
 }
 import lore/world/communication.{type Channel, RoomChannel}
 import lore/world/event.{
@@ -21,9 +18,7 @@ import lore/world/event.{
   type RoomToRoomEvent, type ZoneEvent,
 }
 import lore/world/mapper
-import lore/world/room/room_registry
 import lore/world/system_tables
-import lore/world/zone/zone_registry
 
 /// A builder for a response to a room event.
 /// Brings in context from the event (caller & acting_character) and the room
@@ -34,26 +29,29 @@ pub opaque type Builder(a) {
     room: world.Room,
     caller: Subject(a),
     self: Subject(RoomMessage),
-    acting_character: world.Mobile,
+    acting_character: Option(world.Mobile),
     system_tables: system_tables.Lookup,
     output: List(#(Subject(CharacterMessage), output.Text)),
     events: List(EventToSend(a)),
     update_characters: Option(List(Mobile)),
     update_items: Option(List(ItemInstance)),
     update_exits: Option(List(RoomExit)),
+    combat_queue: List(world.CombatPollData),
+    is_in_combat: Bool,
   )
 }
 
 /// A completed response to an request received by the room.
 ///
-pub opaque type Response(a) {
+pub type Response(a) {
   Response(
     events: List(EventToSend(a)),
     output: List(#(Subject(CharacterMessage), output.Text)),
     update_characters: Option(List(Mobile)),
     update_items: Option(List(ItemInstance)),
     update_exits: Option(List(RoomExit)),
-    system_tables: system_tables.Lookup,
+    combat_queue: List(world.CombatPollData),
+    is_in_combat: Bool,
   )
 }
 
@@ -99,8 +97,10 @@ pub fn new(
   room: world.Room,
   caller: Subject(a),
   self: Subject(RoomMessage),
-  acting_character: world.Mobile,
+  acting_character: Option(world.Mobile),
   system_tables: system_tables.Lookup,
+  combat_queue: List(world.CombatPollData),
+  is_in_combat: Bool,
 ) -> Builder(a) {
   Builder(
     room:,
@@ -113,14 +113,11 @@ pub fn new(
     update_characters: None,
     update_items: None,
     update_exits: None,
+    combat_queue:,
+    is_in_combat:,
   )
 }
 
-/// Exposes the context of the event including:
-/// - `room` data
-/// - 'caller' - i.e. the mailbox of who sent the event
-/// - `acting_character` - the character information of the event sender
-///
 pub fn room(builder: Builder(a)) -> world.Room {
   builder.room
 }
@@ -133,6 +130,23 @@ pub fn self(builder: Builder(a)) -> Subject(RoomMessage) {
 
 pub fn system_tables(builder: Builder(a)) -> system_tables.Lookup {
   builder.system_tables
+}
+
+pub fn is_in_combat(builder: Builder(a)) -> Bool {
+  builder.is_in_combat
+}
+
+pub fn combat_commence(
+  builder: Builder(a),
+  acting_character: world.Mobile,
+) -> Builder(a) {
+  case !builder.is_in_combat {
+    True ->
+      Builder(..builder, is_in_combat: True)
+      |> broadcast(acting_character, event.CombatRoundPoll)
+
+    False -> builder
+  }
 }
 
 /// Get the mini_map via a call
@@ -235,16 +249,17 @@ pub fn reply_character(
   builder: Builder(CharacterMessage),
   data: event.CharacterEvent,
 ) -> Builder(CharacterMessage) {
-  let event =
-    event.new(
-      from: builder.self,
-      acting_character: builder.acting_character,
-      data:,
-    )
-  Builder(..builder, events: [
-    ToCharacter(builder.caller, event),
-    ..builder.events
-  ])
+  case builder.acting_character {
+    Some(acting_character) -> {
+      let event = event.new(from: builder.self, acting_character:, data:)
+      Builder(..builder, events: [
+        ToCharacter(builder.caller, event),
+        ..builder.events
+      ])
+    }
+
+    None -> builder
+  }
 }
 
 /// Convert the response builder to a response to be processed by the room.
@@ -257,7 +272,8 @@ pub fn build(builder: Builder(a)) -> Response(a) {
     update_characters: builder.update_characters,
     update_items: builder.update_items,
     update_exits: builder.update_exits,
-    system_tables: builder.system_tables,
+    combat_queue: builder.combat_queue,
+    is_in_combat: builder.is_in_combat,
   )
 }
 
@@ -428,142 +444,18 @@ pub fn item_delete(builder: Builder(a), item: ItemInstance) -> Builder(a) {
   Builder(..builder, update_items: Some(filtered))
 }
 
+/// Pushes a round-based combat action into the queue
+///
 pub fn round_push(
   builder: Builder(a),
   combat_data: world.CombatPollData,
 ) -> Builder(a) {
-  let room = builder.room
-  let room = world.Room(..room, round_queue: [combat_data, ..room.round_queue])
-  Builder(..builder, room:)
+  Builder(..builder, combat_queue: [combat_data, ..builder.combat_queue])
 }
 
-/// Process a response to a RoomEvent and commit staged state changes.
-///
-pub fn handle_response(response: Response(a), room: world.Room) -> world.Room {
-  // Send outputs
-  send_text(response.output, room)
-  list.each(response.events, send_event(_, room, response.system_tables))
-
-  // update room state
-  let Response(update_characters:, update_items:, update_exits:, ..) = response
-  let items = case update_items {
-    Some(items_update) -> items_update
-    None -> room.items
-  }
-
-  let characters = case update_characters {
-    Some(characters_update) -> characters_update
-    None -> room.characters
-  }
-
-  let exits = case update_exits {
-    Some(exits_update) -> exits_update
-    None -> room.exits
-  }
-
-  Room(..room, characters:, items:, exits:)
-}
-
-fn send_text(
-  output: List(#(Subject(CharacterMessage), output.Text)),
-  from room: world.Room,
-) -> Nil {
-  case output {
-    // if the list is empty, do nothing
-    //
-    [] -> Nil
-    // ...otherwise if the list only has one message to send, send that
-    //
-    [#(subject, output)] -> {
-      let text = event.RoomSentText(text: [output])
-      process.send(subject, event.RoomSent(text, room.id))
-    }
-    // ...and if the list has more than one member, group by subject, reverse
-    // the order, and send as a batch
-    //
-    _ -> {
-      let room_id = room.id
-
-      my_list.group_by(output, function.identity)
-      |> dict.to_list
-      |> list.each(fn(pair) {
-        let #(subject, outputs) = pair
-        let text = event.RoomSentText(text: outputs)
-        process.send(subject, event.RoomSent(text, room_id))
-      })
-    }
-  }
-}
-
-fn send_event(
-  event: EventToSend(a),
-  from room: world.Room,
-  lookup system_tables: system_tables.Lookup,
-) -> Nil {
-  case event {
-    Reply(to:, message:) -> process.send(to, message)
-
-    ToCharacter(subject:, event:) ->
-      process.send(
-        subject,
-        event.RoomSent(event.RoomToCharacter(event), room.id),
-      )
-
-    ToCharacterId(id:, event:) -> {
-      case character_registry.whereis(system_tables.character, id) {
-        Ok(subject) ->
-          process.send(
-            subject,
-            event.RoomSent(event.RoomToCharacter(event), room.id),
-          )
-
-        _ -> Nil
-      }
-    }
-
-    ToZone(id:, event:) ->
-      case zone_registry.whereis(system_tables.zone, id) {
-        Ok(subject) -> process.send(subject, event.RoomToZone(event))
-        _ -> Nil
-      }
-
-    ToRoom(id:, event:) ->
-      case room_registry.whereis(system_tables.room, id) {
-        Ok(subject) -> process.send(subject, event.RoomToRoom(event))
-        _ -> Nil
-      }
-
-    // Sends a room message to all subscribers of the room channel.
-    //
-    Broadcast(channel:, event:) ->
-      communication.publish(
-        system_tables.communication,
-        channel,
-        event.RoomSent(event.RoomToCharacter(event), room.id),
-      )
-
-    // Warning! Blocks until the table is up-to-date to keep the table in sync
-    // for broadcasts.
-    Subscribe(channel:, subscriber:) -> {
-      let _ =
-        communication.subscribe(
-          system_tables.communication,
-          channel,
-          subscriber,
-        )
-      Nil
-    }
-
-    // Warning! Blocks until the table is up-to-date to keep the table in sync
-    // for broadcasts.
-    Unsubscribe(channel:, subscriber:) -> {
-      let _ =
-        communication.unsubscribe(
-          system_tables.communication,
-          channel,
-          subscriber,
-        )
-      Nil
-    }
-  }
+pub fn round_flush(
+  builder: Builder(a),
+) -> #(List(world.CombatPollData), Builder(a)) {
+  let combat_queue = builder.combat_queue
+  #(combat_queue, Builder(..builder, combat_queue: []))
 }

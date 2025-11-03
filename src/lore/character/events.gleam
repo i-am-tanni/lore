@@ -2,8 +2,10 @@
 ////
 
 import gleam/bool
+import gleam/dict.{type Dict}
 import gleam/list
 import gleam/result.{try}
+import lore/character/act
 import lore/character/conn.{type Conn}
 import lore/character/view
 import lore/character/view/character_view
@@ -22,24 +24,35 @@ pub fn route_player(
   conn: Conn,
   event: Event(CharacterEvent, RoomMessage),
 ) -> Conn {
+  echo event.data
   case event.data {
     event.ActFailed(reason) ->
       conn
       |> conn.renderln(error_view.room_request_error(reason))
       |> conn.prompt()
-
+    // move events
+    //
     event.MoveNotifyArrive(data) -> notify_arrive(conn, event, data)
     event.MoveNotifyDepart(data) -> notify_depart(conn, event, data)
     event.MoveCommit(data) -> move_commit(conn, event, data)
     event.DoorNotify(data) -> notify(conn, event, data, door_view.notify)
+    // communication
+    //
     event.Communication(data) ->
       notify(conn, event, data, communication_view.notify)
+    // item events
+    //
     event.ItemGetNotify(item) -> item_get(conn, event, item)
     event.ItemDropNotify(item) -> item_drop(conn, event, item)
     event.ItemInspect(item) -> item_look_at(conn, item)
+    // combat
+    //
     event.CombatCommit(data) -> combat_commit(conn, data)
     event.CombatRound(participants:, commits:) ->
       combat_commit_round(conn, participants, commits)
+    event.CombatRoundPoll -> combat_round_poll(conn)
+    // requests to expose internal data
+    //
     event.MobileInspectRequest(by: requester) ->
       conn.character_event(
         conn,
@@ -205,50 +218,68 @@ fn item_load(
 
 fn combat_commit(conn: Conn, data: event.CombatCommitData) -> Conn {
   let self = conn.get_character(conn)
+  let self_id = self.id
   let victim = data.victim
-  let is_victim = victim.id == self.id
-  let attacker = data.attacker
+  let is_victim = self_id == victim.id
 
-  let conn = case is_victim {
-    True ->
+  let conn = case self.fighting {
+    world.NoTarget if is_victim ->
+      world.MobileInternal(
+        ..self,
+        hp: victim.hp,
+        fighting: world.Fighting(data.attacker.id),
+      )
+      |> conn.put_character(conn, _)
+
+    world.Fighting(_) if is_victim ->
       world.MobileInternal(..self, hp: victim.hp)
       |> conn.put_character(conn, _)
 
-    False -> conn
-  }
-
-  let conn = case is_victim && !conn.is_player(conn) {
-    True ->
-      event.CombatRequestData(
-        victim: event.SearchId(attacker.id),
-        dam_roll: world.random(4),
-        is_round_based: True,
+    world.NoTarget if data.attacker.id == self_id ->
+      world.MobileInternal(
+        ..self,
+        fighting: world.Fighting(victim.id),
+        is_in_combat: True,
       )
-      |> event.CombatRequest
-      |> conn.event(conn, _)
+      |> conn.put_character(conn, _)
 
-    False -> conn
+    _ -> conn
   }
 
-  conn.renderln(conn, combat_view.notify(self, data))
+  conn.render(conn, combat_view.notify(self, data))
+}
+
+fn combat_round_poll(conn: Conn) -> Conn {
+  let self = conn.get_character(conn)
+  case self.fighting {
+    world.Fighting(victim_id) -> auto_attack(conn, victim_id)
+    _ -> conn
+  }
 }
 
 fn combat_commit_round(
   conn: Conn,
-  participants: List(world.Mobile),
+  participants: Dict(world.StringId(world.Mobile), world.Mobile),
   commits: List(world.CombatPollData),
 ) -> Conn {
   let result = {
-    let world.MobileInternal(id: self_id, ..) as self = conn.get_character(conn)
+    let self = conn.get_character(conn)
     use update <- try(
-      list.find(participants, fn(participant) { participant.id == self_id })
+      dict.get(participants, self.id)
       |> result.map(sync_mobile(_, self)),
     )
 
-    conn
-    |> conn.put_character(update)
-    |> conn.renderln(combat_view.round_report(update, participants, commits))
-    |> conn.renderln(combat_view.round_summary(update, participants))
+    let conn =
+      conn
+      |> conn.put_character(update)
+      |> conn.renderln(combat_view.round_report(update, participants, commits))
+      |> conn.renderln(combat_view.round_summary(update, participants))
+      |> conn.prompt()
+
+    case update.fighting {
+      world.Fighting(victim_id) -> auto_attack(conn, victim_id)
+      _ -> conn
+    }
     |> Ok
   }
 
@@ -256,6 +287,16 @@ fn combat_commit_round(
     Ok(conn) -> conn
     _ -> conn
   }
+}
+
+fn auto_attack(conn: Conn, victim_id: world.StringId(world.Mobile)) -> Conn {
+  event.CombatRequestData(
+    victim: event.SearchId(victim_id),
+    dam_roll: world.random(8),
+    is_round_based: True,
+  )
+  |> act.kill
+  |> conn.action(conn, _)
 }
 
 fn sync_mobile(

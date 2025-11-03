@@ -1,8 +1,9 @@
 import gleam/bool
+import gleam/dict.{type Dict}
 import gleam/list
 import gleam/result.{try}
 import gleam/set
-import lore/world.{type Mobile, Player}
+import lore/world.{type Mobile, type StringId, Player}
 import lore/world/event.{
   type CharacterMessage, type CharacterToRoomEvent, type Event,
 }
@@ -13,13 +14,11 @@ pub fn request(
   event: Event(CharacterToRoomEvent, CharacterMessage),
   data: event.CombatRequestData,
 ) -> response.Builder(CharacterMessage) {
+  let attacker = event.acting_character
   let result = {
     use victim <- try(find_local_character(builder, data.victim))
 
-    use <- bool.guard(
-      is_pvp(event.acting_character, victim),
-      Error(world.PvpForbidden),
-    )
+    use <- bool.guard(is_pvp(attacker, victim), Error(world.PvpForbidden))
     world.CombatPollData(
       attacker_id: event.acting_character.id,
       victim_id: victim.id,
@@ -28,58 +27,71 @@ pub fn request(
     |> Ok
   }
 
-  case result {
+  let builder = case result {
     Ok(round_data) if data.is_round_based ->
       response.round_push(builder, round_data)
 
-    Ok(round_data) -> process_combat(builder, round_data)
+    Ok(combat_data) -> process_combat(builder, combat_data)
 
     Error(error) -> response.reply_character(builder, event.ActFailed(error))
+  }
+
+  case !response.is_in_combat(builder) {
+    True -> response.combat_commence(builder, attacker)
+    False -> builder
   }
 }
 
 pub fn round_trigger(
-  builder: response.Builder(CharacterMessage),
+  builder: response.Builder(event.RoomMessage),
   actions: List(world.CombatPollData),
-) -> response.Builder(CharacterMessage) {
+) -> response.Builder(event.RoomMessage) {
   // filter participants
   let participants =
     actions
-    |> list.fold(set.new(), fn(acc, action) {
-      acc
-      |> set.insert(action.attacker_id)
-      |> set.insert(action.victim_id)
-    })
+    |> list.flat_map(fn(action) { [action.attacker_id, action.victim_id] })
+    |> set.from_list
 
   // Make sure participants are still in the room
   let world.Room(characters:, ..) = response.room(builder)
   let participants =
-    list.filter(characters, fn(character) {
-      set.contains(participants, character.id)
+    list.filter_map(characters, fn(character) {
+      case set.contains(participants, character.id) {
+        True -> Ok(#(character.id, character))
+        False -> Error(Nil)
+      }
     })
+    |> dict.from_list()
 
-  // update participants and get commits to broadcast
-  let #(updated_participants, commits) =
+  // update participants and generate commits to broadcast
+  let #(participants, commits) =
     list.fold(actions, #(participants, list.new()), fn(acc, action) {
       let #(participants, commits) = acc
-      process_round_action(action, participants, commits)
+      round_process_action(action, participants, commits)
     })
 
-  use <- bool.guard(commits == [] || participants == [], builder)
-  let assert [world.CombatPollData(attacker_id:, ..), _] = commits
-  let assert Ok(acting_character_to_ignore) =
-    list.find(participants, fn(mobile) { mobile.id == attacker_id })
+  // build response
+  let result = {
+    use acting_character_to_ignore <- try(list.first(characters))
+    let round_event =
+      event.CombatRound(participants:, commits: list.reverse(commits))
 
-  let round_event =
-    event.CombatRound(
-      participants: updated_participants,
-      commits: list.reverse(commits),
-    )
+    // update characters list
+    list.map(characters, fn(character) {
+      case dict.get(participants, character.id) {
+        Ok(update) -> update
+        Error(Nil) -> character
+      }
+    })
+    |> response.characters_put(builder, _)
+    |> response.broadcast(acting_character_to_ignore, round_event)
+    |> Ok
+  }
 
-  // update characters list
-  list.fold(updated_participants, characters, update_character_in_list)
-  |> response.characters_put(builder, _)
-  |> response.broadcast(acting_character_to_ignore, round_event)
+  case result {
+    Ok(builder) -> builder
+    Error(_) -> builder
+  }
 }
 
 pub fn process_combat(
@@ -119,28 +131,27 @@ pub fn process_combat(
   }
 }
 
-pub fn process_round_action(
-  data: world.CombatPollData,
-  participants: List(world.Mobile),
+pub fn round_process_action(
+  action: world.CombatPollData,
+  participants: Dict(StringId(Mobile), Mobile),
   commits: List(world.CombatPollData),
-) -> #(List(world.Mobile), List(world.CombatPollData)) {
+) -> #(Dict(StringId(Mobile), Mobile), List(world.CombatPollData)) {
   let result = {
-    // find characters
-    let world.CombatPollData(victim_id:, attacker_id:, dam_roll:) = data
-    use attacker <- try(find_character(
-      participants,
-      event.SearchId(attacker_id),
-    ))
-    use victim <- try(find_character(participants, event.SearchId(victim_id)))
+    // find and update characters
+    let world.CombatPollData(victim_id:, attacker_id:, dam_roll:) = action
+    use attacker <- try(dict.get(participants, attacker_id))
+    use victim <- try(dict.get(participants, victim_id))
+    let participants = case !attacker.is_in_combat {
+      True ->
+        world.Mobile(..attacker, is_in_combat: True)
+        |> dict.insert(participants, attacker_id, _)
 
-    // update characters
-    let updates = case !attacker.is_in_combat {
-      True -> [world.Mobile(..attacker, is_in_combat: True)]
-      False -> []
+      False -> participants
     }
-    let updates = [world.Mobile(..victim, hp: victim.hp - dam_roll), ..updates]
+
     let participants =
-      list.fold(updates, participants, update_character_in_list)
+      world.Mobile(..victim, hp: victim.hp - dam_roll)
+      |> dict.insert(participants, victim_id, _)
 
     // prepend commits
     let commits =
@@ -179,31 +190,4 @@ fn find_local_character(
         id == character.id
       })
   }
-}
-
-fn find_character(
-  characters: List(world.Mobile),
-  search_term: event.SearchTerm(Mobile),
-) -> Result(Mobile, Nil) {
-  case search_term {
-    event.Keyword(term) ->
-      list.find(characters, fn(character) {
-        list.any(character.keywords, fn(keyword) { term == keyword })
-      })
-
-    event.SearchId(id) ->
-      list.find(characters, fn(character) { id == character.id })
-  }
-}
-
-fn update_character_in_list(
-  list: List(world.Mobile),
-  update: world.Mobile,
-) -> List(world.Mobile) {
-  list.map(list, fn(member) {
-    case member.id == update.id {
-      True -> update
-      False -> member
-    }
-  })
 }

@@ -31,8 +31,8 @@ pub fn room(room: Room, observer: world.Mobile) -> View {
       }
     })
     |> string_tree.join(" ")
-    |> string_tree.prepend("Obvious Exits: &W")
-    |> string_tree.append("\n0;")
+    |> string_tree.prepend("&189[Obvious Exits: &W")
+    |> string_tree.append("&189]0;\n")
 
   let observer_id = observer.id
   let mobiles =

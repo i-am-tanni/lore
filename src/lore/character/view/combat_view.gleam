@@ -1,10 +1,11 @@
+import gleam/dict.{type Dict}
 import gleam/int
 import gleam/list
 import gleam/result.{try}
 import gleam/string_tree
 import lore/character/view.{type View}
 import lore/character/view/character_view
-import lore/world
+import lore/world.{type Mobile, type StringId}
 import lore/world/event
 
 type Perspective {
@@ -47,13 +48,13 @@ pub fn notify(self: world.MobileInternal, data: event.CombatCommitData) -> View 
 
 pub fn round_report(
   self: world.MobileInternal,
-  participants: List(world.Mobile),
+  participants: Dict(StringId(Mobile), Mobile),
   commits: List(world.CombatPollData),
 ) -> View {
   list.filter_map(commits, fn(commit) {
     let world.CombatPollData(attacker_id:, victim_id:, dam_roll:) = commit
-    use attacker <- try(list.find(participants, id_match(_, attacker_id)))
-    use victim <- try(list.find(participants, id_match(_, victim_id)))
+    use attacker <- try(dict.get(participants, attacker_id))
+    use victim <- try(dict.get(participants, victim_id))
     let commit = event.CombatCommitData(attacker:, victim:, damage: dam_roll)
     Ok(notify(self, commit))
   })
@@ -62,10 +63,12 @@ pub fn round_report(
 
 pub fn round_summary(
   self: world.MobileInternal,
-  participants: List(world.Mobile),
+  participants: Dict(StringId(Mobile), Mobile),
 ) -> View {
-  let self_id = self.id
-  let participants = list.filter(participants, id_match(_, self_id))
+  let participants =
+    dict.delete(participants, self.id)
+    |> dict.values
+
   let prelude =
     [
       "You ",
@@ -97,10 +100,6 @@ fn perspective(
     self if self == victim.id -> Victim
     _ -> Witness
   }
-}
-
-fn id_match(a: world.Mobile, id: world.StringId(world.Mobile)) -> Bool {
-  a.id == id
 }
 
 fn damage_feedback(damage: Int, victim_hp_max: Int) -> String {

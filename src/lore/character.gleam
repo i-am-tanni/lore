@@ -63,7 +63,7 @@ pub fn start_reception(
   let init = init_reception(_, endpoint, system_tables)
 
   actor.new_with_initialiser(1000, init)
-  |> actor.on_message(handle_message)
+  |> actor.on_message(recv)
   |> actor.start
 }
 
@@ -101,6 +101,7 @@ fn init_reception(
       pronouns: pronoun.Feminine,
       inventory: [],
       is_in_combat: False,
+      fighting: world.NoTarget,
       hp: 20,
       hp_max: 20,
     )
@@ -132,7 +133,7 @@ pub fn start_character(
   let init = init_character(_, data.endpoint, data.mobile, system_tables)
 
   actor.new_with_initialiser(100, init)
-  |> actor.on_message(handle_message)
+  |> actor.on_message(recv)
   |> actor.start
 }
 
@@ -169,7 +170,7 @@ fn init_character(
   |> Ok
 }
 
-fn handle_message(
+fn recv(
   state: State,
   msg: CharacterMessage,
 ) -> actor.Next(State, CharacterMessage) {
@@ -410,7 +411,7 @@ fn update_actions(response: conn.Response, state: State) -> ActionSummary {
 //
 fn on_controller_message(state: State, request: controller.Request) -> State {
   new_conn(state)
-  |> recv(state.controller, request)
+  |> recv_controller(state.controller, request)
   |> conn.to_response
   |> handle_response(state)
 }
@@ -424,7 +425,7 @@ fn init_controller(conn: Conn, controller: controller.Controller) -> Conn {
   }
 }
 
-fn recv(
+fn recv_controller(
   conn: Conn,
   controller: controller.Controller,
   msg: controller.Request,

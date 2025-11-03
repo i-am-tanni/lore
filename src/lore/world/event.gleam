@@ -8,6 +8,7 @@
 ////
 //// Event is an Event type
 
+import gleam/dict.{type Dict}
 import gleam/erlang/process.{type Subject}
 import gleam/option.{type Option}
 import gleam/order
@@ -144,6 +145,7 @@ pub type RoomMessage {
   InterRoom(event: Event(InterRoomEvent, Done))
   MobileCleanup(id: StringId(Mobile))
   SpawnItem(item: world.ItemInstance)
+  CombatRoundTrigger
 }
 
 /// A wrapper type for messages that can be received by a Zone.
@@ -167,9 +169,10 @@ pub type CharacterEvent {
   MobileInspectResponse(character: world.MobileInternal)
   CombatCommit(CombatCommitData)
   CombatRound(
-    participants: List(world.Mobile),
+    participants: Dict(StringId(Mobile), Mobile),
     commits: List(world.CombatPollData),
   )
+  CombatRoundPoll
   ActFailed(world.ErrorRoomRequest)
 }
 
