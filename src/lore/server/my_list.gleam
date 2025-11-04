@@ -111,10 +111,10 @@ pub fn at(list: List(a), index: Int) -> Result(a, Nil) {
   }
 }
 
-// Groups items in the list.
-// Similar to `list.group`, but the values are mapped.
-// Note: the lists are reversed.
-//
+/// Groups items in the list.
+/// Similar to `list.group`, but the values are mapped.
+/// Warning! The lists are reversed.
+///
 pub fn group_by(list: List(a), group_fun: fn(a) -> #(k, v)) -> Dict(k, List(v)) {
   list.fold(list, dict.new(), fn(acc, x) {
     let #(key, val) = group_fun(x)

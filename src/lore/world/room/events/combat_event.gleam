@@ -19,7 +19,7 @@ pub fn request(
     use victim <- try(find_local_character(builder, data.victim))
 
     use <- bool.guard(is_pvp(attacker, victim), Error(world.PvpForbidden))
-    world.CombatPollData(
+    event.CombatPollData(
       attacker_id: event.acting_character.id,
       victim_id: victim.id,
       dam_roll: data.dam_roll,
@@ -44,7 +44,7 @@ pub fn request(
 
 pub fn round_trigger(
   builder: response.Builder(event.RoomMessage),
-  actions: List(world.CombatPollData),
+  actions: List(event.CombatPollData),
 ) -> response.Builder(event.RoomMessage) {
   // filter participants
   let participants =
@@ -96,10 +96,10 @@ pub fn round_trigger(
 
 pub fn process_combat(
   builder: response.Builder(CharacterMessage),
-  data: world.CombatPollData,
+  data: event.CombatPollData,
 ) -> response.Builder(CharacterMessage) {
   let result = {
-    let world.CombatPollData(victim_id:, attacker_id:, dam_roll:) = data
+    let event.CombatPollData(victim_id:, attacker_id:, dam_roll:) = data
 
     // Make sure actors are still in the room
     use attacker <- try(find_local_character(
@@ -132,13 +132,13 @@ pub fn process_combat(
 }
 
 pub fn round_process_action(
-  action: world.CombatPollData,
+  action: event.CombatPollData,
   participants: Dict(StringId(Mobile), Mobile),
-  commits: List(world.CombatPollData),
-) -> #(Dict(StringId(Mobile), Mobile), List(world.CombatPollData)) {
+  commits: List(event.CombatPollData),
+) -> #(Dict(StringId(Mobile), Mobile), List(event.CombatPollData)) {
   let result = {
     // find and update characters
-    let world.CombatPollData(victim_id:, attacker_id:, dam_roll:) = action
+    let event.CombatPollData(victim_id:, attacker_id:, dam_roll:) = action
     use attacker <- try(dict.get(participants, attacker_id))
     use victim <- try(dict.get(participants, victim_id))
     let participants = case !attacker.is_in_combat {
@@ -155,7 +155,7 @@ pub fn round_process_action(
 
     // prepend commits
     let commits =
-      world.CombatPollData(attacker_id:, victim_id:, dam_roll: dam_roll)
+      event.CombatPollData(attacker_id:, victim_id:, dam_roll: dam_roll)
       |> list.prepend(commits, _)
 
     #(participants, commits)

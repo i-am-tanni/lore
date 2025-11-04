@@ -184,16 +184,6 @@ pub type ItemSpawn {
   ItemSpawn(spawn_id: Id(ItemSpawn), item_id: Id(Item), room_id: Id(Room))
 }
 
-/// An unfired combat event queued by the room.
-///
-pub type CombatPollData {
-  CombatPollData(
-    victim_id: StringId(Mobile),
-    attacker_id: StringId(Mobile),
-    dam_roll: Int,
-  )
-}
-
 /// Generates random 32 bit base-16 encoded string identifier.
 ///
 /// ## Example

@@ -40,7 +40,7 @@ type State {
     room: world.Room,
     system_tables: system_tables.Lookup,
     self: process.Subject(RoomMessage),
-    combat_queue: List(world.CombatPollData),
+    combat_queue: List(event.CombatPollData),
     combat_timer: Timer,
     is_in_combat: Bool,
   )

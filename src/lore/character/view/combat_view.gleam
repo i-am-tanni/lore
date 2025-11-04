@@ -49,10 +49,10 @@ pub fn notify(self: world.MobileInternal, data: event.CombatCommitData) -> View 
 pub fn round_report(
   self: world.MobileInternal,
   participants: Dict(StringId(Mobile), Mobile),
-  commits: List(world.CombatPollData),
+  commits: List(event.CombatPollData),
 ) -> View {
   list.filter_map(commits, fn(commit) {
-    let world.CombatPollData(attacker_id:, victim_id:, dam_roll:) = commit
+    let event.CombatPollData(attacker_id:, victim_id:, dam_roll:) = commit
     use attacker <- try(dict.get(participants, attacker_id))
     use victim <- try(dict.get(participants, victim_id))
     let commit = event.CombatCommitData(attacker:, victim:, damage: dam_roll)

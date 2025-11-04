@@ -259,7 +259,7 @@ fn combat_round_poll(conn: Conn) -> Conn {
 fn combat_commit_round(
   conn: Conn,
   participants: Dict(world.StringId(world.Mobile), world.Mobile),
-  commits: List(world.CombatPollData),
+  commits: List(event.CombatPollData),
 ) -> Conn {
   let result = {
     let self = conn.get_character(conn)

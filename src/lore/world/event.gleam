@@ -170,7 +170,7 @@ pub type CharacterEvent {
   CombatCommit(CombatCommitData)
   CombatRound(
     participants: Dict(StringId(Mobile), Mobile),
-    commits: List(world.CombatPollData),
+    commits: List(CombatPollData),
   )
   CombatRoundPoll
   ActFailed(world.ErrorRoomRequest)
@@ -273,6 +273,16 @@ pub type CommunicationData {
 
 pub type ChatData {
   ChatData(channel: world.ChatChannel, username: String, text: String)
+}
+
+/// An unfired combat event queued by the room.
+///
+pub type CombatPollData {
+  CombatPollData(
+    victim_id: StringId(Mobile),
+    attacker_id: StringId(Mobile),
+    dam_roll: Int,
+  )
 }
 
 pub type CombatCommitData {

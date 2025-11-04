@@ -36,7 +36,7 @@ pub opaque type Builder(a) {
     update_characters: Option(List(Mobile)),
     update_items: Option(List(ItemInstance)),
     update_exits: Option(List(RoomExit)),
-    combat_queue: List(world.CombatPollData),
+    combat_queue: List(event.CombatPollData),
     is_in_combat: Bool,
   )
 }
@@ -50,7 +50,7 @@ pub type Response(a) {
     update_characters: Option(List(Mobile)),
     update_items: Option(List(ItemInstance)),
     update_exits: Option(List(RoomExit)),
-    combat_queue: List(world.CombatPollData),
+    combat_queue: List(event.CombatPollData),
     is_in_combat: Bool,
   )
 }
@@ -99,7 +99,7 @@ pub fn new(
   self: Subject(RoomMessage),
   acting_character: Option(world.Mobile),
   system_tables: system_tables.Lookup,
-  combat_queue: List(world.CombatPollData),
+  combat_queue: List(event.CombatPollData),
   is_in_combat: Bool,
 ) -> Builder(a) {
   Builder(
@@ -448,14 +448,14 @@ pub fn item_delete(builder: Builder(a), item: ItemInstance) -> Builder(a) {
 ///
 pub fn round_push(
   builder: Builder(a),
-  combat_data: world.CombatPollData,
+  combat_data: event.CombatPollData,
 ) -> Builder(a) {
   Builder(..builder, combat_queue: [combat_data, ..builder.combat_queue])
 }
 
 pub fn round_flush(
   builder: Builder(a),
-) -> #(List(world.CombatPollData), Builder(a)) {
+) -> #(List(event.CombatPollData), Builder(a)) {
   let combat_queue = builder.combat_queue
   #(combat_queue, Builder(..builder, combat_queue: []))
 }
