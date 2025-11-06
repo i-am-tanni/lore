@@ -3,7 +3,7 @@ import gleam/dict.{type Dict}
 import gleam/list
 import gleam/result.{try}
 import gleam/set
-import lore/world.{type Mobile, type StringId, Player}
+import lore/world.{type Mobile, type StringId, Fighting, NoTarget, Player}
 import lore/world/event.{
   type CharacterMessage, type CharacterToRoomEvent, type Event,
 }
@@ -27,18 +27,19 @@ pub fn request(
     |> Ok
   }
 
-  let builder = case result {
-    Ok(round_data) if data.is_round_based ->
-      response.round_push(builder, round_data)
+  let is_round_based = data.is_round_based
+  let is_room_in_combat = response.is_in_combat(builder)
+  case result {
+    Ok(round_data) if is_round_based && !is_room_in_combat ->
+      builder
+      |> response.round_push(round_data)
+      |> response.combat_commence(attacker)
+
+    Ok(round_data) if is_round_based -> response.round_push(builder, round_data)
 
     Ok(combat_data) -> process_combat(builder, combat_data)
 
     Error(error) -> response.reply_character(builder, event.ActFailed(error))
-  }
-
-  case !response.is_in_combat(builder) {
-    True -> response.combat_commence(builder, attacker)
-    False -> builder
   }
 }
 
@@ -108,20 +109,44 @@ pub fn process_combat(
     ))
     use victim <- try(find_local_character(builder, event.SearchId(victim_id)))
 
-    let builder = case !attacker.is_in_combat {
+    let builder = case attacker.fighting == NoTarget {
       True ->
-        world.Mobile(..attacker, is_in_combat: True)
+        world.Mobile(..attacker, fighting: Fighting(victim.id))
         |> response.character_update(builder, _)
 
       False -> builder
     }
 
     let victim = world.Mobile(..victim, hp: victim.hp - dam_roll)
+    let is_victim_alive = victim.hp > 0
 
-    event.CombatCommitData(victim:, attacker:, damage: dam_roll)
-    |> event.CombatCommit
-    |> response.broadcast(builder, attacker, _)
-    |> response.character_update(victim)
+    let victim = case victim.fighting {
+      world.NoTarget if is_victim_alive ->
+        world.Mobile(..victim, fighting: world.Fighting(attacker.id))
+      _ -> victim
+    }
+
+    let attacker = case attacker.fighting {
+      world.NoTarget if is_victim_alive ->
+        world.Mobile(..attacker, fighting: world.Fighting(victim.id))
+
+      world.Fighting(_) if !is_victim_alive ->
+        world.Mobile(..attacker, fighting: world.NoTarget)
+
+      _ -> attacker
+    }
+
+    let builder =
+      event.CombatCommitData(victim:, attacker:, damage: dam_roll)
+      |> event.CombatCommit
+      |> response.broadcast(builder, attacker, _)
+      |> response.character_update(victim)
+      |> response.character_update(attacker)
+
+    case victim.hp > 0 && !response.is_in_combat(builder) {
+      True -> response.combat_commence(builder, attacker)
+      False -> builder
+    }
     |> Ok
   }
 
@@ -138,20 +163,27 @@ pub fn round_process_action(
 ) -> #(Dict(StringId(Mobile), Mobile), List(event.CombatPollData)) {
   let result = {
     // find and update characters
+    // confirm characters are alive
     let event.CombatPollData(victim_id:, attacker_id:, dam_roll:) = action
     use attacker <- try(dict.get(participants, attacker_id))
     use victim <- try(dict.get(participants, victim_id))
-    let participants = case !attacker.is_in_combat {
-      True ->
-        world.Mobile(..attacker, is_in_combat: True)
-        |> dict.insert(participants, attacker_id, _)
+    use <- bool.guard(attacker.hp <= 0 || victim.hp <= 0, Error(Nil))
 
-      False -> participants
+    let victim = world.Mobile(..victim, hp: victim.hp - dam_roll)
+
+    let attacker = case victim.hp <= 0 {
+      True -> world.Mobile(..attacker, fighting: world.NoTarget)
+
+      False if attacker.fighting == NoTarget ->
+        world.Mobile(..attacker, fighting: world.Fighting(victim_id))
+
+      _ -> attacker
     }
 
     let participants =
-      world.Mobile(..victim, hp: victim.hp - dam_roll)
-      |> dict.insert(participants, victim_id, _)
+      participants
+      |> dict.insert(victim_id, victim)
+      |> dict.insert(attacker_id, attacker)
 
     // prepend commits
     let commits =

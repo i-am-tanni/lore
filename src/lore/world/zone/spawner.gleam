@@ -193,7 +193,6 @@ fn to_mobile(
     pronouns: pronoun.Masculine,
     short: row.short,
     inventory: [],
-    is_in_combat: False,
     fighting: world.NoTarget,
     hp: hp_max,
     hp_max:,

@@ -217,35 +217,27 @@ fn item_load(
 
 fn combat_commit(conn: Conn, data: event.CombatCommitData) -> Conn {
   let self = conn.get_character(conn)
-  let self_id = self.id
-  let victim = data.victim
-  let is_victim = self_id == victim.id
+  let event.CombatCommitData(attacker:, victim:, ..) = data
+  let victim_id = victim.id
+  let is_victim_dead = victim.hp <= 0
+  let conn = case self.id {
+    self_id if self_id == victim_id && is_victim_dead -> conn.terminate(conn)
 
-  let conn = case self.fighting {
-    world.NoTarget if is_victim ->
-      world.MobileInternal(
-        ..self,
-        hp: victim.hp,
-        fighting: world.Fighting(data.attacker.id),
-      )
+    self_id if self_id == victim_id ->
+      sync_mobile(victim, self)
       |> conn.put_character(conn, _)
 
-    world.Fighting(_) if is_victim ->
-      world.MobileInternal(..self, hp: victim.hp)
-      |> conn.put_character(conn, _)
-
-    world.NoTarget if data.attacker.id == self_id ->
-      world.MobileInternal(
-        ..self,
-        fighting: world.Fighting(victim.id),
-        is_in_combat: True,
-      )
+    self_id if self_id == attacker.id ->
+      sync_mobile(attacker, self)
       |> conn.put_character(conn, _)
 
     _ -> conn
   }
 
-  conn.render(conn, combat_view.notify(self, data))
+  case is_victim_dead {
+    True -> conn.renderln(conn, combat_view.notify(self, data)) |> conn.prompt()
+    False -> conn.render(conn, combat_view.notify(self, data))
+  }
 }
 
 fn combat_round_poll(conn: Conn) -> Conn {
@@ -272,12 +264,20 @@ fn combat_commit_round(
       conn
       |> conn.put_character(update)
       |> conn.renderln(combat_view.round_report(update, participants, commits))
-      |> conn.renderln(combat_view.round_summary(update, participants))
-      |> conn.prompt()
+
+    let conn = case update.hp > 0 {
+      True ->
+        conn
+        |> conn.renderln(combat_view.round_summary(update, participants))
+        |> conn.prompt()
+
+      False -> conn.prompt(conn)
+    }
 
     case update.fighting {
+      _ if update.hp < 0 -> conn.terminate(conn)
       world.Fighting(victim_id) -> auto_attack(conn, victim_id)
-      _ -> conn
+      world.NoTarget -> conn
     }
     |> Ok
   }
@@ -302,6 +302,6 @@ fn sync_mobile(
   update: world.Mobile,
   self: world.MobileInternal,
 ) -> world.MobileInternal {
-  let world.Mobile(hp:, is_in_combat:, ..) = update
-  world.MobileInternal(..self, hp:, is_in_combat:)
+  let world.Mobile(hp:, fighting:, ..) = update
+  world.MobileInternal(..self, hp:, fighting:)
 }

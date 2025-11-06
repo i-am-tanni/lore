@@ -1,6 +1,7 @@
 //// A module for building responses to received room events.
 ////
 
+import gleam/bool
 import gleam/erlang/process.{type Subject}
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -140,13 +141,9 @@ pub fn combat_commence(
   builder: Builder(a),
   acting_character: world.Mobile,
 ) -> Builder(a) {
-  case !builder.is_in_combat {
-    True ->
-      Builder(..builder, is_in_combat: True)
-      |> broadcast(acting_character, event.CombatRoundPoll)
-
-    False -> builder
-  }
+  use <- bool.guard(builder.is_in_combat, builder)
+  Builder(..builder, is_in_combat: True)
+  |> broadcast(acting_character, event.CombatRoundPoll)
 }
 
 /// Get the mini_map via a call

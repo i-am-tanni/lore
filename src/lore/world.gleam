@@ -81,7 +81,7 @@ pub type AccessState {
   Closed
 }
 
-pub type Target {
+pub type Fighting {
   Fighting(StringId(Mobile))
   NoTarget
 }
@@ -97,7 +97,7 @@ pub type Mobile {
     keywords: List(String),
     pronouns: pronoun.PronounChoice,
     short: String,
-    is_in_combat: Bool,
+    fighting: Fighting,
     hp: Int,
     hp_max: Int,
   )
@@ -107,7 +107,6 @@ pub type Mobile {
 ///
 pub type MobileInternal {
   /// ## Private fields
-  /// - target
   /// - inventory
   MobileInternal(
     id: StringId(Mobile),
@@ -118,10 +117,9 @@ pub type MobileInternal {
     inventory: List(ItemInstance),
     pronouns: pronoun.PronounChoice,
     short: String,
-    fighting: Target,
+    fighting: Fighting,
     hp: Int,
     hp_max: Int,
-    is_in_combat: Bool,
   )
 }
 
@@ -253,7 +251,7 @@ pub fn trim_character(character: MobileInternal) -> Mobile {
     short:,
     hp:,
     hp_max:,
-    is_in_combat:,
+    fighting:,
     ..,
   ) = character
 
@@ -265,7 +263,7 @@ pub fn trim_character(character: MobileInternal) -> Mobile {
     keywords:,
     pronouns:,
     short:,
-    is_in_combat:,
+    fighting:,
     hp:,
     hp_max:,
   )

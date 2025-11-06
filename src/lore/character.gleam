@@ -100,7 +100,6 @@ fn init_reception(
       short: "",
       pronouns: pronoun.Feminine,
       inventory: [],
-      is_in_combat: False,
       fighting: world.NoTarget,
       hp: 20,
       hp_max: 20,
@@ -259,34 +258,31 @@ fn handle_response(response: conn.Response, state: State) -> State {
   push_text(state, response.output)
 
   // Handle any change over in character
-  let #(halt, reassign_endpoint) = case response.next_character {
+  let reassign_endpoint = case response.next_character {
     Some(character) -> {
       let assert Ok(actor.Started(data: new_subject, ..)) =
         start_character(
           event.SpawnMobile(state.endpoint, character),
           state.system_tables,
         )
-      #(True, Some(new_subject))
+      Some(new_subject)
     }
 
-    None -> #(response.halt, response.reassign_endpoint)
+    None -> response.reassign_endpoint
   }
 
+  let halt = response.halt
   // Handle any messages to be sent to the endpoint
-  case state.endpoint {
-    Some(endpoint) -> {
-      case reassign_endpoint {
-        Some(subject) -> process.send(endpoint, event.Reassign(subject))
-        None -> Nil
-      }
-
-      case halt {
-        True -> process.send(endpoint, event.Halt(process.self()))
-        False -> Nil
-      }
+  case state.endpoint, reassign_endpoint {
+    Some(endpoint), Some(new_subject) -> {
+      process.send(endpoint, event.Reassign(new_subject))
+      process.send(endpoint, event.Halt(process.self()))
     }
 
-    None -> Nil
+    Some(endpoint), _ if halt ->
+      process.send(endpoint, event.Halt(process.self()))
+
+    _, _ -> Nil
   }
 
   let system_tables = state.system_tables

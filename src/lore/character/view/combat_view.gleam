@@ -2,7 +2,6 @@ import gleam/dict.{type Dict}
 import gleam/int
 import gleam/list
 import gleam/result.{try}
-import gleam/string_tree
 import lore/character/view.{type View}
 import lore/character/view/character_view
 import lore/world.{type Mobile, type StringId}
@@ -14,11 +13,79 @@ type Perspective {
   Witness
 }
 
-pub fn notify(self: world.MobileInternal, data: event.CombatCommitData) -> View {
+pub fn notify(
+  self: world.MobileInternal,
+  commit: event.CombatCommitData,
+) -> View {
+  let event.CombatCommitData(attacker:, victim:, ..) = commit
+
+  let perspective = perspective(self, attacker, victim)
+  let view = damage_notify(perspective, commit)
+  case victim.hp <= 0 {
+    True -> view.join([view, death_notify(perspective, commit)], "\n")
+    False -> view
+  }
+}
+
+pub fn round_report(
+  self: world.MobileInternal,
+  participants: Dict(StringId(Mobile), Mobile),
+  commits: List(event.CombatPollData),
+) -> View {
+  list.filter_map(commits, fn(commit) {
+    let event.CombatPollData(attacker_id:, victim_id:, dam_roll: damage) =
+      commit
+    use attacker <- try(dict.get(participants, attacker_id))
+    use victim <- try(dict.get(participants, victim_id))
+    let commit = event.CombatCommitData(attacker:, victim:, damage:)
+    let perspective = perspective(self, attacker, victim)
+    let view = damage_notify(perspective, commit)
+    case victim.hp < 0 {
+      True -> view.join([view, death_notify(perspective, commit)], "\n")
+      False -> view
+    }
+    |> Ok
+  })
+  |> view.join("\n")
+}
+
+pub fn round_summary(
+  self: world.MobileInternal,
+  participants: Dict(StringId(Mobile), Mobile),
+) -> View {
+  let participants = dict.delete(participants, self.id) |> dict.values
+
+  let prelude =
+    [
+      "You ",
+      health_feedback_1p(self),
+    ]
+    |> view.Leaves
+
+  let rest =
+    list.filter_map(participants, fn(participant) {
+      case participant.hp > 0 {
+        True ->
+          [
+            character_view.name(participant),
+            " ",
+            health_feedback_3p(participant),
+          ]
+          |> view.Leaves
+          |> Ok
+
+        False -> Error(Nil)
+      }
+    })
+
+  view.join([prelude, ..rest], "\n")
+}
+
+fn damage_notify(perspective: Perspective, data: event.CombatCommitData) -> View {
   let event.CombatCommitData(victim:, attacker:, damage:) = data
   let victim_hp_max = victim.hp_max
 
-  case perspective(self, attacker, data.victim) {
+  case perspective {
     Attacker -> [
       "Your strike ",
       damage_feedback(damage, victim_hp_max),
@@ -46,57 +113,33 @@ pub fn notify(self: world.MobileInternal, data: event.CombatCommitData) -> View 
   |> view.Leaves
 }
 
-pub fn round_report(
-  self: world.MobileInternal,
-  participants: Dict(StringId(Mobile), Mobile),
-  commits: List(event.CombatPollData),
-) -> View {
-  list.filter_map(commits, fn(commit) {
-    let event.CombatPollData(attacker_id:, victim_id:, dam_roll:) = commit
-    use attacker <- try(dict.get(participants, attacker_id))
-    use victim <- try(dict.get(participants, victim_id))
-    let commit = event.CombatCommitData(attacker:, victim:, damage: dam_roll)
-    Ok(notify(self, commit))
-  })
-  |> view.join("\n")
-}
+fn death_notify(perspective: Perspective, data: event.CombatCommitData) -> View {
+  let event.CombatCommitData(victim:, attacker:, ..) = data
+  case perspective {
+    Attacker -> ["You have killed ", character_view.name(victim), "!"]
 
-pub fn round_summary(
-  self: world.MobileInternal,
-  participants: Dict(StringId(Mobile), Mobile),
-) -> View {
-  let participants =
-    dict.delete(participants, self.id)
-    |> dict.values
-
-  let prelude =
-    [
-      "You ",
-      health_feedback_1p(self),
+    Victim -> [
+      character_view.name(attacker),
+      " has killed you!",
     ]
-    |> string_tree.from_strings
 
-  let rest =
-    list.map(participants, fn(participant) {
-      [
-        character_view.name(participant),
-        " ",
-        health_feedback_3p(participant),
-      ]
-      |> string_tree.from_strings()
-    })
-
-  string_tree.join([prelude, ..rest], "\n")
-  |> view.Tree
+    Witness -> [
+      character_view.name(attacker),
+      " has killed ",
+      character_view.name(victim),
+      "!",
+    ]
+  }
+  |> view.Leaves
 }
 
 fn perspective(
   self: world.MobileInternal,
-  acting_character: world.Mobile,
+  attacker: world.Mobile,
   victim: world.Mobile,
 ) -> Perspective {
   case self.id {
-    self if self == acting_character.id -> Attacker
+    self if self == attacker.id -> Attacker
     self if self == victim.id -> Victim
     _ -> Witness
   }
