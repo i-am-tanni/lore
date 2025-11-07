@@ -1,6 +1,7 @@
 import gleam/bool
 import gleam/dict.{type Dict}
 import gleam/list
+import gleam/option.{None, Some}
 import gleam/result.{try}
 import gleam/set
 import lore/world.{type Mobile, type StringId, Fighting, NoTarget, Player}
@@ -126,14 +127,19 @@ pub fn process_combat(
       _ -> victim
     }
 
-    let attacker = case attacker.fighting {
+    let attacker_update = case attacker.fighting {
       world.NoTarget if is_victim_alive ->
-        world.Mobile(..attacker, fighting: world.Fighting(victim.id))
+        Some(world.Mobile(..attacker, fighting: world.Fighting(victim.id)))
 
       world.Fighting(_) if !is_victim_alive ->
-        world.Mobile(..attacker, fighting: world.NoTarget)
+        Some(world.Mobile(..attacker, fighting: world.NoTarget))
 
-      _ -> attacker
+      _ -> None
+    }
+
+    let #(attacker, builder) = case attacker_update {
+      Some(update) -> #(update, response.character_update(builder, update))
+      None -> #(attacker, builder)
     }
 
     let builder =
@@ -141,7 +147,6 @@ pub fn process_combat(
       |> event.CombatCommit
       |> response.broadcast(builder, attacker, _)
       |> response.character_update(victim)
-      |> response.character_update(attacker)
 
     case victim.hp > 0 && !response.is_in_combat(builder) {
       True -> response.combat_commence(builder, attacker)
@@ -172,18 +177,20 @@ pub fn round_process_action(
     let victim = world.Mobile(..victim, hp: victim.hp - dam_roll)
 
     let attacker = case victim.hp <= 0 {
-      True -> world.Mobile(..attacker, fighting: world.NoTarget)
+      True -> Some(world.Mobile(..attacker, fighting: world.NoTarget))
 
       False if attacker.fighting == NoTarget ->
-        world.Mobile(..attacker, fighting: world.Fighting(victim_id))
+        Some(world.Mobile(..attacker, fighting: world.Fighting(victim_id)))
 
-      _ -> attacker
+      _ -> None
     }
 
-    let participants =
-      participants
-      |> dict.insert(victim_id, victim)
-      |> dict.insert(attacker_id, attacker)
+    let participants = case attacker {
+      Some(update) -> dict.insert(participants, attacker_id, update)
+      None -> participants
+    }
+
+    let participants = dict.insert(participants, victim_id, victim)
 
     // prepend commits
     let commits =
