@@ -255,29 +255,25 @@ fn combat_commit_round(
 ) -> Conn {
   let result = {
     let self = conn.get_character(conn)
-    use update <- try(
+    use self <- try(
       dict.get(participants, self.id)
       |> result.map(sync_mobile(_, self)),
     )
 
     let conn =
       conn
-      |> conn.put_character(update)
-      |> conn.renderln(combat_view.round_report(update, participants, commits))
+      |> conn.put_character(self)
+      |> conn.renderln(combat_view.round_report(self, participants, commits))
 
-    let conn = case update.hp > 0 {
-      True ->
+    case self.fighting {
+      _ if self.hp <= 0 -> conn.terminate(conn)
+      world.Fighting(victim_id) ->
         conn
-        |> conn.renderln(combat_view.round_summary(update, participants))
-        |> conn.prompt()
+        |> auto_attack(victim_id)
+        |> conn.renderln(combat_view.round_summary(self, participants))
+        |> conn.prompt
 
-      False -> conn.prompt(conn)
-    }
-
-    case update.fighting {
-      _ if update.hp < 0 -> conn.terminate(conn)
-      world.Fighting(victim_id) -> auto_attack(conn, victim_id)
-      world.NoTarget -> conn
+      world.NoTarget -> conn.prompt(conn)
     }
     |> Ok
   }
