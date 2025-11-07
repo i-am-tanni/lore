@@ -30,6 +30,8 @@ type SpawnError(a) {
   IdNotFound(Int)
 }
 
+/// Resets the spawns in the group
+///
 pub fn reset_group(
   group: SpawnGroup,
   system_tables: system_tables.Lookup,
@@ -48,7 +50,7 @@ pub fn reset_group(
   }
 }
 
-pub fn reset_items(
+fn reset_items(
   group: SpawnGroup,
   system_tables: system_tables.Lookup,
 ) -> SpawnGroup {
