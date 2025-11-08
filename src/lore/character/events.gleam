@@ -267,6 +267,7 @@ fn combat_commit_round(
 
     case self.fighting {
       _ if self.hp <= 0 -> conn.terminate(conn)
+
       world.Fighting(victim_id) ->
         conn
         |> auto_attack(victim_id)

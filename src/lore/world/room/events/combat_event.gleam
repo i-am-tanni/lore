@@ -172,14 +172,15 @@ pub fn round_process_action(
     let event.CombatPollData(victim_id:, attacker_id:, dam_roll:) = action
     use attacker <- try(dict.get(participants, attacker_id))
     use victim <- try(dict.get(participants, victim_id))
-    use <- bool.guard(attacker.hp <= 0 || victim.hp <= 0, Error(Nil))
+    use <- bool.guard(attacker.hp <= 0, Error(Nil))
 
     let victim = world.Mobile(..victim, hp: victim.hp - dam_roll)
 
-    let attacker = case victim.hp <= 0 {
-      True -> Some(world.Mobile(..attacker, fighting: world.NoTarget))
+    let attacker = case attacker.fighting {
+      world.Fighting(_) if victim.hp <= 0 ->
+        Some(world.Mobile(..attacker, fighting: world.NoTarget))
 
-      False if attacker.fighting == NoTarget ->
+      NoTarget if victim.hp > 0 ->
         Some(world.Mobile(..attacker, fighting: world.Fighting(victim_id)))
 
       _ -> None
