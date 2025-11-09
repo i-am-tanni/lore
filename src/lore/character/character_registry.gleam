@@ -1,5 +1,5 @@
 //// A registry for character mailboxes.
-//// 
+////
 
 import gleam/bool
 import gleam/dict.{type Dict}
@@ -13,15 +13,18 @@ import lore/world/event.{type CharacterMessage}
 
 pub type Message {
   /// Register is called when a character process initializes or restarts.
-  /// 
+  ///
   Register(id: StringId(Mobile), subject: Subject(CharacterMessage))
 
   /// Deregister the subject when a character process goes down.
-  /// 
+  ///
   Deregister(process.Down)
 }
 
 type State {
+  // When a process goes down, the Id is looked up via the Id dict to then
+  // be removed from the table
+  //
   State(
     table: table.Set(StringId(Mobile), Subject(CharacterMessage)),
     ids: Dict(process.Pid, StringId(Mobile)),
@@ -29,7 +32,7 @@ type State {
 }
 
 /// Starts the character subject registry.
-/// 
+///
 pub fn start(
   table_name: process.Name(Message),
 ) -> Result(actor.Started(Subject(Message)), actor.StartError) {
@@ -40,7 +43,7 @@ pub fn start(
 }
 
 /// Registers a list of character subjects keyed by their mobile id
-/// 
+///
 pub fn register(
   table_name: process.Name(Message),
   mobile_id: StringId(Mobile),
@@ -51,7 +54,7 @@ pub fn register(
 }
 
 /// Returns the subject given a registered character instance id.
-/// 
+///
 pub fn whereis(
   table_name: process.Name(Message),
   mobile_id: StringId(Mobile),
