@@ -1,22 +1,23 @@
 //// A pub-sub system publishing events to subscibers. These can range from
-//// chat channels to room channels. 
+//// chat channels to room channels.
 //// Events can be any events. Not just communication events.
 //// Subjects are monitored so that a crash results in the subject information
 //// being automatically cleaned up.
-//// 
+////
 
 import gleam/dict.{type Dict}
 import gleam/erlang/process.{type Subject}
 import gleam/list
 import gleam/otp/actor
 import gleam/result
+import gleam/set.{type Set}
 import gleam/string
 import glets/table
 import lore/world.{type Id, type Mobile, type Room}
 import lore/world/event
 
 /// A communication channel will push events to all subscribers.
-/// 
+///
 pub type Channel {
   /// The main chat channel for out-of-character communication.
   ///
@@ -30,36 +31,36 @@ pub type Channel {
   DirectMessage(Id(Mobile))
 }
 
-/// Messages to be received by the channel process for the purpose of 
+/// Messages to be received by the channel process for the purpose of
 /// serializing writes.
-/// 
+///
 pub type Message {
   /// Subscribing is performed as a call to avoid race conditions with
   /// publishing in room channels.
-  /// 
+  ///
   Subscribe(caller: Subject(Bool), channel: Channel, subscriber: Subscriber)
 
   /// Unsubscribing is performed as a call to avoid race conditions with
   /// publishing in room channels.
-  /// 
+  ///
   Unsubscribe(caller: Subject(Bool), channel: Channel, subscriber: Subscriber)
 
   /// Drops the pid entirely from the table and tracking.
   /// This occurs if the subscriber shuts down nomrally or crashes.
   /// So it's basically an automatic cleanup.
-  Drop(process.Pid)
+  Drop(process.Down)
 }
 
 type State {
   State(
     table: table.Set(Channel, List(Subscriber)),
-    monitors: Dict(process.Pid, process.Monitor),
+    monitors: Set(process.Pid),
     subscriptions: Dict(process.Pid, List(Channel)),
   )
 }
 
 /// A mailbox for published events to receive events from the channel subscribed
-/// 
+///
 pub type Subscriber {
   Mobile(subject: Subject(event.CharacterMessage))
 }
@@ -75,7 +76,7 @@ pub fn start(
 }
 
 // We use an init here to add a selector for downed process monitoring.
-// 
+//
 fn init(
   self: process.Subject(Message),
   table_name: process.Name(Message),
@@ -94,13 +95,10 @@ fn init(
   // This prevents a memory leak over time as dead mailboxes accumulate.
   let selector =
     process.new_selector()
-    |> process.select_monitors(fn(monitor) {
-      let assert process.ProcessDown(pid:, ..) = monitor
-      Drop(pid)
-    })
+    |> process.select_monitors(fn(down) { Drop(down) })
     |> process.select(self)
 
-  State(table: table, monitors: dict.new(), subscriptions: dict.new())
+  State(table: table, monitors: set.new(), subscriptions: dict.new())
   |> actor.initialised()
   |> actor.selecting(selector)
   |> actor.returning(self)
@@ -153,7 +151,7 @@ pub fn unsubscribe_chat(
 
 /// Publishes a message to a channel's subscribers.
 /// The lookup occurs inside the caller.
-/// 
+///
 pub fn publish(
   table_name: process.Name(Message),
   channel: Channel,
@@ -169,7 +167,7 @@ pub fn publish(
 }
 
 /// Publish a message to a chat channel.
-/// 
+///
 pub fn publish_chat(
   table_name: process.Name(Message),
   channel: world.ChatChannel,
@@ -215,13 +213,14 @@ fn handle_message(state: State, msg: Message) -> Result(State, Nil) {
       use pid <- result.try(process.subject_owner(subscriber.subject))
 
       // check if pid is known to the actor
-      let monitors = case dict.has_key(monitors, pid) {
+      let monitors = case set.contains(monitors, pid) {
         // .. and do nothing if known
         True -> monitors
         False -> {
           // ..but if this is a new pid subscribing, add monitoring for
           //   later clean up when mailbox shuts down.
-          dict.insert(monitors, pid, process.monitor(pid))
+          process.monitor(pid)
+          set.insert(monitors, pid)
         }
       }
 
@@ -264,10 +263,9 @@ fn handle_message(state: State, msg: Message) -> Result(State, Nil) {
     }
 
     // Automatic cleanup for when a subscriber mailbox exits
-    Drop(pid) -> {
+    Drop(process.ProcessDown(monitor:, pid:, ..)) -> {
       // First, get channel list that the subscriber is subscribed to
       let State(table:, monitors:, subscriptions:) = state
-      use monitor <- result.try(dict.get(monitors, pid))
       use channels <- result.try(dict.get(subscriptions, pid))
       // ..then for each channel drop the subscriber info
       list.each(channels, fn(channel) {
@@ -280,10 +278,12 @@ fn handle_message(state: State, msg: Message) -> Result(State, Nil) {
       // ..and deactivate monitoring
       process.demonitor_process(monitor)
       // Finally delete tracking info related to the pid
-      let monitors = dict.delete(monitors, pid)
+      let monitors = set.delete(monitors, pid)
       let subscriptions = dict.delete(subscriptions, pid)
       Ok(State(..state, monitors:, subscriptions:))
     }
+
+    Drop(_) -> Ok(state)
   }
 }
 
