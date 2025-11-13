@@ -8,6 +8,38 @@ import gleam/dynamic/decode
 import gleam/option.{type Option}
 import pog
 
+/// A row you get from running the `containers` query
+/// defined in `./src/lore/world/sql/containers.sql`.
+///
+/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub type ContainersRow {
+  ContainersRow(container_id: Int, item_id: Int)
+}
+
+/// Runs the `containers` query
+/// defined in `./src/lore/world/sql/containers.sql`.
+///
+/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub fn containers(
+  db: pog.Connection,
+) -> Result(pog.Returned(ContainersRow), pog.QueryError) {
+  let decoder = {
+    use container_id <- decode.field(0, decode.int)
+    use item_id <- decode.field(1, decode.int)
+    decode.success(ContainersRow(container_id:, item_id:))
+  }
+
+  "SELECT container_id, item_id FROM container_item;
+"
+  |> pog.query
+  |> pog.returning(decoder)
+  |> pog.execute(db)
+}
+
 /// A row you get from running the `doors` query
 /// defined in `./src/lore/world/sql/doors.sql`.
 ///
@@ -154,6 +186,7 @@ pub type ItemsRow {
     short: String,
     long: String,
     keywords: List(String),
+    container_id: Option(Int),
   )
 }
 
@@ -172,10 +205,27 @@ pub fn items(
     use short <- decode.field(2, decode.string)
     use long <- decode.field(3, decode.string)
     use keywords <- decode.field(4, decode.list(decode.string))
-    decode.success(ItemsRow(item_id:, name:, short:, long:, keywords:))
+    use container_id <- decode.field(5, decode.optional(decode.int))
+    decode.success(ItemsRow(
+      item_id:,
+      name:,
+      short:,
+      long:,
+      keywords:,
+      container_id:,
+    ))
   }
 
-  "SELECT * from item;
+  "SELECT
+  i.item_id,
+  i.name,
+  i.short,
+  i.long,
+  i.keywords,
+  c.container_id
+FROM item as i
+LEFT JOIN container as c
+  ON c.item_id = i.item_id;
 "
   |> pog.query
   |> pog.returning(decoder)

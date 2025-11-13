@@ -1,13 +1,16 @@
 //// Stores item data in a flyweight pattern. Instances reference the item data
 //// in this table via an id.
-//// 
+////
 
+import gleam/dict
 import gleam/erlang/process
 import gleam/list
+import gleam/option.{None, Some}
 import gleam/otp/actor
 import gleam/result
 import glets/cache
 import glets/table
+import lore/server/my_list
 import lore/world.{type Id, type Item}
 import lore/world/sql
 import pog
@@ -43,17 +46,40 @@ fn init(
     |> table.set
     |> result.replace_error("Failed to start ets table: 'items'"),
   )
+  let db = pog.named_connection(db)
   use pog.Returned(rows:, ..) <- result.try(
-    sql.items(pog.named_connection(db))
+    sql.items(db)
     |> result.replace_error("Could not get items from the database!"),
   )
+  use pog.Returned(rows: containers, ..) <- result.try(
+    sql.containers(db)
+    |> result.replace_error("Could not get items from the database!"),
+  )
+  let containers =
+    my_list.group_by(containers, fn(container) {
+      #(container.container_id, container.item_id)
+    })
 
   let items =
     list.map(rows, fn(row) {
-      let sql.ItemsRow(item_id:, name:, short:, long:, keywords:) = row
+      let sql.ItemsRow(item_id:, name:, short:, long:, keywords:, container_id:) =
+        row
+
+      let contains = case container_id {
+        Some(container_id) ->
+          dict.get(containers, container_id)
+          |> result.unwrap([])
+          |> list.map(world.Id)
+          |> world.Contains
+
+        None -> world.NotContainer
+      }
+
       let id = world.Id(item_id)
-      #(id, world.Item(id:, name:, short:, long:, keywords:))
+      let item = world.Item(id:, name:, short:, long:, keywords:, contains:)
+      #(id, item)
     })
+
   table.insert_many(table, items)
 
   table
@@ -77,7 +103,7 @@ pub fn insert(table_name: process.Name(Message), item: Item) -> Nil {
 }
 
 /// Load item data
-/// 
+///
 pub fn load(
   table_name: process.Name(Message),
   item_id: Id(Item),
@@ -114,24 +140,35 @@ pub fn load_instances(
 }
 
 /// Generate an item instance given an item id
-/// 
+///
 pub fn instance(
   table_name: process.Name(Message),
   item_id: Id(Item),
 ) -> Result(world.ItemInstance, Nil) {
-  use world.Item(id:, keywords:, ..) <- result.try(cache.lookup(
+  use world.Item(id:, keywords:, contains:, ..) <- result.try(cache.lookup(
     table_name,
     item_id,
   ))
+
+  let contains = case contains {
+    world.Contains(container_contents) ->
+      // generate instances if a container
+      list.filter_map(container_contents, instance(table_name, _))
+      |> world.Contains
+
+    world.NotContainer -> world.NotContainer
+  }
+
   Ok(world.ItemInstance(
     id: world.generate_id(),
     item: world.Loading(id),
     keywords:,
+    contains:,
   ))
 }
 
 /// A basic API for inserting and deleting from the key-val store.
-/// 
+///
 fn recv(
   table: table.Set(Id(Item), Item),
   msg: Message,

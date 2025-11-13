@@ -25,6 +25,7 @@ connection at `src/lore/server/telnet/protocol.gleam`.
 - ✅ Socials
 - ✅ Mobile spawns
 - ✅ Item spawns
-- ✅ Basic Combat
-- ⬜ Death handling
+- ✅ Basic combat
+- ✅ Basic death handling
 - ⬜ Spawn groups with resets
+- ⬜ Containers

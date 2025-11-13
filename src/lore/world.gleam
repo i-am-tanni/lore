@@ -132,6 +132,11 @@ pub type TemplateId {
   Player(template_id: Id(Player))
 }
 
+pub type Container(a) {
+  Contains(List(a))
+  NotContainer
+}
+
 pub type Item {
   Item(
     id: Id(Item),
@@ -139,6 +144,7 @@ pub type Item {
     name: String,
     short: String,
     long: String,
+    contains: Container(Id(Item)),
   )
 }
 
@@ -150,7 +156,12 @@ pub type Load {
 /// An instance of an item. Uses a flyweight pattern to retrieve data.
 ///
 pub type ItemInstance {
-  ItemInstance(id: StringId(ItemInstance), keywords: List(String), item: Load)
+  ItemInstance(
+    id: StringId(ItemInstance),
+    keywords: List(String),
+    item: Load,
+    contains: Container(ItemInstance),
+  )
 }
 
 pub type SpawnGroup {
