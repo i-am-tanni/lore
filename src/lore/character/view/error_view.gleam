@@ -6,6 +6,10 @@ pub fn parse_error(_) -> View {
   |> view.Leaf
 }
 
+pub fn render_error(error: String) -> View {
+  view.Leaf(error)
+}
+
 pub fn room_request_error(error: world.ErrorRoomRequest) -> View {
   case error {
     world.UnknownExit(direction:) ->
