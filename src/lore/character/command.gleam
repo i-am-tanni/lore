@@ -212,25 +212,25 @@ fn options(
 fn options_loop(
   s: String,
   parsers: List(#(String, fn(String) -> Result(#(String, String), Nil))),
-  saved: List(#(String, fn(String) -> Result(#(String, String), Nil))),
+  try_again: List(#(String, fn(String) -> Result(#(String, String), Nil))),
   acc: List(#(String, String)),
 ) -> #(List(#(String, String)), String) {
-  // Any failed parsers will be stashed in saved in case the failure
+  // Any failed parsers will be stashed in try_again in case the failure
   // is due to option order
   case parsers {
     [] -> #(acc, s)
     [#(tag, parser_fun) as parser, ..rest] ->
       case parser_fun(s) {
-        Ok(#(option, s)) if saved == [] ->
+        Ok(#(option, s)) if try_again == [] ->
           options_loop(s, rest, [], [#(tag, option), ..acc])
 
         Ok(#(option, s)) ->
-          list.append(rest, saved)
+          list.append(rest, try_again)
           |> options_loop(s, _, [], [#(tag, option), ..acc])
 
         // since options could be in any order, try again later if there is
         // ever a success
-        Error(Nil) -> options_loop(s, rest, [parser, ..saved], acc)
+        Error(Nil) -> options_loop(s, rest, [parser, ..try_again], acc)
       }
   }
 }
