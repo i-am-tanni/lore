@@ -1,6 +1,5 @@
 import gleam/erlang/process
 import gleam/list
-import gleam/string_tree
 import lore/character/view.{type View}
 import lore/character/view/character_view
 import lore/world
@@ -10,23 +9,39 @@ pub fn inventory(
   item_table: process.Name(items.Message),
   self: world.MobileInternal,
 ) -> View {
-  let items =
-    list.filter_map(self.inventory, fn(item_instance) {
-      case item_instance.item {
-        world.Loading(id) -> items.load(item_table, id)
-        world.Loaded(item) -> Ok(item)
-      }
-    })
-    |> list.map(fn(item) { string_tree.from_strings(["  ", item.name]) })
+  case container_contents(item_table, self.inventory) {
+    items if items != [] ->
+      [view.Leaf("You are carrying:"), ..items]
+      |> view.join("\n")
 
-  case items != [] {
-    True ->
-      [string_tree.from_string("You are carrying:"), ..items]
-      |> string_tree.join("\n")
-      |> view.Tree
-
-    False -> view.Leaf("You are carrying:\n    Nothing.")
+    _ -> view.Leaf("You are carrying:\n    Nothing.")
   }
+}
+
+pub fn item_contains(
+  item_table: process.Name(items.Message),
+  instances: List(world.ItemInstance),
+) -> View {
+  case container_contents(item_table, instances) {
+    items if items != [] ->
+      [view.Leaf("Contains:"), ..items]
+      |> view.join("\n")
+
+    _ -> view.Leaf("Contains:\n    Nothing.")
+  }
+}
+
+pub fn container_contents(
+  item_table: process.Name(items.Message),
+  instances: List(world.ItemInstance),
+) -> List(View) {
+  list.filter_map(instances, fn(item_instance) {
+    case item_instance.item {
+      world.Loading(id) -> items.load(item_table, id)
+      world.Loaded(item) -> Ok(item)
+    }
+  })
+  |> list.map(fn(item) { view.Leaves(["  ", item.name]) })
 }
 
 pub fn get(
