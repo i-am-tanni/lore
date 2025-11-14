@@ -116,18 +116,20 @@ fn damage_notify(perspective: Perspective, data: event.CombatCommitData) -> View
 fn death_notify(perspective: Perspective, data: event.CombatCommitData) -> View {
   let event.CombatCommitData(victim:, attacker:, ..) = data
   case perspective {
-    Attacker -> ["You have killed ", character_view.name(victim), "!"]
+    Attacker -> ["&YYou have killed ", character_view.name(victim), "!0;"]
 
     Victim -> [
+      "&Y",
       character_view.name(attacker),
-      " has killed you!",
+      " has killed you!0;",
     ]
 
     Witness -> [
+      "&Y",
       character_view.name(attacker),
       " has killed ",
       character_view.name(victim),
-      "!",
+      "!0;",
     ]
   }
   |> view.Leaves

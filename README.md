@@ -27,5 +27,5 @@ connection at `src/lore/server/telnet/protocol.gleam`.
 - ✅ Item spawns
 - ✅ Basic combat
 - ✅ Basic death handling
+- ✅ Containers
 - ⬜ Spawn groups with resets
-- ⬜ Containers

@@ -56,7 +56,7 @@ fn reset_items(
 ) -> SpawnGroup {
   let item_instances =
     list.filter_map(group.item_members, fn(member) {
-      use item <- try(generate_item(member.item_id, system_tables))
+      use item <- try(items.instance(system_tables.items, member.item_id))
       use room_subject <- try(room_registry.whereis(
         system_tables.room,
         member.room_id,
@@ -199,19 +199,6 @@ fn to_mobile(
     hp: hp_max,
     hp_max:,
   )
-}
-
-fn generate_item(
-  item_id: Id(world.Item),
-  system_tables: system_tables.Lookup,
-) -> Result(world.ItemInstance, Nil) {
-  use item <- try(items.load(system_tables.items, item_id))
-  world.ItemInstance(
-    id: world.generate_id(),
-    item: world.Loading(item_id),
-    keywords: item.keywords,
-  )
-  |> Ok()
 }
 
 // reject any members of list b in list a
