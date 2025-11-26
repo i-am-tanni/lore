@@ -28,4 +28,4 @@ connection at `src/lore/server/telnet/protocol.gleam`.
 - ✅ Basic combat
 - ✅ Basic death handling
 - ✅ Containers
-- ⬜ Spawn groups with resets
+- ✅ Spawn groups with resets
