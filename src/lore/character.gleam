@@ -254,7 +254,7 @@ fn recv(
 // process a response to a request that was built up by the conn builder
 //
 fn handle_response(response: conn.Response, state: State) -> State {
-  // send output if there is a endpoint and something to send
+  // send output if there is an endpoint and something to send
   push_text(state, response.output)
 
   // Handle any change over in character

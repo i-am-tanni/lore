@@ -146,6 +146,10 @@ pub fn combat_commence(
   |> broadcast(acting_character, event.CombatRoundPoll)
 }
 
+pub fn combat_end(builder: Builder(a)) -> Builder(a) {
+  Builder(..builder, is_in_combat: False)
+}
+
 /// Get the mini_map via a call
 ///
 pub fn mini_map(builder: Builder(a)) {

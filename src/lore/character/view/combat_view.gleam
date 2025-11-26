@@ -21,6 +21,7 @@ pub fn notify(
 
   let perspective = perspective(self, attacker, victim)
   let view = damage_notify(perspective, commit)
+
   case victim.hp <= 0 {
     True -> view.join([view, death_notify(perspective, commit)], "\n")
     False -> view
@@ -40,7 +41,7 @@ pub fn round_report(
     let commit = event.CombatCommitData(attacker:, victim:, damage:)
     let perspective = perspective(self, attacker, victim)
     let view = damage_notify(perspective, commit)
-    case victim.hp < 0 {
+    case victim.hp <= 0 {
       True -> view.join([view, death_notify(perspective, commit)], "\n")
       False -> view
     }

@@ -99,6 +99,7 @@ fn recv(state: State, msg: Message) -> actor.Next(State, Message) {
       // If pid is new, add monitoring so clean up can be auto-performed
       //   when pid exits.
       use <- bool.guard(dict.has_key(ids, pid), Ok(state))
+      process.monitor(pid)
       let update = dict.insert(ids, pid, id)
       Ok(State(table:, ids: update))
     }

@@ -91,7 +91,7 @@ fn recv(state: State, msg: RoomMessage) -> actor.Next(State, RoomMessage) {
     event.PollRoom(event) -> poll_room(state, event)
     event.InterRoom(event) -> route_from_zone(state, event)
     event.MobileCleanup(mobile_id) -> {
-      // clean up crashed mobile
+      // clean up dead or crashed mobile
       let world.Room(characters:, ..) as room = state.room
       let characters =
         list.filter(characters, fn(character) { mobile_id != character.id })

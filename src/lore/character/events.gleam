@@ -198,11 +198,10 @@ pub fn item_look_at(conn: Conn, item_instance: world.ItemInstance) -> Conn {
 
     Ok(item), world.Contains(contents) -> {
       let system_tables.Lookup(items:, ..) = conn.system_tables(conn)
-      let contents_view = item_view.item_contains(items, contents)
 
       conn
       |> conn.renderln(item_view.inspect(item))
-      |> conn.renderln(contents_view)
+      |> conn.renderln(item_view.item_contains(items, contents))
       |> conn.prompt
     }
 

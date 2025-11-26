@@ -66,8 +66,13 @@ pub fn parse(conn: Conn, input: String) -> Conn {
     "who" -> who_command(conn)
     "quit" -> quit_command(conn)
     "i" | "inventory" -> command_nil(conn, Inventory, inventory_command)
+    "status" -> {
+      let character = conn.get_character(conn)
+      echo character.fighting
+      conn.prompt(conn)
+    }
     "" -> conn.prompt(conn)
-    _ -> conn
+    _ -> conn.renderln(conn, error_view.parse_error()) |> conn.prompt()
   }
 }
 

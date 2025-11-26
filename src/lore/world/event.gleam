@@ -152,6 +152,7 @@ pub type RoomMessage {
 ///
 pub type ZoneMessage {
   RoomToZone(event: Event(ZoneEvent, RoomMessage))
+  ResetSpawnGroup(Id(world.SpawnGroup))
 }
 
 /// An event that a character can receive

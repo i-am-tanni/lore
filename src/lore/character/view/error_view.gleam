@@ -1,7 +1,7 @@
 import lore/character/view.{type View}
 import lore/world
 
-pub fn parse_error(_) -> View {
+pub fn parse_error() -> View {
   "huh?"
   |> view.Leaf
 }

@@ -25,7 +25,7 @@ import lore/world/system_tables
 import pog
 
 type SpawnError(a) {
-  Database(pog.QueryError)
+  DatabaseError(pog.QueryError)
   NotStarted(actor.StartError)
   IdNotFound(Int)
 }
@@ -170,7 +170,7 @@ fn generate_mobile(
   let world.Id(mobile_id) = template_id
   use returned <- try(
     sql.mobile_by_id(db, mobile_id)
-    |> result.map_error(Database),
+    |> result.map_error(DatabaseError),
   )
   case returned {
     pog.Returned(count: 1, rows: [data]) ->
@@ -184,7 +184,7 @@ fn to_mobile(
   instance_id: StringId(Mobile),
   room_id: Id(Room),
 ) -> world.MobileInternal {
-  let hp_max = world.random(8)
+  let hp_max = 8
 
   world.MobileInternal(
     id: instance_id,

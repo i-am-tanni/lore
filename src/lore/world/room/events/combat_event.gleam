@@ -10,12 +10,21 @@ import lore/world/event.{
 }
 import lore/world/room/response
 
+type CombatRoundTemp {
+  CombatRoundTemp(
+    participants: Dict(StringId(world.Mobile), world.Mobile),
+    commits: List(event.CombatPollData),
+    continue: Bool,
+  )
+}
+
 pub fn request(
   builder: response.Builder(CharacterMessage),
   event: Event(CharacterToRoomEvent, CharacterMessage),
   data: event.CombatRequestData,
 ) -> response.Builder(CharacterMessage) {
   let attacker = event.acting_character
+  echo data.victim as "VICTIM"
   let result = {
     use victim <- try(find_local_character(builder, data.victim))
 
@@ -66,13 +75,16 @@ pub fn round_trigger(
     |> dict.from_list()
 
   // update participants and generate commits to broadcast
-  let #(participants, commits) =
-    list.fold(actions, #(participants, list.new()), fn(acc, action) {
-      let #(participants, commits) = acc
-      round_process_action(action, participants, commits)
-    })
+  let CombatRoundTemp(participants:, commits:, continue:) =
+    CombatRoundTemp(participants:, commits: [], continue: False)
+    |> list.fold(actions, _, round_process_action)
 
   // build response
+  let builder = case !continue {
+    True -> response.combat_end(builder)
+    False -> builder
+  }
+
   let result = {
     use acting_character_to_ignore <- try(list.first(characters))
     let round_event =
@@ -118,13 +130,16 @@ pub fn process_combat(
       False -> builder
     }
 
-    let victim = world.Mobile(..victim, hp: victim.hp - dam_roll)
-    let is_victim_alive = victim.hp > 0
+    let #(victim, is_victim_alive) = case victim.hp - dam_roll {
+      hp if hp > 0 && victim.fighting == world.NoTarget -> #(
+        world.Mobile(..victim, hp:, fighting: world.Fighting(attacker.id)),
+        True,
+      )
 
-    let victim = case victim.fighting {
-      world.NoTarget if is_victim_alive ->
-        world.Mobile(..victim, fighting: world.Fighting(attacker.id))
-      _ -> victim
+      hp if hp > 0 -> #(world.Mobile(..victim, hp:), True)
+
+      // ..else victim is dead
+      hp -> #(world.Mobile(..victim, hp:, fighting: world.NoTarget), False)
     }
 
     let attacker_update = case attacker.fighting {
@@ -137,9 +152,14 @@ pub fn process_combat(
       _ -> None
     }
 
-    let #(attacker, builder) = case attacker_update {
-      Some(update) -> #(update, response.character_update(builder, update))
-      None -> #(attacker, builder)
+    let builder = case attacker_update {
+      Some(update) -> response.character_update(builder, update)
+      None -> builder
+    }
+
+    let attacker = case attacker_update {
+      Some(update) -> update
+      None -> attacker
     }
 
     let builder =
@@ -161,11 +181,12 @@ pub fn process_combat(
   }
 }
 
-pub fn round_process_action(
+fn round_process_action(
+  temp: CombatRoundTemp,
   action: event.CombatPollData,
-  participants: Dict(StringId(Mobile), Mobile),
-  commits: List(event.CombatPollData),
-) -> #(Dict(StringId(Mobile), Mobile), List(event.CombatPollData)) {
+) -> CombatRoundTemp {
+  let CombatRoundTemp(participants:, commits:, continue:) = temp
+
   let result = {
     // find and update characters
     // confirm characters are alive
@@ -173,8 +194,10 @@ pub fn round_process_action(
     use attacker <- try(dict.get(participants, attacker_id))
     use victim <- try(dict.get(participants, victim_id))
     use <- bool.guard(attacker.hp <= 0, Error(Nil))
-
-    let victim = world.Mobile(..victim, hp: victim.hp - dam_roll)
+    let victim = case victim.hp - dam_roll {
+      hp if hp > 0 -> world.Mobile(..victim, hp:)
+      hp -> world.Mobile(..victim, hp:, fighting: NoTarget)
+    }
 
     let attacker = case attacker.fighting {
       world.Fighting(_) if victim.hp <= 0 ->
@@ -198,13 +221,14 @@ pub fn round_process_action(
       event.CombatPollData(attacker_id:, victim_id:, dam_roll: dam_roll)
       |> list.prepend(commits, _)
 
-    #(participants, commits)
-    |> Ok
+    let continue = continue || victim.hp > 0
+
+    Ok(CombatRoundTemp(participants:, commits:, continue:))
   }
 
   case result {
     Ok(response) -> response
-    Error(_) -> #(participants, commits)
+    Error(_) -> temp
   }
 }
 
