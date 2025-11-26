@@ -24,7 +24,7 @@ pub fn request(
   data: event.CombatRequestData,
 ) -> response.Builder(CharacterMessage) {
   let attacker = event.acting_character
-  echo data.victim as "VICTIM"
+
   let result = {
     use victim <- try(find_local_character(builder, data.victim))
 

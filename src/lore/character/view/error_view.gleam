@@ -64,6 +64,10 @@ pub fn cannot_target_self() {
   "That would be unwise." |> view.Leaf
 }
 
+pub fn already_fighting() {
+  "You are fighting for your life!" |> view.Leaf
+}
+
 fn direction_to_string(direction: world.Direction) -> String {
   case direction {
     world.North -> "north"

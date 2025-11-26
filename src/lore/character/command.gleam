@@ -66,11 +66,6 @@ pub fn parse(conn: Conn, input: String) -> Conn {
     "who" -> who_command(conn)
     "quit" -> quit_command(conn)
     "i" | "inventory" -> command_nil(conn, Inventory, inventory_command)
-    "status" -> {
-      let character = conn.get_character(conn)
-      echo character.fighting
-      conn.prompt(conn)
-    }
     "" -> conn.prompt(conn)
     _ -> conn.renderln(conn, error_view.parse_error()) |> conn.prompt()
   }
@@ -264,7 +259,14 @@ fn adverb(s: String, word: Splitter) -> Result(#(String, String), Nil) {
 //
 
 fn move_command(conn: Conn, direction: world.Direction) -> Conn {
-  conn.action(conn, act.move(direction))
+  let character = conn.get_character(conn)
+  case character.fighting {
+    world.NoTarget -> conn.action(conn, act.move(direction))
+    world.Fighting(..) ->
+      conn
+      |> conn.renderln(error_view.already_fighting())
+      |> conn.prompt()
+  }
 }
 
 fn look_command(conn: Conn, _: Command(Nil)) -> Conn {
@@ -368,15 +370,8 @@ fn drop_command(conn: Conn, command: Command(String)) -> Conn {
 
 fn kill_command(conn: Conn, command: Command(String)) -> Conn {
   let self = conn.get_character(conn)
-  let search_term = command.data
-  let is_auto = case search_term {
-    "self" -> True
-    search_term ->
-      list.any(self.keywords, fn(keyword) { search_term == keyword })
-  }
-
-  case !is_auto {
-    True ->
+  case !is_auto(self, command.data) {
+    True if self.fighting == world.NoTarget ->
       event.CombatRequestData(
         victim: event.Keyword(command.data),
         dam_roll: world.random(8),
@@ -385,10 +380,23 @@ fn kill_command(conn: Conn, command: Command(String)) -> Conn {
       |> act.kill
       |> conn.action(conn, _)
 
+    True ->
+      conn
+      |> conn.renderln(error_view.already_fighting())
+      |> conn.prompt()
+
     False ->
       conn
       |> conn.renderln(error_view.cannot_target_self())
       |> conn.prompt()
+  }
+}
+
+fn is_auto(self: world.MobileInternal, search_term: String) -> Bool {
+  case search_term {
+    "self" -> True
+    search_term ->
+      list.any(self.keywords, fn(keyword) { search_term == keyword })
   }
 }
 
