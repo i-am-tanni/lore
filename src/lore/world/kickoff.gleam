@@ -121,6 +121,7 @@ fn load_zones(
         items: [],
         characters: [],
         exits:,
+        xdescs: [],
       )
     })
 

@@ -65,6 +65,10 @@ fn join_loop(views: List(View), delim: String, acc: List(StringTree)) -> View {
   }
 }
 
+pub fn text(s: String) -> View {
+  Leaf(s)
+}
+
 /// Template varables:
 /// - $n - Subject name
 /// - $e - He / She pronouns

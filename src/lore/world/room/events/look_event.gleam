@@ -1,5 +1,5 @@
 import gleam/list
-import gleam/result
+import gleam/result.{try_recover}
 import lore/character/view
 import lore/character/view/look_view
 import lore/world.{type Mobile}
@@ -11,6 +11,7 @@ import lore/world/system_tables
 type Found {
   Item(world.ItemInstance)
   Mobile(world.Mobile)
+  ExtraDesc(world.ExtraDesc)
 }
 
 pub fn room_look(
@@ -38,12 +39,19 @@ pub fn look_at(
   event: Event(event.CharacterToRoomEvent, CharacterMessage),
   search_term: String,
 ) -> response.Builder(CharacterMessage) {
+  let room = response.room(builder)
+
   let result = {
-    use _ <- result.try_recover(
-      response.find_local_item(builder, search_term) |> result.map(Item),
+    use _ <- try_recover(
+      find_local_item(room, search_term)
+      |> result.map(Item),
     )
-    find_local_character(builder, search_term)
-    |> result.map(Mobile)
+    use _ <- try_recover(
+      find_local_character(room, search_term)
+      |> result.map(Mobile),
+    )
+    find_local_xdesc(room, search_term)
+    |> result.map(ExtraDesc)
   }
 
   case result {
@@ -59,6 +67,10 @@ pub fn look_at(
       )
     }
 
+    Ok(ExtraDesc(xdesc_match)) -> {
+      response.renderln(builder, view.text(xdesc_match.text))
+    }
+
     Error(_) ->
       response.reply_character(
         builder,
@@ -67,11 +79,26 @@ pub fn look_at(
   }
 }
 
-fn find_local_character(
-  builder: response.Builder(a),
+fn find_local_item(
+  room: world.Room,
   term: String,
-) -> Result(Mobile, world.ErrorRoomRequest) {
-  response.find_local_character(builder, fn(character) {
+) -> Result(world.ItemInstance, Nil) {
+  list.find(room.items, fn(item) {
+    list.any(item.keywords, fn(keyword) { term == keyword })
+  })
+}
+
+fn find_local_character(room: world.Room, term: String) -> Result(Mobile, Nil) {
+  list.find(room.characters, fn(character) {
     list.any(character.keywords, fn(keyword) { term == keyword })
+  })
+}
+
+fn find_local_xdesc(
+  room: world.Room,
+  term: String,
+) -> Result(world.ExtraDesc, Nil) {
+  list.find(room.xdescs, fn(xdesc) {
+    list.any([xdesc.short, ..xdesc.keywords], fn(keyword) { term == keyword })
   })
 }

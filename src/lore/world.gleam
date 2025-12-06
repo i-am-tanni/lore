@@ -49,6 +49,7 @@ pub type Room {
     exits: List(RoomExit),
     characters: List(Mobile),
     items: List(ItemInstance),
+    xdescs: List(ExtraDesc),
   )
 }
 
@@ -60,6 +61,11 @@ pub type Direction {
   Up
   Down
   CustomExit(String)
+}
+
+/// An extra description that can be revealed via keyword search
+pub type ExtraDesc {
+  ExtraDesc(short: String, keywords: List(String), text: String)
 }
 
 pub type RoomExit {
