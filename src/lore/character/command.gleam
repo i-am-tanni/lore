@@ -193,8 +193,10 @@ fn quote(s: String) -> String {
 fn keyword(s: String, word: Splitter) -> Result(#(String, String), Nil) {
   let #(slice, _, rest) = splitter.split(word, s)
   case slice {
-    "a" | "the" -> keyword(rest, word)
+    // an empty string is unexpected
     "" -> Error(Nil)
+    // ignore articles
+    "a" | "the" -> keyword(rest, word)
     keyword -> Ok(#(keyword, string.trim_start(rest)))
   }
 }
