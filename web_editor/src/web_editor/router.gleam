@@ -62,17 +62,6 @@ pub type Direction {
   West
 }
 
-pub type RoomExit {
-  RoomExit(
-    exit_id: Int,
-    keyword: String,
-    from_room_id: Int,
-    to_room_id: Int,
-    is_active: Bool,
-    door_id: Option(Int),
-  )
-}
-
 pub type DoorInsert {
   DoorInsert(access_state: String)
 }
