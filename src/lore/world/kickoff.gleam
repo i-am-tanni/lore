@@ -6,7 +6,7 @@ import gleam/bool
 import gleam/dict
 import gleam/erlang/process
 import gleam/list
-import gleam/option.{None, Some}
+import gleam/option
 import gleam/order
 import gleam/otp/actor
 import gleam/otp/static_supervisor
@@ -82,13 +82,11 @@ fn load_zones(
   let exits =
     list.map(exits, fn(exit) {
       let id = exit.exit_id
-      let door =
-        option.then(exit.door_id, fn(id) {
-          case dict.get(doors, id) {
-            Ok(door) -> Some(door)
-            Error(Nil) -> None
-          }
-        })
+      let door = {
+        use door_id <- option.then(exit.door_id)
+        dict.get(doors, door_id)
+        |> option.from_result
+      }
 
       world.RoomExit(
         id: world.Id(id),
