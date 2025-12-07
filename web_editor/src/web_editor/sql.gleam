@@ -1,5 +1,5 @@
 //// This module contains the code to run the sql queries defined in
-//// `./src/olc/sql`.
+//// `./src/web_editor/sql`.
 //// > 🐿️ This module was generated automatically using v4.4.1 of
 //// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ////
@@ -9,7 +9,7 @@ import gleam/option.{type Option}
 import pog
 
 /// Runs the `door_deactivate` query
-/// defined in `./src/olc/sql/door_deactivate.sql`.
+/// defined in `./src/web_editor/sql/door_deactivate.sql`.
 ///
 /// > 🐿️ This function was generated automatically using v4.4.1 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
@@ -30,7 +30,7 @@ WHERE door_id = $1;"
 }
 
 /// A row you get from running the `door_get` query
-/// defined in `./src/olc/sql/door_get.sql`.
+/// defined in `./src/web_editor/sql/door_get.sql`.
 ///
 /// > 🐿️ This type definition was generated automatically using v4.4.1 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
@@ -40,7 +40,7 @@ pub type DoorGetRow {
 }
 
 /// Runs the `door_get` query
-/// defined in `./src/olc/sql/door_get.sql`.
+/// defined in `./src/web_editor/sql/door_get.sql`.
 ///
 /// > 🐿️ This function was generated automatically using v4.4.1 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
@@ -68,7 +68,7 @@ WHERE r.room_id = $1;
 }
 
 /// A row you get from running the `door_get_from_exit_id` query
-/// defined in `./src/olc/sql/door_get_from_exit_id.sql`.
+/// defined in `./src/web_editor/sql/door_get_from_exit_id.sql`.
 ///
 /// > 🐿️ This type definition was generated automatically using v4.4.1 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
@@ -78,7 +78,7 @@ pub type DoorGetFromExitIdRow {
 }
 
 /// Runs the `door_get_from_exit_id` query
-/// defined in `./src/olc/sql/door_get_from_exit_id.sql`.
+/// defined in `./src/web_editor/sql/door_get_from_exit_id.sql`.
 ///
 /// > 🐿️ This function was generated automatically using v4.4.1 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
@@ -103,7 +103,7 @@ WHERE s.exit_id = $1;
 }
 
 /// A row you get from running the `door_insert` query
-/// defined in `./src/olc/sql/door_insert.sql`.
+/// defined in `./src/web_editor/sql/door_insert.sql`.
 ///
 /// > 🐿️ This type definition was generated automatically using v4.4.1 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
@@ -152,43 +152,8 @@ RETURNING door_id;
   |> pog.execute(db)
 }
 
-/// A row you get from running the `door_side_get` query
-/// defined in `./src/olc/sql/door_side_get.sql`.
-///
-/// > 🐿️ This type definition was generated automatically using v4.4.1 of the
-/// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
-///
-pub type DoorSideGetRow {
-  DoorSideGetRow(exit_id: Int, door_id: Int)
-}
-
-/// Runs the `door_side_get` query
-/// defined in `./src/olc/sql/door_side_get.sql`.
-///
-/// > 🐿️ This function was generated automatically using v4.4.1 of
-/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
-///
-pub fn door_side_get(
-  db: pog.Connection,
-  arg_1: List(Int),
-) -> Result(pog.Returned(DoorSideGetRow), pog.QueryError) {
-  let decoder = {
-    use exit_id <- decode.field(0, decode.int)
-    use door_id <- decode.field(1, decode.int)
-    decode.success(DoorSideGetRow(exit_id:, door_id:))
-  }
-
-  "SELECT exit_id, door_id FROM door_side
-WHERE exit_id = ANY($1);
-"
-  |> pog.query
-  |> pog.parameter(pog.array(fn(value) { pog.int(value) }, arg_1))
-  |> pog.returning(decoder)
-  |> pog.execute(db)
-}
-
 /// A row you get from running the `exit_deactivate` query
-/// defined in `./src/olc/sql/exit_deactivate.sql`.
+/// defined in `./src/web_editor/sql/exit_deactivate.sql`.
 ///
 /// > 🐿️ This type definition was generated automatically using v4.4.1 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
@@ -198,7 +163,7 @@ pub type ExitDeactivateRow {
 }
 
 /// Runs the `exit_deactivate` query
-/// defined in `./src/olc/sql/exit_deactivate.sql`.
+/// defined in `./src/web_editor/sql/exit_deactivate.sql`.
 ///
 /// > 🐿️ This function was generated automatically using v4.4.1 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
@@ -229,7 +194,7 @@ RETURNING
 }
 
 /// Runs the `exit_deactivate_other_side` query
-/// defined in `./src/olc/sql/exit_deactivate_other_side.sql`.
+/// defined in `./src/web_editor/sql/exit_deactivate_other_side.sql`.
 ///
 /// > 🐿️ This function was generated automatically using v4.4.1 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
@@ -253,7 +218,7 @@ WHERE from_room_id = $1 AND keyword = $2;
 }
 
 /// A row you get from running the `exit_get` query
-/// defined in `./src/olc/sql/exit_get.sql`.
+/// defined in `./src/web_editor/sql/exit_get.sql`.
 ///
 /// > 🐿️ This type definition was generated automatically using v4.4.1 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
@@ -270,7 +235,7 @@ pub type ExitGetRow {
 }
 
 /// Runs the `exit_get` query
-/// defined in `./src/olc/sql/exit_get.sql`.
+/// defined in `./src/web_editor/sql/exit_get.sql`.
 ///
 /// > 🐿️ This function was generated automatically using v4.4.1 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
@@ -406,7 +371,7 @@ SELECT exit_id, $4 FROM inserted;
 }
 
 /// A row you get from running the `room_get` query
-/// defined in `./src/olc/sql/room_get.sql`.
+/// defined in `./src/web_editor/sql/room_get.sql`.
 ///
 /// > 🐿️ This type definition was generated automatically using v4.4.1 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
@@ -426,7 +391,7 @@ pub type RoomGetRow {
 }
 
 /// Runs the `room_get` query
-/// defined in `./src/olc/sql/room_get.sql`.
+/// defined in `./src/web_editor/sql/room_get.sql`.
 ///
 /// > 🐿️ This function was generated automatically using v4.4.1 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
@@ -479,7 +444,7 @@ WHERE r.room_id = $1;"
 }
 
 /// A row you get from running the `room_insert` query
-/// defined in `./src/olc/sql/room_insert.sql`.
+/// defined in `./src/web_editor/sql/room_insert.sql`.
 ///
 /// > 🐿️ This type definition was generated automatically using v4.4.1 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
@@ -489,7 +454,7 @@ pub type RoomInsertRow {
 }
 
 /// Runs the `room_insert` query
-/// defined in `./src/olc/sql/room_insert.sql`.
+/// defined in `./src/web_editor/sql/room_insert.sql`.
 ///
 /// > 🐿️ This function was generated automatically using v4.4.1 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
@@ -525,7 +490,7 @@ RETURNING room_id;"
 }
 
 /// Runs the `room_update` query
-/// defined in `./src/olc/sql/room_update.sql`.
+/// defined in `./src/web_editor/sql/room_update.sql`.
 ///
 /// > 🐿️ This function was generated automatically using v4.4.1 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
@@ -560,7 +525,7 @@ WHERE room_id = $1"
 }
 
 /// A row you get from running the `zone_get` query
-/// defined in `./src/olc/sql/zone_get.sql`.
+/// defined in `./src/web_editor/sql/zone_get.sql`.
 ///
 /// > 🐿️ This type definition was generated automatically using v4.4.1 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
@@ -570,7 +535,7 @@ pub type ZoneGetRow {
 }
 
 /// Runs the `zone_get` query
-/// defined in `./src/olc/sql/zone_get.sql`.
+/// defined in `./src/web_editor/sql/zone_get.sql`.
 ///
 /// > 🐿️ This function was generated automatically using v4.4.1 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
@@ -597,7 +562,7 @@ WHERE zone_id = $1;"
 }
 
 /// A row you get from running the `zone_rooms_get` query
-/// defined in `./src/olc/sql/zone_rooms_get.sql`.
+/// defined in `./src/web_editor/sql/zone_rooms_get.sql`.
 ///
 /// > 🐿️ This type definition was generated automatically using v4.4.1 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
@@ -607,7 +572,7 @@ pub type ZoneRoomsGetRow {
 }
 
 /// Runs the `zone_rooms_get` query
-/// defined in `./src/olc/sql/zone_rooms_get.sql`.
+/// defined in `./src/web_editor/sql/zone_rooms_get.sql`.
 ///
 /// > 🐿️ This function was generated automatically using v4.4.1 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
