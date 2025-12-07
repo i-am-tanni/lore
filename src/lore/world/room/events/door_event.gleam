@@ -1,5 +1,5 @@
 import gleam/list
-import gleam/option.{None, Some}
+import gleam/option.{Some}
 import gleam/result
 import lore/world.{
   type Direction, type ErrorRoomRequest, Closed, DoorErr, MissingDoor,
