@@ -92,10 +92,7 @@ fn door_error(error: world.ErrorDoor) -> Result(a, ErrorRoomRequest) {
 }
 
 fn door_get(exit: world.RoomExit) -> Result(world.Door, ErrorRoomRequest) {
-  case exit.door {
-    Some(door) -> Ok(door)
-    None -> Error(DoorErr(MissingDoor(exit.keyword)))
-  }
+  option.to_result(exit.door, DoorErr(MissingDoor(exit.keyword)))
 }
 
 fn find_local_exit_by_keyword(
