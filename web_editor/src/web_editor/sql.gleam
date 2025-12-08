@@ -152,16 +152,6 @@ RETURNING door_id;
   |> pog.execute(db)
 }
 
-/// A row you get from running the `exit_deactivate` query
-/// defined in `./src/web_editor/sql/exit_deactivate.sql`.
-///
-/// > 🐿️ This type definition was generated automatically using v4.4.1 of the
-/// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
-///
-pub type ExitDeactivateRow {
-  ExitDeactivateRow(exit_id: Int, to_room_id: Int, keyword: String)
-}
-
 /// Runs the `exit_deactivate` query
 /// defined in `./src/web_editor/sql/exit_deactivate.sql`.
 ///
@@ -171,48 +161,41 @@ pub type ExitDeactivateRow {
 pub fn exit_deactivate(
   db: pog.Connection,
   arg_1: Int,
-) -> Result(pog.Returned(ExitDeactivateRow), pog.QueryError) {
-  let decoder = {
-    use exit_id <- decode.field(0, decode.int)
-    use to_room_id <- decode.field(1, decode.int)
-    use keyword <- decode.field(2, decode.string)
-    decode.success(ExitDeactivateRow(exit_id:, to_room_id:, keyword:))
-  }
-
-  "UPDATE exit
-SET
-  is_active = FALSE
-WHERE
-  exit_id = $1
-RETURNING
-  exit_id, to_room_id, keyword;
-"
-  |> pog.query
-  |> pog.parameter(pog.int(arg_1))
-  |> pog.returning(decoder)
-  |> pog.execute(db)
-}
-
-/// Runs the `exit_deactivate_other_side` query
-/// defined in `./src/web_editor/sql/exit_deactivate_other_side.sql`.
-///
-/// > 🐿️ This function was generated automatically using v4.4.1 of
-/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
-///
-pub fn exit_deactivate_other_side(
-  db: pog.Connection,
-  arg_1: Int,
-  arg_2: String,
 ) -> Result(pog.Returned(Nil), pog.QueryError) {
   let decoder = decode.map(decode.dynamic, fn(_) { Nil })
 
-  "UPDATE exit
+  "WITH deactivate_exit AS (
+  UPDATE exit
+  SET is_active = FALSE
+  WHERE exit_id = $1
+  RETURNING to_room_id
+),
+
+-- If exit has a door, deactivate the door and both sides
+
+deactivate_door_side AS (
+  UPDATE door_side
+  SET is_active = FALSE
+  WHERE exit_id = $1
+  RETURNING door_id
+),
+
+deactivate_door AS (
+  UPDATE door
+  SET is_active = FALSE
+  WHERE door_id = (SELECT door_id FROM deactivate_door_side)
+  RETURNING door_id
+)
+
+UPDATE door_side
 SET is_active = FALSE
-WHERE from_room_id = $1 AND keyword = $2;
+WHERE
+  exit_id = (SELECT to_room_id FROM deactivate_exit) AND
+  door_id = (SELECT door_id FROM deactivate_door)
+;
 "
   |> pog.query
   |> pog.parameter(pog.int(arg_1))
-  |> pog.parameter(pog.text(arg_2))
   |> pog.returning(decoder)
   |> pog.execute(db)
 }
@@ -269,8 +252,9 @@ pub fn exit_get(
   e.is_active,
   d.door_id
 FROM exit as e
-LEFT JOIN door_side as d ON d.exit_id = e.exit_id
-WHERE from_room_id = $1 AND is_active = TRUE;
+LEFT JOIN door_side as d
+  ON d.exit_id = e.exit_id AND d.is_active
+WHERE e.from_room_id = $1 AND e.is_active = TRUE;
 "
   |> pog.query
   |> pog.parameter(pog.int(arg_1))
@@ -350,16 +334,31 @@ WITH reused AS (
   RETURNING *
 ),
 
-inserted AS(
+exit_inserted AS(
   -- If nothing was reused, create a new exit
   INSERT INTO exit (from_room_id, to_room_id, keyword, is_active)
   SELECT $1, $2, $3, TRUE
   WHERE NOT EXISTS (SELECT 1 FROM reused)
   RETURNING exit_id
+),
+
+door_side_reused AS (
+  UPDATE door_side
+  SET
+    exit_id = (SELECT exit_id FROM exit_inserted),
+    door_id = $4,
+    is_active = TRUE
+  WHERE door_side_id = (
+    SELECT door_side_id FROM door_side
+    WHERE is_active = FALSE
+    LIMIT 1
+  )
+  RETURNING door_side_id
 )
 
 INSERT INTO door_side (exit_id, door_id)
-SELECT exit_id, $4 FROM inserted;
+SELECT exit_id, $4 FROM exit_inserted
+WHERE NOT EXISTS (SELECT 1 FROM door_side_reused);
 "
   |> pog.query
   |> pog.parameter(pog.int(arg_1))

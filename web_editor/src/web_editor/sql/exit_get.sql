@@ -6,5 +6,6 @@ SELECT
   e.is_active,
   d.door_id
 FROM exit as e
-LEFT JOIN door_side as d ON d.exit_id = e.exit_id
-WHERE from_room_id = $1 AND is_active = TRUE;
+LEFT JOIN door_side as d
+  ON d.exit_id = e.exit_id AND d.is_active
+WHERE e.from_room_id = $1 AND e.is_active = TRUE;

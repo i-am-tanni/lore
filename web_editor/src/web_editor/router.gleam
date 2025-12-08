@@ -559,28 +559,7 @@ fn update_room(req: Request, db: process.Name(pog.Message)) -> Response {
     // Delete any exits
     list.key_filter(formdata.values, "delete_exit_id")
     |> list.filter_map(string_to_int)
-    |> list.filter_map(fn(id) {
-      query1(sql.exit_deactivate(db, id), "Other Exit Side Info")
-    })
-    |> list.each(fn(other_exit_side_info) {
-      let sql.ExitDeactivateRow(exit_id:, keyword:, to_room_id:) =
-        other_exit_side_info
-      let keyword =
-        keyword
-        |> string_to_direction
-        |> direction_opposite
-        |> direction_to_string
-
-      // deactivate any associated doors
-      use _ <- try(query1(
-        sql.exit_deactivate_other_side(db, to_room_id, keyword),
-        "Nothing",
-      ))
-      use doors <- try(query_many(sql.door_get_from_exit_id(db, exit_id)))
-      list.map(doors, fn(door) { door.door_id })
-      |> list.each(sql.door_deactivate(db, _))
-      |> Ok
-    })
+    |> list.each(fn(id) { query0(sql.exit_deactivate(db, id)) })
 
     let success = "<a href='/r/" <> room_id <> "'>Updated!</a>"
     // Add exit if inputted
