@@ -6,5 +6,5 @@ SELECT
   d.door_id
 FROM exit as e
 LEFT JOIN door_side as d
-  ON e.exit_id = d.exit_id
+  ON e.exit_id = d.exit_id AND d.is_active
 WHERE e.is_active = TRUE;
