@@ -576,7 +576,6 @@ fn update_room(req: Request, db: process.Name(pog.Message)) -> Response {
           db,
           ExitInsert(id, to_room_id, exit_keyword:, door:),
         ))
-        echo formdata as "formdata"
         use <- bool.guard(
           !form_get_bool(formdata, "is_two_way_exit"),
           Ok(success),
@@ -703,7 +702,6 @@ fn form_get_int(formdata: wisp.FormData, key: String) -> Result(Int, Error) {
 }
 
 fn form_get_bool(formdata: wisp.FormData, key: String) -> Bool {
-  echo formdata.values
   list.key_find(formdata.values, key) == Ok("True")
 }
 

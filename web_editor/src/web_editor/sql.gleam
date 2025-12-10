@@ -309,6 +309,69 @@ WHERE NOT EXISTS (SELECT 1 FROM reused);
 /// > 🐿️ This function was generated automatically using v4.4.1 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
+pub fn exit_insert_2way(
+  db: pog.Connection,
+  arg_1: Int,
+  arg_2: Int,
+  arg_3: String,
+  arg_4: String,
+) -> Result(pog.Returned(Nil), pog.QueryError) {
+  let decoder = decode.map(decode.dynamic, fn(_) { Nil })
+
+  "-- recycle any inactive ids before inserting a new row
+WITH reused_forward AS (
+  UPDATE exit
+  SET
+    from_room_id = $1,
+    to_room_id = $2,
+    keyword = $3,
+    is_active = TRUE
+  WHERE exit_id = (
+    SELECT exit_id FROM exit
+    WHERE is_active = FALSE
+    LIMIT 1
+  )
+  RETURNING *
+),
+
+reused_reverse AS (
+  UPDATE exit
+  SET
+    from_room_id = $2,
+    to_room_id = $1,
+    keyword = $4,
+    is_active = TRUE
+  WHERE exit_id = (
+    SELECT exit_id FROM exit
+    WHERE is_active = FALSE
+    LIMIT 1
+  )
+  RETURNING *
+)
+
+-- If nothing was reused, create a new exit
+INSERT INTO exit (from_room_id, to_room_id, keyword, is_active)
+SELECT $1, $2, $3, TRUE
+WHERE NOT EXISTS (SELECT 1 FROM reused_forward)
+UNION
+SELECT $2, $1, $4, TRUE
+WHERE NOT EXISTS (SELECT 1 FROM reused_reverse)
+;
+"
+  |> pog.query
+  |> pog.parameter(pog.int(arg_1))
+  |> pog.parameter(pog.int(arg_2))
+  |> pog.parameter(pog.text(arg_3))
+  |> pog.parameter(pog.text(arg_4))
+  |> pog.returning(decoder)
+  |> pog.execute(db)
+}
+
+/// recycle any inactive ids before inserting a new row
+///
+/// > 🐿️ This function was generated automatically using v4.4.1 of
+/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
 pub fn exit_insert_w_door(
   db: pog.Connection,
   arg_1: Int,
