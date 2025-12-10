@@ -292,3 +292,10 @@ pub fn is_player(mobile: Mobile) -> Bool {
     Npc(_) -> False
   }
 }
+
+pub fn item_id(instance: ItemInstance) -> Id(Item) {
+  case instance.item {
+    Loading(item_id) -> item_id
+    Loaded(Item(id:, ..)) -> id
+  }
+}

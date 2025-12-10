@@ -100,7 +100,14 @@ fn recv(state: State, msg: RoomMessage) -> actor.Next(State, RoomMessage) {
     }
     event.SpawnItem(item_instance) -> {
       let world.Room(items:, ..) as room = state.room
-      State(..state, room: world.Room(..room, items: [item_instance, ..items]))
+      case item_exists(items, item_instance) {
+        True -> state
+        False ->
+          State(
+            ..state,
+            room: world.Room(..room, items: [item_instance, ..items]),
+          )
+      }
     }
     event.RoomToRoom(..) -> state
     event.CombatRoundTrigger -> {
@@ -367,4 +374,12 @@ fn schedule_combat_round(
 
   process.send_after(self, delay, event.CombatRoundTrigger)
   |> Timer
+}
+
+fn item_exists(
+  instances: List(world.ItemInstance),
+  reset: world.ItemInstance,
+) -> Bool {
+  let item_id = world.item_id(reset)
+  list.any(instances, fn(instance) { world.item_id(instance) == item_id })
 }
