@@ -87,12 +87,14 @@ fn init(
 /// Track the item and clean up as scheduled.
 /// This typically is called when an item is dropped.
 ///
-pub fn track_item(
+pub fn item_schedule_clean_up(
   name: process.Name(Message),
-  item_id: StringId(ItemInstance),
-  location: Id(Room),
-  destroy_at: Timestamp,
+  what item_id: StringId(ItemInstance),
+  at location: Id(Room),
+  in duration: duration.Duration,
 ) -> Nil {
+  let destroy_at = timestamp.system_time() |> timestamp.add(duration)
+
   process.named_subject(name)
   |> actor.send(Track(item_id:, location:, destroy_at:))
 }
@@ -100,7 +102,7 @@ pub fn track_item(
 /// Remove tracking on an item.
 /// This is typically called when an item is picked up.
 ///
-pub fn untrack_item(
+pub fn item_cancel_clean_up(
   name: process.Name(Message),
   item: StringId(ItemInstance),
 ) -> Nil {

@@ -164,6 +164,7 @@ pub fn instance(
     item: world.Loading(id),
     keywords:,
     contains:,
+    was_touched: False,
   ))
 }
 

@@ -167,6 +167,7 @@ pub type ItemInstance {
     keywords: List(String),
     item: Load,
     contains: Container(ItemInstance),
+    was_touched: Bool,
   )
 }
 
