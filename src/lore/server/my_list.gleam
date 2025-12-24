@@ -124,3 +124,29 @@ pub fn group_by(list: List(a), group_fun: fn(a) -> #(k, v)) -> Dict(k, List(v)) 
     }
   })
 }
+
+/// Insert element into list when compare_fun returns `True`
+///
+pub fn insert_when(
+  list: List(a),
+  element: a,
+  compare_fun: fn(a, a) -> Bool,
+) -> List(a) {
+  insert_when_loop(list, element, compare_fun, [])
+}
+
+fn insert_when_loop(
+  list: List(a),
+  element: a,
+  compare_fun: fn(a, a) -> Bool,
+  acc: List(a),
+) -> List(a) {
+  case list {
+    [] -> list.reverse([element, ..acc])
+    [first, ..rest] ->
+      case compare_fun(first, element) {
+        True -> [element, ..acc] |> list.reverse |> list.append(rest)
+        False -> insert_when_loop(rest, element, compare_fun, [first, ..acc])
+      }
+  }
+}

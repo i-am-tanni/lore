@@ -98,6 +98,7 @@ fn recv(state: State, msg: RoomMessage) -> actor.Next(State, RoomMessage) {
       let update = world.Room(..room, characters:)
       State(..state, room: update)
     }
+
     event.SpawnItem(item_instance) -> {
       let world.Room(items:, ..) as room = state.room
       case item_exists(items, item_instance) {
@@ -109,6 +110,19 @@ fn recv(state: State, msg: RoomMessage) -> actor.Next(State, RoomMessage) {
           )
       }
     }
+
+    event.DespawnItems(item_ids) -> {
+      let world.Room(items:, ..) as room = state.room
+      let filtered =
+        list.filter(items, fn(item) {
+          let item_id = item.id
+          !list.any(item_ids, fn(id) { id == item_id })
+        })
+
+      let room = world.Room(..room, items: filtered)
+      State(..state, room:)
+    }
+
     event.RoomToRoom(..) -> state
     event.CombatRoundTrigger -> {
       let state = State(..state, combat_timer: Cancelled)

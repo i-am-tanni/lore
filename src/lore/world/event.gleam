@@ -145,6 +145,7 @@ pub type RoomMessage {
   InterRoom(event: Event(InterRoomEvent, Done))
   MobileCleanup(id: StringId(Mobile))
   SpawnItem(item: world.ItemInstance)
+  DespawnItems(item_ids: List(StringId(world.ItemInstance)))
   CombatRoundTrigger
 }
 

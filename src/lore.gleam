@@ -40,6 +40,7 @@ pub fn main() {
         users: process.new_name("users"),
         items: process.new_name("items"),
         socials: process.new_name("socials"),
+        janitor: process.new_name("janitor"),
         mob_factory: process.new_name("mob_factory"),
       )
 
