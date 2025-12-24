@@ -1,5 +1,5 @@
 //// An actor that tracks dropped items and periodically cleans them up.
-//// Checks every ten minutes at fixed, hour-aligned intervals if there is
+//// Checks every at fixed, hour-aligned intervals if there is
 //// anything to despawn.
 ////
 
@@ -22,12 +22,21 @@ import lore/world/room/room_registry
 const check_every_ms = 600_000
 
 pub type Message {
+  /// Add tracking and send despawn message to location
+  /// when destroy_at time is exceeded.
+  ///
   Track(
     item_id: StringId(ItemInstance),
     location: Id(Room),
     destroy_at: Timestamp,
   )
+
+  /// Remove tracking.
+  ///
   Untrack(item_id: StringId(ItemInstance))
+
+  /// Check if there are any items due for clean up
+  ///
   Clean(Timestamp)
 }
 
@@ -39,6 +48,9 @@ type ItemTracked {
   )
 }
 
+/// Internally the tracked items are stored in a list sorted by destroy_at time
+///
+///
 type State {
   State(
     self: process.Subject(Message),
@@ -102,7 +114,7 @@ fn recv(state: State, msg: Message) -> actor.Next(State, Message) {
       let update =
         ItemTracked(item_id:, location:, destroy_at:)
         |> my_list.insert_when(state.sorted, _, fn(a, b) {
-          // insert into list in ascending order
+          // insert into list in ascending order by destroy_at time
           timestamp.compare(a.destroy_at, b.destroy_at) == order.Gt
         })
 
@@ -115,12 +127,12 @@ fn recv(state: State, msg: Message) -> actor.Next(State, Message) {
       State(..state, sorted: filtered)
     }
 
-    Clean(timestamp) -> {
+    Clean(cutoff) -> {
       let #(to_destroy, sorted) =
         list.split_while(state.sorted, fn(tracking) {
-          // list is sorted in ascending order by destroy_at timestamp
-          // split at timestamp
-          timestamp.compare(tracking.destroy_at, timestamp) != order.Gt
+          // list is sorted in ascending order by destroy_at time
+          // split at cutoff
+          timestamp.compare(tracking.destroy_at, cutoff) != order.Gt
         })
 
       despawn_items(to_destroy, state.room_registry)
