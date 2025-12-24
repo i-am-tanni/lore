@@ -145,7 +145,7 @@ fn insert_when_loop(
     [] -> list.reverse([element, ..acc])
     [first, ..rest] ->
       case compare_fun(first, element) {
-        True -> [element, ..acc] |> list.reverse |> list.append(rest)
+        True -> [element, ..acc] |> list.reverse |> list.append(list)
         False -> insert_when_loop(rest, element, compare_fun, [first, ..acc])
       }
   }
