@@ -14,27 +14,26 @@ pub fn get(
   item_keyword: String,
 ) -> response.Builder(CharacterMessage) {
   let result = {
-    use instance <- result.try(find_local_item(builder, item_keyword))
-    case instance.was_touched {
+    use item_instance <- result.try(find_local_item(builder, item_keyword))
+    case item_instance.was_touched {
+      // if item instance was previously touched by a mobile and dropped
+      // cancel clean up
       True -> {
         let names = response.system_tables(builder)
-        janitor.item_cancel_clean_up(names.janitor, instance.id)
-        instance
+        janitor.item_cancel_clean_up(names.janitor, item_instance.id)
+        item_instance
       }
-
-      False -> world.ItemInstance(..instance, was_touched: True)
+      // ..else mark it as touched
+      False -> world.ItemInstance(..item_instance, was_touched: True)
     }
     |> Ok
   }
 
   case result {
-    Ok(instance) -> {
-      let instance = world.ItemInstance(..instance, was_touched: True)
-
+    Ok(instance) ->
       builder
       |> response.item_delete(instance)
       |> response.broadcast(event.acting_character, ItemGetNotify(instance))
-    }
 
     Error(error) -> response.reply_character(builder, event.ActFailed(error))
   }
