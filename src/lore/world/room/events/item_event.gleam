@@ -16,14 +16,15 @@ pub fn get(
   let result = {
     use item_instance <- result.try(find_local_item(builder, item_keyword))
     case item_instance.was_touched {
-      // if item instance was previously touched by a mobile and dropped
-      // cancel clean up
+      // If item instance was previously touched by a mobile
+      // then it was dropped and thus scheduled for clean up. Cancel that.
       True -> {
         let names = response.system_tables(builder)
         janitor.item_cancel_clean_up(names.janitor, item_instance.id)
         item_instance
       }
-      // ..else mark it as touched
+      // ..else mark it as touched so we can schedule a clean up if it gets
+      // dropped
       False -> world.ItemInstance(..item_instance, was_touched: True)
     }
     |> Ok
