@@ -45,7 +45,6 @@ type State {
   )
 }
 
-///
 // Action queue data is held in this struct temporarily before constructing the
 // next State.
 type ActionSummary {
