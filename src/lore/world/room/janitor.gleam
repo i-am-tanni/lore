@@ -3,13 +3,14 @@
 //// anything to despawn.
 ////
 
+import gleam/bool
 import gleam/dict.{type Dict}
 import gleam/erlang/process
 import gleam/float
 import gleam/int
 import gleam/list
 import gleam/otp/actor
-import gleam/result
+import gleam/result.{try}
 import gleam/time/duration
 import gleam/time/timestamp.{type Timestamp}
 import lore/server/my_list
@@ -123,30 +124,26 @@ pub fn item_cancel_clean_up(
 }
 
 fn recv(state: State, msg: Message) -> actor.Next(State, Message) {
-  let state = case msg {
-    Track(item_id:, location:, destroy_at:) -> {
-      let update =
-        ItemTracked(item_id:, location:, destroy_at:)
-        |> track_item_instance(state.tracking, _)
+  let result = case msg {
+    Track(item_id:, location:, destroy_at:) ->
+      ItemTracked(item_id:, location:, destroy_at:)
+      |> track_item_instance(state.tracking, _)
+      |> Ok
 
-      State(..state, tracking: update)
-    }
-
-    Untrack(item_id) -> {
-      case untrack_item_instance(state.tracking, item_id) {
-        Ok(update) -> State(..state, tracking: update)
-        Error(_) -> state
-      }
-    }
+    Untrack(item_id) -> untrack_item_instance(state.tracking, item_id)
 
     Clean(cutoff) -> {
-      let tracking = clean_up(state.tracking, cutoff, state.room_registry)
-      schedule_next_cleanup(state.self)
-      State(..state, tracking:)
+      let State(tracking:, room_registry:, self:) = state
+      schedule_next_cleanup(self)
+      clean_up(tracking, cutoff, room_registry)
     }
   }
 
-  actor.continue(state)
+  case result {
+    Ok(update) -> State(..state, tracking: update)
+    Error(_) -> state
+  }
+  |> actor.continue
 }
 
 fn track_item_instance(
@@ -185,8 +182,8 @@ fn untrack_item_instance(
   item_id: StringId(ItemInstance),
 ) -> Result(Tracking, Nil) {
   let Tracking(clean_up_blocks:, block_lookup:) = tracking
-  use timestamp <- result.try(dict.get(block_lookup, item_id))
-  use clean_up_list <- result.try(dict.get(clean_up_blocks, timestamp))
+  use timestamp <- try(dict.get(block_lookup, item_id))
+  use clean_up_list <- try(dict.get(clean_up_blocks, timestamp))
   let filtered =
     list.filter(clean_up_list, fn(item_tracked) {
       item_tracked.item_id != item_id
@@ -212,12 +209,10 @@ fn clean_up(
   tracking: Tracking,
   cutoff: Timestamp,
   room_registry: process.Name(room_registry.Message),
-) -> Tracking {
+) -> Result(Tracking, Nil) {
   let Tracking(clean_up_blocks:, block_lookup:) = tracking
-  let clean_up_list =
-    dict.get(clean_up_blocks, cutoff)
-    |> result.unwrap([])
-
+  use clean_up_list <- try(dict.get(clean_up_blocks, cutoff))
+  use <- bool.guard(clean_up_list == [], Error(Nil))
   despawn_items(clean_up_list, room_registry)
 
   let block_lookup =
@@ -225,6 +220,7 @@ fn clean_up(
     |> dict.drop(block_lookup, _)
 
   Tracking(clean_up_blocks: dict.delete(clean_up_blocks, cutoff), block_lookup:)
+  |> Ok
 }
 
 fn despawn_items(
