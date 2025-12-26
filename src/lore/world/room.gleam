@@ -381,7 +381,8 @@ fn schedule_combat_round(
   let delay =
     timestamp.system_time()
     |> timestamp.to_unix_seconds
-    |> fn(x) { float.truncate(x *. 1000.0) }
+    |> float.multiply(1000.0)
+    |> float.truncate
     |> int.modulo(combat_round_len_in_ms)
     |> result.unwrap(0)
     |> int.subtract(combat_round_len_in_ms, _)

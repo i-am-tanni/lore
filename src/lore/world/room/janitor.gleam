@@ -171,7 +171,8 @@ fn schedule_next_cleanup(self: process.Subject(Message)) -> process.Timer {
   let delay_in_ms =
     now
     |> timestamp.to_unix_seconds
-    |> fn(x) { float.truncate(x *. 1000.0) }
+    |> float.multiply(1000.0)
+    |> float.truncate
     |> int.modulo(check_every_ms)
     |> result.unwrap(0)
     |> int.subtract(check_every_ms, _)
