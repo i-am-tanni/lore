@@ -37,7 +37,7 @@ pub type Message {
 
   /// Check if there are any items due for clean up.
   ///
-  Clean(Timestamp)
+  Clean(before: Timestamp)
 }
 
 type ItemTracked {
@@ -132,10 +132,10 @@ fn recv(state: State, msg: Message) -> actor.Next(State, Message) {
 
     Untrack(item_id) -> untrack_item_instance(state.tracking, item_id)
 
-    Clean(cutoff) -> {
+    Clean(before: timestamp) -> {
       let State(tracking:, room_registry:, self:) = state
       schedule_next_cleanup(self)
-      clean_up(tracking, cutoff, room_registry)
+      clean_up(tracking, timestamp, room_registry)
     }
   }
 
