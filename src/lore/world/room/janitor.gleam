@@ -19,7 +19,7 @@ import lore/world/event
 import lore/world/room/room_registry
 
 // Check every 10 minutes at fixed, hour-aligned intervals
-const check_every_ms = 600_000
+const check_every_x_seconds = 600
 
 pub type Message {
   /// Add tracking and send despawn message to location
@@ -168,18 +168,17 @@ fn despawn_items(
 fn schedule_next_cleanup(self: process.Subject(Message)) -> process.Timer {
   let now = timestamp.system_time()
 
-  let delay_in_ms =
+  let delay_in_seconds =
     now
     |> timestamp.to_unix_seconds
-    |> float.multiply(1000.0)
-    |> float.truncate
-    |> int.modulo(check_every_ms)
+    |> float.round
+    |> int.modulo(check_every_x_seconds)
     |> result.unwrap(0)
-    |> int.subtract(check_every_ms, _)
+    |> int.subtract(check_every_x_seconds, _)
 
   process.send_after(
     self,
-    delay_in_ms,
-    Clean(timestamp.add(now, duration.milliseconds(delay_in_ms))),
+    delay_in_seconds * 1000,
+    Clean(timestamp.add(now, duration.seconds(delay_in_seconds))),
   )
 }
