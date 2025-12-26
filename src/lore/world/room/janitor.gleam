@@ -3,12 +3,11 @@
 //// anything to despawn.
 ////
 
-import gleam/dict
+import gleam/dict.{type Dict}
 import gleam/erlang/process
 import gleam/float
 import gleam/int
 import gleam/list
-import gleam/order
 import gleam/otp/actor
 import gleam/result
 import gleam/time/duration
@@ -35,7 +34,7 @@ pub type Message {
   ///
   Untrack(item_id: StringId(ItemInstance))
 
-  /// Check if there are any items due for clean up
+  /// Check if there are any items due for clean up.
   ///
   Clean(Timestamp)
 }
@@ -48,14 +47,22 @@ type ItemTracked {
   )
 }
 
-/// Internally the tracked items are stored in a list sorted by destroy_at time
-///
+type Tracking {
+  Tracking(
+    clean_up_blocks: Dict(Timestamp, List(ItemTracked)),
+    block_lookup: Dict(StringId(ItemInstance), Timestamp),
+  )
+}
+
+/// Internally the tracked items are stored in a dict keyed by their clean up
+/// timestamp, which is arranged in fixed interval blocks. Keys are tracked
+/// in a separate dictionary.
 ///
 type State {
   State(
     self: process.Subject(Message),
     room_registry: process.Name(room_registry.Message),
-    sorted: List(ItemTracked),
+    tracking: Tracking,
   )
 }
 
@@ -77,8 +84,9 @@ fn init(
   room_registry: process.Name(room_registry.Message),
 ) -> Result(actor.Initialised(State, Message, process.Subject(Message)), String) {
   schedule_next_cleanup(self)
+  let tracking = Tracking(clean_up_blocks: dict.new(), block_lookup: dict.new())
 
-  State(self:, sorted: [], room_registry:)
+  State(self:, tracking:, room_registry:)
   |> actor.initialised
   |> actor.returning(self)
   |> Ok
@@ -115,31 +123,22 @@ fn recv(state: State, msg: Message) -> actor.Next(State, Message) {
     Track(item_id:, location:, destroy_at:) -> {
       let update =
         ItemTracked(item_id:, location:, destroy_at:)
-        |> my_list.insert_when(state.sorted, _, fn(a, b) {
-          // insert into list in ascending order by destroy_at time
-          timestamp.compare(a.destroy_at, b.destroy_at) == order.Gt
-        })
+        |> track_item_instance(state.tracking)
 
-      State(..state, sorted: update)
+      State(..state, tracking: update)
     }
 
-    Untrack(id) -> {
-      let filtered =
-        list.filter(state.sorted, fn(tracking) { tracking.item_id != id })
-      State(..state, sorted: filtered)
+    Untrack(item_id) -> {
+      case untrack_item_instance(state.tracking, item_id) {
+        Ok(update) -> State(..state, tracking: update)
+        Error(_) -> state
+      }
     }
 
     Clean(cutoff) -> {
-      let #(to_destroy, sorted) =
-        list.split_while(state.sorted, fn(tracking) {
-          // list is sorted in ascending order by destroy_at time
-          // split at cutoff
-          timestamp.compare(tracking.destroy_at, cutoff) != order.Gt
-        })
-
-      despawn_items(to_destroy, state.room_registry)
+      let tracking = clean_up(state.tracking, cutoff, state.room_registry)
       schedule_next_cleanup(state.self)
-      State(..state, sorted:)
+      State(..state, tracking:)
     }
   }
 
@@ -166,19 +165,96 @@ fn despawn_items(
 }
 
 fn schedule_next_cleanup(self: process.Subject(Message)) -> process.Timer {
-  let now = timestamp.system_time()
+  let now =
+    timestamp.system_time()
+    |> timestamp.to_unix_seconds
+    |> float.truncate
 
   let delay_in_seconds =
     now
-    |> timestamp.to_unix_seconds
-    |> float.round
     |> int.modulo(check_every_x_seconds)
     |> result.unwrap(0)
     |> int.subtract(check_every_x_seconds, _)
 
-  process.send_after(
-    self,
-    delay_in_seconds * 1000,
-    Clean(timestamp.add(now, duration.seconds(delay_in_seconds))),
+  let next = timestamp.from_unix_seconds(now + delay_in_seconds)
+
+  process.send_after(self, delay_in_seconds * 1000, Clean(next))
+}
+
+fn clean_up_time(destroy_at: Timestamp) -> Timestamp {
+  let destroy_at =
+    destroy_at
+    |> timestamp.to_unix_seconds
+    |> float.truncate
+
+  destroy_at
+  |> int.modulo(check_every_x_seconds)
+  |> result.unwrap(0)
+  |> int.subtract(check_every_x_seconds, _)
+  |> int.add(destroy_at)
+  |> timestamp.from_unix_seconds
+}
+
+fn track_item_instance(
+  item_tracked: ItemTracked,
+  tracking: Tracking,
+) -> Tracking {
+  let Tracking(clean_up_blocks:, block_lookup:) = tracking
+  let block = clean_up_time(item_tracked.destroy_at)
+  let clean_up_list =
+    dict.get(clean_up_blocks, block)
+    |> result.unwrap([])
+    |> list.prepend(item_tracked)
+
+  Tracking(
+    clean_up_blocks: dict.insert(clean_up_blocks, block, clean_up_list),
+    block_lookup: dict.insert(block_lookup, item_tracked.item_id, block),
   )
+}
+
+fn untrack_item_instance(
+  tracking: Tracking,
+  item_id: StringId(ItemInstance),
+) -> Result(Tracking, Nil) {
+  let Tracking(clean_up_blocks:, block_lookup:) = tracking
+  use timestamp <- result.try(dict.get(block_lookup, item_id))
+  use clean_up_list <- result.try(dict.get(clean_up_blocks, timestamp))
+  let filtered =
+    list.filter(clean_up_list, fn(item_tracked) {
+      item_tracked.item_id != item_id
+    })
+
+  case filtered {
+    [_, ..] ->
+      Tracking(
+        clean_up_blocks: dict.insert(clean_up_blocks, timestamp, filtered),
+        block_lookup: dict.delete(block_lookup, item_id),
+      )
+
+    [] ->
+      Tracking(
+        clean_up_blocks: dict.delete(clean_up_blocks, timestamp),
+        block_lookup: dict.delete(block_lookup, item_id),
+      )
+  }
+  |> Ok
+}
+
+fn clean_up(
+  tracking: Tracking,
+  cutoff: Timestamp,
+  room_registry: process.Name(room_registry.Message),
+) -> Tracking {
+  let Tracking(clean_up_blocks:, block_lookup:) = tracking
+  let clean_up_list =
+    dict.get(clean_up_blocks, cutoff)
+    |> result.unwrap([])
+
+  despawn_items(clean_up_list, room_registry)
+
+  let block_lookup =
+    list.map(clean_up_list, fn(tracked) { tracked.item_id })
+    |> dict.drop(block_lookup, _)
+
+  Tracking(clean_up_blocks: dict.delete(clean_up_blocks, cutoff), block_lookup:)
 }
