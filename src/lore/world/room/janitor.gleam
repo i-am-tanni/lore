@@ -127,7 +127,7 @@ fn recv(state: State, msg: Message) -> actor.Next(State, Message) {
     Track(item_id:, location:, destroy_at:) -> {
       let update =
         ItemTracked(item_id:, location:, destroy_at:)
-        |> track_item_instance(state.tracking)
+        |> track_item_instance(state.tracking, _)
 
       State(..state, tracking: update)
     }
@@ -149,40 +149,21 @@ fn recv(state: State, msg: Message) -> actor.Next(State, Message) {
   actor.continue(state)
 }
 
-fn despawn_items(
-  to_destroy: List(ItemTracked),
-  room_registry: process.Name(room_registry.Message),
-) -> Nil {
-  my_list.group_by(to_destroy, fn(tracked) {
-    #(tracked.location, tracked.item_id)
-  })
-  |> dict.to_list
-  |> list.each(fn(pair) {
-    let #(room_id, items_to_despawn) = pair
-    case room_registry.whereis(room_registry, room_id) {
-      Ok(room_subject) ->
-        actor.send(room_subject, event.DespawnItems(items_to_despawn))
+fn track_item_instance(
+  tracking: Tracking,
+  item_tracked: ItemTracked,
+) -> Tracking {
+  let Tracking(clean_up_blocks:, block_lookup:) = tracking
+  let block = clean_up_time(item_tracked.destroy_at)
+  let clean_up_list =
+    dict.get(clean_up_blocks, block)
+    |> result.unwrap([])
+    |> list.prepend(item_tracked)
 
-      Error(_) -> Nil
-    }
-  })
-}
-
-fn schedule_next_cleanup(self: process.Subject(Message)) -> process.Timer {
-  let now =
-    timestamp.system_time()
-    |> timestamp.to_unix_seconds
-    |> float.truncate
-
-  let delay_in_seconds =
-    now
-    |> int.modulo(check_every_x_seconds)
-    |> result.unwrap(0)
-    |> int.subtract(check_every_x_seconds, _)
-
-  let next = timestamp.from_unix_seconds(now + delay_in_seconds)
-
-  process.send_after(self, delay_in_seconds * 1000, Clean(next))
+  Tracking(
+    clean_up_blocks: dict.insert(clean_up_blocks, block, clean_up_list),
+    block_lookup: dict.insert(block_lookup, item_tracked.item_id, block),
+  )
 }
 
 fn clean_up_time(destroy_at: Timestamp) -> Timestamp {
@@ -197,23 +178,6 @@ fn clean_up_time(destroy_at: Timestamp) -> Timestamp {
   |> int.subtract(check_every_x_seconds, _)
   |> int.add(destroy_at)
   |> timestamp.from_unix_seconds
-}
-
-fn track_item_instance(
-  item_tracked: ItemTracked,
-  tracking: Tracking,
-) -> Tracking {
-  let Tracking(clean_up_blocks:, block_lookup:) = tracking
-  let block = clean_up_time(item_tracked.destroy_at)
-  let clean_up_list =
-    dict.get(clean_up_blocks, block)
-    |> result.unwrap([])
-    |> list.prepend(item_tracked)
-
-  Tracking(
-    clean_up_blocks: dict.insert(clean_up_blocks, block, clean_up_list),
-    block_lookup: dict.insert(block_lookup, item_tracked.item_id, block),
-  )
 }
 
 fn untrack_item_instance(
@@ -261,4 +225,40 @@ fn clean_up(
     |> dict.drop(block_lookup, _)
 
   Tracking(clean_up_blocks: dict.delete(clean_up_blocks, cutoff), block_lookup:)
+}
+
+fn despawn_items(
+  to_destroy: List(ItemTracked),
+  room_registry: process.Name(room_registry.Message),
+) -> Nil {
+  my_list.group_by(to_destroy, fn(tracked) {
+    #(tracked.location, tracked.item_id)
+  })
+  |> dict.to_list
+  |> list.each(fn(pair) {
+    let #(room_id, items_to_despawn) = pair
+    case room_registry.whereis(room_registry, room_id) {
+      Ok(room_subject) ->
+        actor.send(room_subject, event.DespawnItems(items_to_despawn))
+
+      Error(_) -> Nil
+    }
+  })
+}
+
+fn schedule_next_cleanup(self: process.Subject(Message)) -> process.Timer {
+  let now =
+    timestamp.system_time()
+    |> timestamp.to_unix_seconds
+    |> float.truncate
+
+  let delay_in_seconds =
+    now
+    |> int.modulo(check_every_x_seconds)
+    |> result.unwrap(0)
+    |> int.subtract(check_every_x_seconds, _)
+
+  let next = timestamp.from_unix_seconds(now + delay_in_seconds)
+
+  process.send_after(self, delay_in_seconds * 1000, Clean(next))
 }
