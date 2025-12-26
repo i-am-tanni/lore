@@ -47,6 +47,10 @@ type ItemTracked {
   )
 }
 
+/// Organize the clean up lists into blocks
+/// With an extra dict for tracking which block the id lives in in case it
+/// clean up is cancelled.
+///
 type Tracking {
   Tracking(
     clean_up_blocks: Dict(Timestamp, List(ItemTracked)),
