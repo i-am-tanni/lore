@@ -4,7 +4,7 @@
 import gleam/bool
 import gleam/list
 import gleam/option
-import gleam/result.{try}
+import gleam/result
 import gleam/string
 import lore/character/act
 import lore/character/conn.{type Conn}
