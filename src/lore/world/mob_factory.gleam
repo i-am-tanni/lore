@@ -1,3 +1,6 @@
+//// A factory supervisor API for mobile spawns
+////
+
 import gleam/erlang/process
 import gleam/option.{None, Some}
 import gleam/otp/factory_supervisor
