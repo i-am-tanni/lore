@@ -9,7 +9,9 @@ import gleam/string
 import lore/character/act
 import lore/character/conn.{type Conn}
 import lore/character/events
+import lore/character/socials
 import lore/character/users
+import lore/character/view
 import lore/character/view/character_view
 import lore/character/view/communication_view
 import lore/character/view/error_view
@@ -35,11 +37,18 @@ type Verb {
   Drop
   Kill
   Inventory
+  Social
 }
 
 type LookAt {
   Self
   Item(world.ItemInstance)
+}
+
+type SocialData {
+  SocialAuto(social: socials.Social)
+  SocialAt(social: socials.Social, at: String)
+  SocialNoArg(social: socials.Social)
 }
 
 pub fn parse(conn: Conn, input: String) -> Conn {
@@ -70,7 +79,8 @@ pub fn parse(conn: Conn, input: String) -> Conn {
     "quit" -> quit_command(conn)
     "i" | "inventory" -> command_nil(conn, Inventory, inventory_command)
     "" -> conn.prompt(conn)
-    _ -> conn.renderln(conn, error_view.parse_error()) |> conn.prompt()
+    social ->
+      command(conn, social_command, social_args(conn, social, rest, word))
   }
 }
 
@@ -81,7 +91,8 @@ fn command(
 ) -> Conn {
   case args_result {
     Ok(data) -> command_fun(conn, data)
-    Error(error) -> conn.renderln(conn, error_view.render_error(error))
+    Error(error) ->
+      conn.renderln(conn, error_view.render_error(error)) |> conn.prompt
   }
 }
 
@@ -190,6 +201,29 @@ fn kill_args(s: String, word: Splitter) -> Result(Command(String), String) {
     Ok(#(keyword, _)) -> Ok(Command(Kill, keyword))
     Error(_) -> Error("What do you want to kill?")
   }
+}
+
+fn social_args(
+  conn: Conn,
+  verb: String,
+  rest: String,
+  word: Splitter,
+) -> Result(Command(SocialData), String) {
+  let lookups = conn.system_tables(conn)
+  use social <- result.try(
+    socials.lookup(lookups.socials, verb)
+    |> result.replace_error("Huh?"),
+  )
+  let data = case keyword(rest, word) {
+    Ok(#(at, _)) ->
+      case is_auto(conn.get_character(conn), at) {
+        True -> SocialAuto(social)
+        False -> SocialAt(social, at)
+      }
+    Error(_) -> SocialNoArg(social)
+  }
+
+  Ok(Command(Social, data))
 }
 
 fn quote(s: String) -> String {
@@ -427,6 +461,28 @@ fn quit_command(conn: Conn) -> Conn {
   conn
   |> conn.renderln(character_view.quit())
   |> conn.terminate
+}
+
+fn social_command(conn: Conn, command: Command(SocialData)) -> Conn {
+  let comm_data = case command.data {
+    SocialAuto(social:) ->
+      view.ReportBasic(self: social.char_auto, witness: social.others_auto)
+      |> event.SocialData()
+
+    SocialNoArg(social:) ->
+      view.ReportBasic(self: social.char_no_arg, witness: social.others_no_arg)
+      |> event.SocialData()
+
+    SocialAt(social:, at:) ->
+      view.ReportAdvanced(
+        self: social.char_found,
+        witness: social.others_found,
+        victim: social.victim_found,
+      )
+      |> event.SocialAtData(at:)
+  }
+
+  conn.action(conn, act.communicate(comm_data))
 }
 
 //

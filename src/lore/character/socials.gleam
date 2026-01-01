@@ -81,7 +81,7 @@ fn init(
 }
 
 /// Registers as list of room subjects keyed by their room instance id
-/// 
+///
 pub fn insert(
   table_name: process.Name(Message),
   command: String,
@@ -98,7 +98,7 @@ pub fn delete(table_name: process.Name(Message), command: String) {
 }
 
 /// Returns the subject given a registered room instance id.
-/// 
+///
 pub fn lookup(
   table_name: process.Name(Message),
   command: String,
@@ -107,7 +107,7 @@ pub fn lookup(
 }
 
 /// A basic API for inserting and deleting from the key-val store.
-/// 
+///
 fn recv(
   table: table.Set(String, Social),
   msg: Message,
