@@ -214,7 +214,7 @@ fn social_args(
     socials.lookup(lookups.socials, verb)
     |> result.replace_error("Huh?"),
   )
-  let data = case at(rest, word) {
+  let data = case victim(rest, word) {
     Ok(#(victim, _)) ->
       case is_auto(conn.get_character(conn), victim) {
         True -> SocialAuto(social)
@@ -276,6 +276,15 @@ fn options_loop(
         // ever a success
         Error(Nil) -> options_loop(s, rest, [parser, ..try_again], acc)
       }
+  }
+}
+
+fn victim(s: String, word: Splitter) -> Result(#(String, String), Nil) {
+  use #(slice, rest) <- result.try(keyword(s, word))
+  case slice {
+    "@" <> slice -> Ok(#(slice, rest))
+    "at" -> keyword(rest, word)
+    _ -> Ok(#(slice, rest))
   }
 }
 
