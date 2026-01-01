@@ -214,11 +214,11 @@ fn social_args(
     socials.lookup(lookups.socials, verb)
     |> result.replace_error("Huh?"),
   )
-  let data = case keyword(rest, word) {
-    Ok(#(at, _)) ->
-      case is_auto(conn.get_character(conn), at) {
+  let data = case at(rest, word) {
+    Ok(#(victim, _)) ->
+      case is_auto(conn.get_character(conn), victim) {
         True -> SocialAuto(social)
-        False -> SocialAt(social, at)
+        False -> SocialAt(social, victim)
       }
     Error(_) -> SocialNoArg(social)
   }
