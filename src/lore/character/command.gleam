@@ -4,7 +4,7 @@
 import gleam/bool
 import gleam/list
 import gleam/option
-import gleam/result
+import gleam/result.{try}
 import gleam/string
 import lore/character/act
 import lore/character/conn.{type Conn}
@@ -54,7 +54,7 @@ pub fn parse(conn: Conn, input: String) -> Conn {
     "u" | "up" -> move_command(conn, world.Up)
     "d" | "down" -> move_command(conn, world.Down)
     "l" | "look" if rest == "" -> command_nil(conn, Look, look_command)
-    "l" | "look" -> command(conn, look_at_command, look_at_args(rest, word))
+    "l" | "look" -> command(conn, look_at_command, look_args(rest, word))
     "say" -> command(conn, room_comms, say_args(rest, word))
     "whisper" -> command(conn, room_comms, whisper_args(rest, word))
     "emote" -> command(conn, room_comms, emote_text(rest))
@@ -93,10 +93,14 @@ fn command_nil(
   command_fun(conn, Command(verb, Nil))
 }
 
-fn look_at_args(s: String, word: Splitter) -> Result(Command(String), String) {
-  case keyword(s, word) {
-    Ok(#(keyword, _)) -> Ok(Command(Look, keyword))
-    Error(_) -> Error("What do you want to look at?")
+fn look_args(s: String, word: Splitter) -> Result(Command(String), String) {
+  use #(kw, rest) <- result.try(
+    keyword(s, word)
+    |> result.replace_error("What do you want to look at?"),
+  )
+  case kw {
+    "at" | "in" -> look_args(rest, word)
+    _ -> Ok(Command(Look, kw))
   }
 }
 
@@ -199,8 +203,8 @@ fn keyword(s: String, word: Splitter) -> Result(#(String, String), Nil) {
     // an empty string is unexpected
     "" -> Error(Nil)
     // ignore articles
-    "a" | "the" -> keyword(rest, word)
-    keyword -> Ok(#(keyword, string.trim_start(rest)))
+    "a" | "an" | "the" -> keyword(rest, word)
+    keyword -> Ok(#(string.lowercase(keyword), string.trim_start(rest)))
   }
 }
 
@@ -244,7 +248,7 @@ fn options_loop(
 fn at(s: String, word: Splitter) -> Result(#(String, String), Nil) {
   let #(slice, _, rest) = splitter.split(word, s)
   let rest = string.trim_start(rest)
-  case slice {
+  case string.lowercase(slice) {
     "@" <> keyword -> Ok(#(keyword, rest))
     "at" -> keyword(rest, word)
     _ -> Error(Nil)
