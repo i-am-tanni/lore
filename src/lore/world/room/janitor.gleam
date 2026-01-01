@@ -151,15 +151,15 @@ fn track_item_instance(
   item_tracked: ItemTracked,
 ) -> Tracking {
   let Tracking(clean_up_blocks:, block_lookup:) = tracking
-  let block = clean_up_time(item_tracked.destroy_at)
+  let block_id = clean_up_time(item_tracked.destroy_at)
   let clean_up_list =
-    dict.get(clean_up_blocks, block)
+    dict.get(clean_up_blocks, block_id)
     |> result.unwrap([])
     |> list.prepend(item_tracked)
 
   Tracking(
-    clean_up_blocks: dict.insert(clean_up_blocks, block, clean_up_list),
-    block_lookup: dict.insert(block_lookup, item_tracked.item_id, block),
+    clean_up_blocks: dict.insert(clean_up_blocks, block_id, clean_up_list),
+    block_lookup: dict.insert(block_lookup, item_tracked.item_id, block_id),
   )
 }
 
@@ -182,8 +182,8 @@ fn untrack_item_instance(
   item_id: StringId(ItemInstance),
 ) -> Result(Tracking, Nil) {
   let Tracking(clean_up_blocks:, block_lookup:) = tracking
-  use timestamp <- try(dict.get(block_lookup, item_id))
-  use clean_up_list <- try(dict.get(clean_up_blocks, timestamp))
+  use block_id <- try(dict.get(block_lookup, item_id))
+  use clean_up_list <- try(dict.get(clean_up_blocks, block_id))
   let filtered =
     list.filter(clean_up_list, fn(item_tracked) {
       item_tracked.item_id != item_id
@@ -192,13 +192,13 @@ fn untrack_item_instance(
   case filtered {
     [_, ..] ->
       Tracking(
-        clean_up_blocks: dict.insert(clean_up_blocks, timestamp, filtered),
+        clean_up_blocks: dict.insert(clean_up_blocks, block_id, filtered),
         block_lookup: dict.delete(block_lookup, item_id),
       )
 
     [] ->
       Tracking(
-        clean_up_blocks: dict.delete(clean_up_blocks, timestamp),
+        clean_up_blocks: dict.delete(clean_up_blocks, block_id),
         block_lookup: dict.delete(block_lookup, item_id),
       )
   }
@@ -207,11 +207,11 @@ fn untrack_item_instance(
 
 fn clean_up(
   tracking: Tracking,
-  cutoff: Timestamp,
+  block_id: Timestamp,
   room_registry: process.Name(room_registry.Message),
 ) -> Result(Tracking, Nil) {
   let Tracking(clean_up_blocks:, block_lookup:) = tracking
-  use clean_up_list <- try(dict.get(clean_up_blocks, cutoff))
+  use clean_up_list <- try(dict.get(clean_up_blocks, block_id))
   use <- bool.guard(clean_up_list == [], Error(Nil))
   despawn_items(clean_up_list, room_registry)
 
@@ -219,7 +219,10 @@ fn clean_up(
     list.map(clean_up_list, fn(tracked) { tracked.item_id })
     |> dict.drop(block_lookup, _)
 
-  Tracking(clean_up_blocks: dict.delete(clean_up_blocks, cutoff), block_lookup:)
+  Tracking(
+    clean_up_blocks: dict.delete(clean_up_blocks, block_id),
+    block_lookup:,
+  )
   |> Ok
 }
 
