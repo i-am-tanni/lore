@@ -29,3 +29,8 @@ connection at `src/lore/server/telnet/protocol.gleam`.
 - ✅ Basic death handling
 - ✅ Containers
 - ✅ Spawn groups with resets
+- ⬜ Accounts / Roles
+- ⬜ Admin Commands 
+- ⬜ Equipment
+- ⬜ Corpses
+- ⬜ Instanced Rooms
