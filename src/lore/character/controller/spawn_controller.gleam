@@ -24,7 +24,7 @@ pub fn init(conn: Conn, flash: SpawnFlash) -> Conn {
 
     // If character location is not already present in the world
     Error(Nil) ->
-      conn.put_controller(
+      conn.next_controller(
         conn,
         controller.Character(controller.CharacterFlash(name: "Test")),
       )

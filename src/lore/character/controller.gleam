@@ -1,6 +1,6 @@
 //// A controller is a simple state machine that takes a request and outputs
 //// a response.
-//// 
+////
 
 import gleam/erlang/process
 import lore/world.{type Id}
@@ -8,9 +8,10 @@ import lore/world/event.{
   type CharacterEvent, type Event, type RoomMessage, type ZoneMessage,
 }
 import lore/world/room/presence
+import splitter
 
 /// A request received by a controller for processing.
-/// 
+///
 pub type Request {
   UserSentCommand(text: String)
   Chat(event.ChatData)
@@ -19,7 +20,7 @@ pub type Request {
 }
 
 /// Tagged flash data. This determines the state.
-/// 
+///
 pub type Controller {
   Login(flash: LoginFlash)
   Character(flash: CharacterFlash)
@@ -28,7 +29,14 @@ pub type Controller {
 
 pub type LoginFlash {
   /// Score determines if a connection is terminated due to bad behavior
-  LoginFlash(stage: LoginStage, score: Int, name: String, endpoint: process.Pid)
+  LoginFlash(
+    stage: LoginStage,
+    score: Int,
+    name: String,
+    splitter: splitter.Splitter,
+    password_hash: String,
+    endpoint: process.Pid,
+  )
 }
 
 pub type CharacterFlash {
@@ -42,16 +50,8 @@ pub type SpawnFlash {
 /// Stages of Login
 pub type LoginStage {
   LoginName
-}
-
-pub fn is_same_kind(a: Controller, b: Controller) -> Bool {
-  kind(a) == kind(b)
-}
-
-fn kind(controller: Controller) -> Int {
-  case controller {
-    Login(..) -> 1
-    Character(..) -> 2
-    Spawn(..) -> 3
-  }
+  LoginConfirmNewAccount
+  LoginPassword
+  LoginNewPassword
+  LoginConfirmNewPassword
 }

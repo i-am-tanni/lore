@@ -188,11 +188,11 @@ pub fn next_character(conn: Conn, character: world.MobileInternal) -> Conn {
 
 /// Stages a change in controller.
 ///
-pub fn put_controller(conn: Conn, next: Controller) -> Conn {
+pub fn next_controller(conn: Conn, next: Controller) -> Conn {
   Conn(..conn, next_controller: Some(next))
 }
 
-/// This is useful if you want to puppet an NPC or switch characters.
+/// This is useful if you want to puppet an Npc or switch characters.
 ///
 pub fn reassign_endpoint(
   conn: Conn,
@@ -211,11 +211,8 @@ pub fn get_flash(conn: Conn) -> Controller {
 /// Fails if the controller received is not the same kind as the current
 /// controller.
 ///
-pub fn put_flash(conn: Conn, flash: Controller) -> Result(Conn, Nil) {
-  case controller.is_same_kind(conn.flash, flash) {
-    True -> Ok(Conn(..conn, flash: flash))
-    False -> Error(Nil)
-  }
+pub fn put_flash(conn: Conn, flash: Controller) -> Conn {
+  Conn(..conn, flash: flash)
 }
 
 /// Renders text without a newline.

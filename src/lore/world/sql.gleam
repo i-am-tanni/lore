@@ -8,6 +8,78 @@ import gleam/dynamic/decode
 import gleam/option.{type Option}
 import pog
 
+/// A row you get from running the `account_get` query
+/// defined in `./src/lore/world/sql/account_get.sql`.
+///
+/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub type AccountGetRow {
+  AccountGetRow(
+    account_id: Int,
+    name: String,
+    password_hash: String,
+    role: RoleEnum,
+  )
+}
+
+/// Runs the `account_get` query
+/// defined in `./src/lore/world/sql/account_get.sql`.
+///
+/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub fn account_get(
+  db: pog.Connection,
+  arg_1: String,
+) -> Result(pog.Returned(AccountGetRow), pog.QueryError) {
+  let decoder = {
+    use account_id <- decode.field(0, decode.int)
+    use name <- decode.field(1, decode.string)
+    use password_hash <- decode.field(2, decode.string)
+    use role <- decode.field(3, role_enum_decoder())
+    decode.success(AccountGetRow(account_id:, name:, password_hash:, role:))
+  }
+
+  "SELECT * FROM account
+WHERE LOWER(name) = LOWER($1);
+"
+  |> pog.query
+  |> pog.parameter(pog.text(arg_1))
+  |> pog.returning(decoder)
+  |> pog.execute(db)
+}
+
+/// Runs the `account_put` query
+/// defined in `./src/lore/world/sql/account_put.sql`.
+///
+/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub fn account_put(
+  db: pog.Connection,
+  arg_1: String,
+  arg_2: String,
+) -> Result(pog.Returned(Nil), pog.QueryError) {
+  let decoder = decode.map(decode.dynamic, fn(_) { Nil })
+
+  "INSERT INTO account (name, password_hash, role)
+VALUES ($1, $2,
+  CASE
+    WHEN (SELECT 1 FROM account WHERE role = 'admin'::role_enum LIMIT 1) IS NULL
+      THEN 'admin'::role_enum
+  ELSE
+    'user'::role_enum
+  END
+);
+"
+  |> pog.query
+  |> pog.parameter(pog.text(arg_1))
+  |> pog.parameter(pog.text(arg_2))
+  |> pog.returning(decoder)
+  |> pog.execute(db)
+}
+
 /// A row you get from running the `containers` query
 /// defined in `./src/lore/world/sql/containers.sql`.
 ///
@@ -649,5 +721,22 @@ fn access_state_decoder() -> decode.Decoder(AccessState) {
     "open" -> decode.success(Open)
     "closed" -> decode.success(Closed)
     _ -> decode.failure(Open, "AccessState")
+  }
+}/// Corresponds to the Postgres `role_enum` enum.
+///
+/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub type RoleEnum {
+  User
+  Admin
+}
+
+fn role_enum_decoder() -> decode.Decoder(RoleEnum) {
+  use role_enum <- decode.then(decode.string)
+  case role_enum {
+    "user" -> decode.success(User)
+    "admin" -> decode.success(Admin)
+    _ -> decode.failure(User, "RoleEnum")
   }
 }

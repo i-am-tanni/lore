@@ -1,7 +1,7 @@
-//// An actor for processing I/O from a glisten TCP connection. 
+//// An actor for processing I/O from a glisten TCP connection.
 //// Any processed data is forwarded to the owned character.
 //// Responses from the owned character are forwarded to the socket.
-//// 
+////
 
 import gleam/bit_array
 import gleam/bool
@@ -33,7 +33,7 @@ const rate_limit_in_ms = 200
 
 // constants for telnet out of band communication
 
-// interpret as command - 
+// interpret as command -
 const iac = 255
 
 // end of record telnet option and command
@@ -63,18 +63,18 @@ pub type ProtocolError {
   /// Input sent from non-standard clients may be in a form that is unreadable
   /// by the telnet library. If that is the case, the connection will
   /// disconnect as there is not much point in continuing.
-  /// 
+  ///
   InputUnreadable
 
   /// If too much data is being sent via sub-negotiation or sub-negotiation
-  /// is malformed, than eventually the buffer will overflow resulting in a 
+  /// is malformed, than eventually the buffer will overflow resulting in a
   /// disconnect. This is a guard to prevent a connection from consuming
   /// too much memory.
-  /// 
+  ///
   InputBufferOverflow
 
   /// Drop inputs that exceed rate_limit_in_ms
-  /// 
+  ///
   RateLimitExceeded
 }
 
@@ -84,11 +84,11 @@ pub type State {
   /// in a set. Whether to the next output should be prepended with a newline
   /// is also tracked. As long as bool continue is true, then the connection
   /// will persist.
-  /// 
-  /// The endpoint is the actor the connection is sending inputs to and 
-  /// receiving outputs from. This could be a character, a puppeted NPC, a bot
+  ///
+  /// The endpoint is the actor the connection is sending inputs to and
+  /// receiving outputs from. This could be a character, a puppeted Npc, a bot
   /// API, etc.
-  /// 
+  ///
   State(
     conn: glisten.Connection(Outgoing),
     ip_address: String,
@@ -108,22 +108,22 @@ pub type State {
 /// If the server communicates a window size that is too smal or a size of
 /// 0: width and 0:height, the server will consider the size unknown and defer
 /// line wrapping to the client.
-/// 
+///
 pub type WindowSize {
   WindowSize(width: Int, height: Int)
   Unknown
 }
 
 /// Telnet options supported by the server
-/// 
+///
 pub type TelnetOption {
   /// End of Record
   EOR
 }
 
-/// Receives a new connection, sends initial telnet negotiation, and 
+/// Receives a new connection, sends initial telnet negotiation, and
 /// starts a new character actor for the player with the initial controller.
-/// 
+///
 pub fn init(
   conn: glisten.Connection(Outgoing),
   system_tables: system_tables.Lookup,
@@ -163,7 +163,7 @@ pub fn init(
 
 /// Receives a packet from the connection (Input) or a message from the linked
 /// character actor (Output).
-/// 
+///
 pub fn recv(
   state: State,
   msg: glisten.Message(Outgoing),

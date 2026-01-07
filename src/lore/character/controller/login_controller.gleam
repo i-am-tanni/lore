@@ -1,18 +1,35 @@
-import gleam/bit_array
-import gleam/result
+import argus
+import gleam/result.{try}
 import gleam/string
 import lore/character/conn.{type Conn}
 import lore/character/controller.{
-  type LoginFlash, CharacterFlash, LoginFlash, LoginName, UserSentCommand,
+  type LoginFlash, CharacterFlash, LoginFlash, UserSentCommand,
 }
 import lore/character/pronoun
 import lore/character/users
 import lore/character/view/login_view
 import lore/world.{Id}
+import lore/world/sql
 import lore/world/system_tables
+import pog
+import splitter
 
-pub fn init(conn: Conn, _flash: LoginFlash) -> Conn {
+pub type LoginError {
+  InputEmpty
+  DatabaseError(pog.QueryError)
+  NotFound(String)
+}
+
+pub type PasswordError {
+  HashError(argus.HashError)
+  Blank
+}
+
+pub fn init(conn: Conn, flash: LoginFlash) -> Conn {
+  let flash = LoginFlash(..flash, score: 12)
+
   conn
+  |> put_flash(flash)
   |> conn.renderln(login_view.login())
   |> conn.renderln(login_view.name())
 }
@@ -24,57 +41,227 @@ pub fn recv(conn: Conn, flash: LoginFlash, msg: controller.Request) -> Conn {
   }
 }
 
-fn handle_text(conn: Conn, flash: LoginFlash, text: String) -> Conn {
-  let LoginFlash(stage: stage, score: score, ..) = flash
-  case stage {
-    _ if score <= 0 -> conn.terminate(conn)
-    LoginName -> login_name(conn, flash, text)
+fn handle_text(conn: Conn, flash: LoginFlash, input: String) -> Conn {
+  case flash.stage {
+    controller.LoginName -> login_name(conn, flash, input)
+    controller.LoginPassword -> login_password(conn, flash, input)
+    controller.LoginConfirmNewAccount -> new_account_confirm(conn, flash, input)
+    controller.LoginNewPassword -> new_password(conn, flash, input)
+    controller.LoginConfirmNewPassword ->
+      new_password_confirm(conn, flash, input)
   }
 }
 
-fn login_name(conn: Conn, flash: LoginFlash, text: String) -> Conn {
-  case text {
-    "\r\n" | "\n" | "" -> {
-      let LoginFlash(score: score, ..) = flash
-      let update = LoginFlash(..flash, score: score - 40)
+fn login_name(conn: Conn, flash: LoginFlash, input: String) -> Conn {
+  let result = {
+    use name <- try(parse(flash.splitter, input))
+    let system_tables.Lookup(db:, ..) = conn.system_tables(conn)
+    let db = pog.named_connection(db)
+    use account <- try(query1(sql.account_get(db, name), name))
+    let update =
+      LoginFlash(
+        ..flash,
+        stage: controller.LoginPassword,
+        password_hash: account.password_hash,
+        name: account.name,
+      )
 
-      conn
-      |> conn.renderln(login_view.name())
-      |> conn.put_flash(controller.Login(update))
-      |> result.unwrap(conn)
-    }
+    conn
+    |> put_flash(update)
+    |> conn.render(login_view.password(name))
+    |> Ok
+  }
 
-    name -> {
-      // Remove "\r\n" from the tail
-      let name = bit_array.from_string(name)
-      let assert Ok(name) =
-        bit_array.slice(name, 0, bit_array.byte_size(name) - 2)
-      let assert Ok(name) = bit_array.to_string(name)
-
-      let world.MobileInternal(id:, ..) = conn.get_character(conn)
-
+  case result {
+    Ok(conn) -> conn
+    Error(NotFound(name)) -> {
+      let name = name |> string.lowercase |> string.capitalise
       let update =
-        world.MobileInternal(
-          id:,
-          name:,
-          room_id: Id(1),
-          template_id: world.Player(Id(0)),
-          keywords: [string.lowercase(name)],
-          pronouns: pronoun.Feminine,
-          short: name <> " is standing here.",
-          inventory: [],
-          fighting: world.NoTarget,
-          hp: 20,
-          hp_max: 20,
-        )
-
-      let system_tables.Lookup(users:, ..) = conn.system_tables(conn)
-      users.insert(users, flash.endpoint, id, users.User(name:, id:))
+        LoginFlash(..flash, name:, stage: controller.LoginConfirmNewAccount)
 
       conn
-      |> conn.put_character(update)
-      |> conn.subscribe(world.General)
-      |> conn.put_controller(controller.Character(CharacterFlash(name)))
+      |> conn.render(login_view.new_name_confirm(name))
+      |> put_flash(update)
     }
+    Error(DatabaseError(_)) -> conn.terminate(conn)
+    Error(InputEmpty) ->
+      conn
+      |> penalize(flash, amount: 3)
+      |> conn.renderln(login_view.name())
+  }
+}
+
+fn new_account_confirm(conn: Conn, flash: LoginFlash, input: String) -> Conn {
+  let #(answer, _) = splitter.split_before(flash.splitter, input)
+  case string.lowercase(answer) {
+    "y" | "ye" | "yes" | "" ->
+      conn
+      |> conn.render(login_view.new_password1())
+      |> put_flash(LoginFlash(..flash, stage: controller.LoginNewPassword))
+
+    "n" | "no" ->
+      conn
+      |> conn.render(login_view.name_abort())
+      |> put_flash(LoginFlash(..flash, name: "", stage: controller.LoginName))
+      |> penalize(flash, amount: 2)
+
+    _ ->
+      conn
+      |> conn.render(login_view.new_name_confirm(flash.name))
+      |> penalize(flash, amount: 3)
+  }
+}
+
+fn new_password(conn: Conn, flash: LoginFlash, input: String) -> Conn {
+  let result = {
+    use input <- try(
+      parse(flash.splitter, input) |> result.replace_error(Blank),
+    )
+    use hashes <- try(
+      argus.hash(argus.hasher(), input, argus.gen_salt())
+      |> result.map_error(HashError),
+    )
+    let update =
+      LoginFlash(
+        ..flash,
+        password_hash: hashes.encoded_hash,
+        stage: controller.LoginConfirmNewPassword,
+      )
+
+    conn
+    |> put_flash(update)
+    |> conn.render(login_view.new_password2())
+    |> Ok
+  }
+
+  case result {
+    Ok(conn) -> conn
+    Error(_) ->
+      conn
+      |> conn.render(login_view.password_invalid())
+      |> penalize(flash, amount: 3)
+  }
+}
+
+fn new_password_confirm(conn: Conn, flash: LoginFlash, input: String) -> Conn {
+  let result = {
+    use input <- try(
+      parse(flash.splitter, input) |> result.replace_error(Blank),
+    )
+    argus.verify(flash.password_hash, input)
+    |> result.map_error(HashError)
+  }
+
+  case result {
+    Ok(True) -> {
+      let lookup = conn.system_tables(conn)
+      let db = pog.named_connection(lookup.db)
+      case sql.account_put(db, flash.name, flash.password_hash) {
+        Ok(_) -> login(conn, flash)
+        Error(_) -> conn.terminate(conn)
+      }
+    }
+
+    Ok(False) ->
+      conn
+      |> penalize(flash, amount: 3)
+      |> conn.render(login_view.password_mismatch_err())
+      |> put_flash(LoginFlash(..flash, stage: controller.LoginNewPassword))
+
+    Error(_) -> conn.terminate(conn)
+  }
+}
+
+fn login_password(conn: Conn, flash: LoginFlash, input: String) -> Conn {
+  let result = {
+    use input <- try(
+      parse(flash.splitter, input) |> result.replace_error(Blank),
+    )
+    argus.verify(flash.password_hash, input)
+    |> result.map_error(HashError)
+  }
+
+  case result {
+    Ok(True) -> login(conn, flash)
+
+    Ok(False) ->
+      conn
+      |> penalize(flash, amount: 3)
+      |> conn.render(login_view.password_err())
+      |> put_flash(LoginFlash(..flash, stage: controller.LoginPassword))
+
+    Error(_) -> conn.terminate(conn)
+  }
+}
+
+fn login(conn: Conn, flash: LoginFlash) -> Conn {
+  let name = flash.name
+  let world.MobileInternal(id:, ..) = conn.get_character(conn)
+
+  let update =
+    world.MobileInternal(
+      id:,
+      name:,
+      room_id: Id(1),
+      template_id: world.Player(Id(0)),
+      role: world.User,
+      keywords: [string.lowercase(name)],
+      pronouns: pronoun.Feminine,
+      short: name <> " is standing here.",
+      inventory: [],
+      fighting: world.NoTarget,
+      hp: 20,
+      hp_max: 20,
+    )
+
+  let system_tables.Lookup(users:, ..) = conn.system_tables(conn)
+  users.insert(users, flash.endpoint, id, users.User(name:, id:))
+
+  let next_flash = CharacterFlash(name)
+  conn
+  |> conn.put_character(update)
+  |> conn.subscribe(world.General)
+  |> conn.next_controller(controller.Character(next_flash))
+}
+
+// Add a penalty to the connection.
+// Terminate if the connection's points are exhausted.
+//
+fn penalize(conn: Conn, flash: LoginFlash, amount penalty: Int) -> Conn {
+  case flash.score - penalty {
+    score if score > 0 -> {
+      conn
+      |> put_flash(LoginFlash(..flash, score:))
+      |> conn.renderln(login_view.name())
+    }
+
+    _ -> conn.terminate(conn)
+  }
+}
+
+fn query1(
+  result: Result(pog.Returned(a), pog.QueryError),
+  expected: String,
+) -> Result(a, LoginError) {
+  use returned <- try(result.map_error(result, DatabaseError))
+  case returned {
+    pog.Returned(count: 1, rows: [returned]) -> Ok(returned)
+    _ -> Error(NotFound(expected))
+  }
+}
+
+// Wrapped around conn.put_flash to add some type safety.
+//
+fn put_flash(conn: Conn, flash: LoginFlash) -> Conn {
+  conn.put_flash(conn, controller.Login(flash))
+}
+
+fn parse(
+  splitter: splitter.Splitter,
+  text: String,
+) -> Result(String, LoginError) {
+  case splitter.split_before(splitter, text) {
+    #("", _) -> Error(InputEmpty)
+    #(name, _) -> Ok(name)
   }
 }

@@ -1,11 +1,11 @@
-//// A table for tracking pc / npc locations
+//// A table for tracking pc / Npc locations
 //// Upon restart characters can lookup their location previous to the crash.
-//// 
+////
 //// ## Automatic cleanup
-//// 
+////
 //// If a character crashes a timeout begins and if the character does not
 //// restart during the time frame, the room will remove the character info.
-//// 
+////
 
 import gleam/dict.{type Dict}
 import gleam/erlang/process
@@ -34,7 +34,7 @@ pub type Message {
   )
 
   /// Character crashed and never restarted.
-  /// 
+  ///
   RestartTimeoutElapsed(mobile_id: StringId(Mobile), room_id: Id(Room))
 }
 
@@ -42,7 +42,7 @@ type State {
   /// Restart timeouts begin in the event a character exits abnormally
   /// If a restart timeout elapses, the presence table notifies the room the
   /// character process is dead and that character should be removed.
-  /// 
+  ///
   State(
     self: process.Subject(Message),
     table: table.Set(StringId(Mobile), Id(Room)),
@@ -55,7 +55,7 @@ type State {
 const timeout_ms = 1000
 
 /// Starts the room subject registry.
-/// 
+///
 pub fn start(
   table_name: process.Name(Message),
   room_registry: process.Name(room_registry.Message),
@@ -101,7 +101,7 @@ fn init(
 }
 
 /// Returns the room id given a registered room instance id.
-/// 
+///
 pub fn lookup(
   table_name: process.Name(Message),
   mobile_id: StringId(Mobile),
@@ -122,7 +122,7 @@ pub fn update(
 
 /// Notifies the presence process that a character restarted so it can be
 /// monitored and timeouts cancelled.
-/// 
+///
 pub fn notify_restart(
   table_name: process.Name(Message),
   subject: process.Subject(event.CharacterMessage),
@@ -188,7 +188,7 @@ fn recv(state: State, msg: Message) -> actor.Next(State, Message) {
 /// Character exited.
 /// If not a crash, delete tracking.
 /// Else, start a restart timeout.
-/// 
+///
 fn handle_down(
   state: State,
   monitor: process.Monitor,

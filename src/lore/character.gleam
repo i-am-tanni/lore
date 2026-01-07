@@ -27,6 +27,7 @@ import lore/world/communication
 import lore/world/event.{type CharacterMessage, type Outgoing}
 import lore/world/room/room_registry
 import lore/world/system_tables
+import splitter
 
 const dummy_id = 0
 
@@ -80,8 +81,10 @@ fn init_reception(
   )
   let login_controller =
     controller.LoginFlash(
-      score: 120,
+      score: 0,
       name: "",
+      password_hash: "",
+      splitter: splitter.new([" ", "\r\n", "\n"]),
       stage: controller.LoginName,
       endpoint: endpoint_pid,
     )
@@ -95,6 +98,7 @@ fn init_reception(
       room_id: Id(dummy_id),
       template_id: Player(Id(dummy_id)),
       name: "",
+      role: world.User,
       keywords: [],
       short: "",
       pronouns: pronoun.Feminine,

@@ -109,6 +109,11 @@ pub type Mobile {
   )
 }
 
+pub type Role {
+  Admin
+  User
+}
+
 /// Private internal mobile data.
 ///
 pub type MobileInternal {
@@ -118,6 +123,7 @@ pub type MobileInternal {
     id: StringId(Mobile),
     room_id: Id(Room),
     template_id: TemplateId,
+    role: Role,
     name: String,
     keywords: List(String),
     inventory: List(ItemInstance),

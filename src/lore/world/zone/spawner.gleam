@@ -191,6 +191,7 @@ fn to_mobile(
     room_id:,
     template_id: world.Npc(Id(row.mobile_id)),
     name: row.name,
+    role: world.User,
     keywords: row.keywords,
     pronouns: pronoun.Masculine,
     short: row.short,
