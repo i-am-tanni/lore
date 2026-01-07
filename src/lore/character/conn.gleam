@@ -201,18 +201,12 @@ pub fn reassign_endpoint(
   Conn(..conn, reassign_endpoint: Some(endpoint))
 }
 
-/// Returns controller flash memory
-///
-pub fn get_flash(conn: Conn) -> Controller {
-  conn.flash
-}
-
 /// Updates the current flash memory for the current controller.
 /// Fails if the controller received is not the same kind as the current
 /// controller.
 ///
-pub fn put_flash(conn: Conn, flash: Controller) -> Conn {
-  Conn(..conn, flash: flash)
+pub fn flash_put(conn: Conn, flash: Controller) -> Conn {
+  Conn(..conn, flash:)
 }
 
 /// Renders text without a newline.

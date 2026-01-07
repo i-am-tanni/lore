@@ -7,6 +7,7 @@ import lore/character/controller.{
 }
 import lore/character/pronoun
 import lore/character/users
+import lore/character/view
 import lore/character/view/login_view
 import lore/world.{Id}
 import lore/world/sql
@@ -29,7 +30,7 @@ pub fn init(conn: Conn, flash: LoginFlash) -> Conn {
   let flash = LoginFlash(..flash, score: 12)
 
   conn
-  |> put_flash(flash)
+  |> flash_put(flash)
   |> conn.renderln(login_view.login())
   |> conn.renderln(login_view.name())
 }
@@ -67,7 +68,7 @@ fn login_name(conn: Conn, flash: LoginFlash, input: String) -> Conn {
       )
 
     conn
-    |> put_flash(update)
+    |> flash_put(update)
     |> conn.render(login_view.password(name))
     |> Ok
   }
@@ -81,34 +82,44 @@ fn login_name(conn: Conn, flash: LoginFlash, input: String) -> Conn {
 
       conn
       |> conn.render(login_view.new_name_confirm(name))
-      |> put_flash(update)
+      |> flash_put(update)
     }
-    Error(DatabaseError(_)) -> conn.terminate(conn)
-    Error(InputEmpty) ->
+
+    Error(InputEmpty) -> {
+      use score <- penalize(conn, flash, amount: 3)
       conn
-      |> penalize(flash, amount: 3)
+      |> flash_put(LoginFlash(..flash, score:))
       |> conn.renderln(login_view.name())
+    }
+
+    Error(DatabaseError(_)) -> conn.terminate(conn)
   }
 }
 
 fn new_account_confirm(conn: Conn, flash: LoginFlash, input: String) -> Conn {
   let #(answer, _) = splitter.split_before(flash.splitter, input)
+
   case string.lowercase(answer) {
     "y" | "ye" | "yes" | "" ->
       conn
       |> conn.render(login_view.new_password1())
-      |> put_flash(LoginFlash(..flash, stage: controller.LoginNewPassword))
+      |> flash_put(LoginFlash(..flash, stage: controller.LoginNewPassword))
 
-    "n" | "no" ->
+    "n" | "no" -> {
+      use score <- penalize(conn, flash, amount: 3)
       conn
       |> conn.render(login_view.name_abort())
-      |> put_flash(LoginFlash(..flash, name: "", stage: controller.LoginName))
-      |> penalize(flash, amount: 2)
+      |> flash_put(
+        LoginFlash(..flash, score:, name: "", stage: controller.LoginName),
+      )
+    }
 
-    _ ->
+    _ -> {
+      use score <- penalize(conn, flash, amount: 3)
       conn
       |> conn.render(login_view.new_name_confirm(flash.name))
-      |> penalize(flash, amount: 3)
+      |> flash_put(LoginFlash(..flash, score:))
+    }
   }
 }
 
@@ -129,17 +140,19 @@ fn new_password(conn: Conn, flash: LoginFlash, input: String) -> Conn {
       )
 
     conn
-    |> put_flash(update)
+    |> flash_put(update)
     |> conn.render(login_view.new_password2())
     |> Ok
   }
 
   case result {
     Ok(conn) -> conn
-    Error(_) ->
+    Error(_) -> {
+      use score <- penalize(conn, flash, amount: 3)
       conn
       |> conn.render(login_view.password_invalid())
-      |> penalize(flash, amount: 3)
+      |> flash_put(LoginFlash(..flash, score:))
+    }
   }
 }
 
@@ -162,11 +175,14 @@ fn new_password_confirm(conn: Conn, flash: LoginFlash, input: String) -> Conn {
       }
     }
 
-    Ok(False) ->
+    Ok(False) -> {
+      use score <- penalize(conn, flash, amount: 3)
       conn
-      |> penalize(flash, amount: 3)
       |> conn.render(login_view.password_mismatch_err())
-      |> put_flash(LoginFlash(..flash, stage: controller.LoginNewPassword))
+      |> flash_put(
+        LoginFlash(..flash, score:, stage: controller.LoginNewPassword),
+      )
+    }
 
     Error(_) -> conn.terminate(conn)
   }
@@ -184,11 +200,12 @@ fn login_password(conn: Conn, flash: LoginFlash, input: String) -> Conn {
   case result {
     Ok(True) -> login(conn, flash)
 
-    Ok(False) ->
+    Ok(False) -> {
+      use score <- penalize(conn, flash, amount: 3)
       conn
-      |> penalize(flash, amount: 3)
       |> conn.render(login_view.password_err())
-      |> put_flash(LoginFlash(..flash, stage: controller.LoginPassword))
+      |> flash_put(LoginFlash(..flash, score:, stage: controller.LoginPassword))
+    }
 
     Error(_) -> conn.terminate(conn)
   }
@@ -224,21 +241,6 @@ fn login(conn: Conn, flash: LoginFlash) -> Conn {
   |> conn.next_controller(controller.Character(next_flash))
 }
 
-// Add a penalty to the connection.
-// Terminate if the connection's points are exhausted.
-//
-fn penalize(conn: Conn, flash: LoginFlash, amount penalty: Int) -> Conn {
-  case flash.score - penalty {
-    score if score > 0 -> {
-      conn
-      |> put_flash(LoginFlash(..flash, score:))
-      |> conn.renderln(login_view.name())
-    }
-
-    _ -> conn.terminate(conn)
-  }
-}
-
 fn query1(
   result: Result(pog.Returned(a), pog.QueryError),
   expected: String,
@@ -250,10 +252,10 @@ fn query1(
   }
 }
 
-// Wrapped around conn.put_flash to add some type safety.
+// Wrapped around conn.flash_put to add some type safety.
 //
-fn put_flash(conn: Conn, flash: LoginFlash) -> Conn {
-  conn.put_flash(conn, controller.Login(flash))
+fn flash_put(conn: Conn, flash: LoginFlash) -> Conn {
+  conn.flash_put(conn, controller.Login(flash))
 }
 
 fn parse(
@@ -263,5 +265,22 @@ fn parse(
   case splitter.split_before(splitter, text) {
     #("", _) -> Error(InputEmpty)
     #(name, _) -> Ok(name)
+  }
+}
+
+// Add a penalty to the connection with control flow
+// This is a substitute for a bool.lazy_guard()
+//
+fn penalize(
+  conn: Conn,
+  flash: LoginFlash,
+  amount penalty: Int,
+  on_success continue_with: fn(Int) -> Conn,
+) -> Conn {
+  case flash.score - penalty {
+    // Lazily execute continue_with if points remain
+    score if score > 0 -> continue_with(score)
+    // ..else the connection's points are exhausted, terminate the connection
+    _ -> conn |> conn.renderln(view.Leaf("\nGoodbye.")) |> conn.terminate
   }
 }
