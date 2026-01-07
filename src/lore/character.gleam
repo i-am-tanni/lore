@@ -309,7 +309,8 @@ fn handle_response(response: conn.Response, state: State) -> State {
   // Get cooldown status and updated action queue information
   let ActionSummary(cooldown:, actions:) = update_actions(response, state)
 
-  let controller = case response.next_controller {
+  let next_controller = response.next_controller
+  let controller = case next_controller {
     Some(next) -> next
     None -> response.flash
   }
@@ -328,7 +329,7 @@ fn handle_response(response: conn.Response, state: State) -> State {
     )
 
   // update_controller if applicable
-  case response.next_controller {
+  case next_controller {
     Some(next) -> update_controller(updated_state, next)
     None -> updated_state
   }
