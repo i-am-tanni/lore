@@ -59,22 +59,24 @@ fn login_name(conn: Conn, flash: LoginFlash, input: String) -> Conn {
     let system_tables.Lookup(db:, ..) = conn.system_tables(conn)
     let db = pog.named_connection(db)
     use account <- try(query1(sql.account_get(db, name), name))
-    let update =
+
+    conn
+    |> flash_put(
       LoginFlash(
         ..flash,
         stage: controller.LoginPassword,
         password_hash: account.password_hash,
         name: account.name,
-      )
-
-    conn
-    |> flash_put(update)
+      ),
+    )
+    |> conn.echo_disable
     |> conn.render(login_view.password(name))
     |> Ok
   }
 
   case result {
     Ok(conn) -> conn
+
     Error(NotFound(name)) -> {
       let name = name |> string.lowercase |> string.capitalise
       let update =
@@ -103,10 +105,11 @@ fn new_account_confirm(conn: Conn, flash: LoginFlash, input: String) -> Conn {
     "y" | "ye" | "yes" | "" ->
       conn
       |> conn.render(login_view.new_password1())
+      |> conn.echo_disable
       |> flash_put(LoginFlash(..flash, stage: controller.LoginNewPassword))
 
     "n" | "no" -> {
-      use score <- penalize(conn, flash, amount: 3)
+      use score <- penalize(conn, flash, amount: 4)
       conn
       |> conn.render(login_view.name_abort())
       |> flash_put(
@@ -148,7 +151,7 @@ fn new_password(conn: Conn, flash: LoginFlash, input: String) -> Conn {
   case result {
     Ok(conn) -> conn
     Error(_) -> {
-      use score <- penalize(conn, flash, amount: 3)
+      use score <- penalize(conn, flash, amount: 4)
       conn
       |> conn.render(login_view.password_invalid())
       |> flash_put(LoginFlash(..flash, score:))
@@ -176,7 +179,7 @@ fn new_password_confirm(conn: Conn, flash: LoginFlash, input: String) -> Conn {
     }
 
     Ok(False) -> {
-      use score <- penalize(conn, flash, amount: 3)
+      use score <- penalize(conn, flash, amount: 4)
       conn
       |> conn.render(login_view.password_mismatch_err())
       |> flash_put(
@@ -201,7 +204,7 @@ fn login_password(conn: Conn, flash: LoginFlash, input: String) -> Conn {
     Ok(True) -> login(conn, flash)
 
     Ok(False) -> {
-      use score <- penalize(conn, flash, amount: 3)
+      use score <- penalize(conn, flash, amount: 5)
       conn
       |> conn.render(login_view.password_err())
       |> flash_put(LoginFlash(..flash, score:, stage: controller.LoginPassword))
@@ -236,6 +239,7 @@ fn login(conn: Conn, flash: LoginFlash) -> Conn {
 
   let next_flash = CharacterFlash(name)
   conn
+  |> conn.echo_enable
   |> conn.put_character(update)
   |> conn.subscribe(world.General)
   |> conn.next_controller(controller.Character(next_flash))

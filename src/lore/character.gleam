@@ -3,6 +3,7 @@
 //// them in request-response cycle.
 ////
 
+import gleam/bool
 import gleam/erlang/process.{type Subject}
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -183,21 +184,26 @@ fn recv(
     // Only process messages from a room that the character is currently in
     event.RoomSent(received:, from:) if from == state.character.room_id ->
       case received {
-        event.RoomSentText(text) -> {
-          // Append prompt and push text to socket
-          let prompt =
-            prompt_view.prompt(state.character)
-            |> view.to_string_tree
-            |> output.Text(text: _, newline: False)
+        event.RoomSentText(text) ->
+          case state.endpoint {
+            Some(endpoint) -> {
+              // Append prompt and push text to socket
+              let prompt =
+                prompt_view.prompt(state.character)
+                |> view.to_string_tree
+                |> output.Text(text: _, newline: False)
 
-          text
-          |> list.append([
-            output.Text(text: string_tree.new(), newline: True),
-            prompt,
-          ])
-          |> push_text(state, _)
-          state
-        }
+              text
+              |> list.append([
+                output.Text(text: string_tree.new(), newline: True),
+                prompt,
+              ])
+              |> push_text(endpoint, _)
+
+              state
+            }
+            None -> state
+          }
 
         event.RoomToCharacter(event) ->
           on_controller_message(state, controller.RoomToCharacter(event))
@@ -258,7 +264,14 @@ fn recv(
 //
 fn handle_response(response: conn.Response, state: State) -> State {
   // send output if there is an endpoint and something to send
-  push_text(state, response.output)
+  case state.endpoint {
+    Some(endpoint) -> {
+      push_text(endpoint, response.output)
+      push_out_of_band(endpoint, response.out_of_band)
+    }
+
+    None -> Nil
+  }
 
   // Handle any change over in character
   let reassign_endpoint = case response.next_character {
@@ -336,12 +349,17 @@ fn handle_response(response: conn.Response, state: State) -> State {
 }
 
 // Pushes text to the endpoint assuming one is available
-fn push_text(state: State, output: List(output.Text)) -> Nil {
-  case state.endpoint {
-    Some(endpoint) if output != [] ->
-      actor.send(endpoint, event.PushText(output))
-    _ -> Nil
-  }
+fn push_text(endpoint: Subject(Outgoing), output: List(output.Text)) -> Nil {
+  use <- bool.guard(output == [], Nil)
+  actor.send(endpoint, event.PushText(output))
+}
+
+fn push_out_of_band(
+  endpoint: Subject(Outgoing),
+  output: List(output.OutOfBand),
+) -> Nil {
+  use <- bool.guard(output == [], Nil)
+  actor.send(endpoint, event.OutOfBand(output))
 }
 
 fn push_events(

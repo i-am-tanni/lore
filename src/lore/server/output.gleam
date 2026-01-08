@@ -1,6 +1,6 @@
-//// Transforms outgoing text output, replacing color codes to ansi, 
+//// Transforms outgoing text output, replacing color codes to ansi,
 //// expanding newlines into "\r\n", etc.
-//// 
+////
 
 import gleam/bit_array
 import gleam/bytes_tree.{type BytesTree}
@@ -18,16 +18,21 @@ const char1 = 50
 const char9 = 57
 
 /// Text to be sent to user over the wire
-/// 
+///
 pub type Text {
   /// The newline bool communicates to the protocol to prepend a newline
   /// to the following output.
-  /// 
+  ///
   Text(text: StringTree, newline: Bool)
 }
 
+pub type OutOfBand {
+  EchoDisable
+  EchoEnable
+}
+
 /// Map over Text with a list of BitArray transformers
-/// 
+///
 pub fn map(
   output: Text,
   output_processors: List(fn(BitArray) -> BitArray),
@@ -48,7 +53,7 @@ pub fn map(
 /// Expand any newlines to '\r\n'.
 /// This avoids having to remember the order and avoids mistakes where \r is
 /// omitted.
-/// 
+///
 pub fn expand_newline(binary: BitArray) -> BitArray {
   let result =
     expand_newline_loop(binary, found: False, accumulating: bytes_tree.new())
@@ -87,7 +92,7 @@ pub fn expand_colors_16(binary: BitArray) -> BitArray {
 
 /// Expands 16 colors. & indicates foreground. { indicates background.
 /// 0; is reset.
-/// 
+///
 /// Codes:
 /// - x - black
 /// - r - red
@@ -105,7 +110,7 @@ pub fn expand_colors_16(binary: BitArray) -> BitArray {
 /// - P - bright pink
 /// - C - bright cyan
 /// - W - bright white
-/// 
+///
 fn expand_colors_16_loop(
   binary: BitArray,
   found is_found: Bool,
@@ -352,7 +357,7 @@ fn expand_colors_16_loop(
 }
 
 /// &00# == foreground color. {00# == background color. 0; is reset.
-/// 
+///
 pub fn expand_colors_256(binary: BitArray) -> BitArray {
   let result =
     expand_colors_256_loop(binary, found: False, accumulating: bytes_tree.new())
@@ -448,7 +453,7 @@ fn expand_colors_256_loop(
 }
 
 /// Like `list.map` but works on a StringTree.
-/// 
+///
 @external(erlang, "lore_ffi", "iolist_map")
 fn string_tree_map(
   over tree: StringTree,

@@ -39,6 +39,7 @@ pub opaque type Conn {
     system_tables: system_tables.Lookup,
     events: List(EventToSend),
     output: List(Text),
+    out_of_band: List(output.OutOfBand),
     actions: List(event.Action),
     publish: List(ChatData),
     update_character: Option(world.MobileInternal),
@@ -101,6 +102,7 @@ pub type Response {
     events: List(EventToSend),
     actions: List(event.Action),
     output: List(Text),
+    out_of_band: List(output.OutOfBand),
     publish: List(ChatData),
     subscribed: Set(world.ChatChannel),
     halt: Bool,
@@ -138,6 +140,7 @@ pub fn new(
     system_tables:,
     events: [],
     output: [],
+    out_of_band: [],
     actions: [],
     publish: [],
     request_id: world.generate_id(),
@@ -207,6 +210,14 @@ pub fn reassign_endpoint(
 ///
 pub fn flash_put(conn: Conn, flash: Controller) -> Conn {
   Conn(..conn, flash:)
+}
+
+pub fn echo_disable(conn: Conn) -> Conn {
+  Conn(..conn, out_of_band: [output.EchoDisable, ..conn.out_of_band])
+}
+
+pub fn echo_enable(conn: Conn) -> Conn {
+  Conn(..conn, out_of_band: [output.EchoEnable, ..conn.out_of_band])
 }
 
 /// Renders text without a newline.
@@ -411,6 +422,7 @@ pub fn to_response(conn: Conn) -> Response {
     next_controller: conn.next_controller,
     events: list.reverse(conn.events),
     output: list.reverse(output),
+    out_of_band: list.reverse(conn.out_of_band),
     publish: list.reverse(conn.publish),
     subscribed: conn.subscribed,
     actions: conn.actions,

@@ -47,6 +47,9 @@ const ga = 249
 // will communicates an option is available
 const will = 251
 
+/// server communicates an option is not available
+const wont = 252
+
 // negoatiate about window size
 const naws = 31
 
@@ -173,6 +176,10 @@ pub fn recv(
     Packet(msg) -> handle_packet(state, msg)
     User(event.PushText(text)) -> Ok(push_text(state, text))
     User(event.Reassign(subject:)) -> Ok(State(..state, endpoint: subject))
+    User(event.OutOfBand(options)) -> {
+      push_out_of_band(conn, options)
+      Ok(state)
+    }
     User(event.Halt(pid)) -> {
       case process.subject_owner(state.endpoint) {
         // shutdown if this would orphan the protocol from the endpoint
@@ -354,6 +361,20 @@ fn push_text(state: State, outputs: List(output.Text)) -> State {
   push(conn, end_transmission)
 
   State(..state, newline: newline)
+}
+
+fn push_out_of_band(
+  conn: glisten.Connection(Outgoing),
+  output: List(output.OutOfBand),
+) -> Nil {
+  list.each(output, fn(option) {
+    case option {
+      output.EchoDisable -> <<iac, will, echo_option>>
+      output.EchoEnable -> <<iac, wont, echo_option>>
+    }
+    |> bytes_tree.from_bit_array()
+    |> push(conn, _)
+  })
 }
 
 fn push(conn: glisten.Connection(a), data: BytesTree) -> Nil {

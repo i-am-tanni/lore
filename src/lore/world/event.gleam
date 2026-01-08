@@ -105,6 +105,7 @@ pub type Outgoing {
   Halt(process.Pid)
   /// Reassigns connection to a new character.
   Reassign(subject: Subject(CharacterMessage))
+  OutOfBand(List(output.OutOfBand))
 }
 
 /// This is a request that is received by the character process
