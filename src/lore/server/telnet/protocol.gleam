@@ -367,14 +367,14 @@ fn push_out_of_band(
   conn: glisten.Connection(Outgoing),
   output: List(output.OutOfBand),
 ) -> Nil {
-  list.each(output, fn(option) {
+  list.map(output, fn(option) {
     case option {
       output.EchoDisable -> <<iac, will, echo_option>>
       output.EchoEnable -> <<iac, wont, echo_option>>
     }
-    |> bytes_tree.from_bit_array()
-    |> push(conn, _)
   })
+  |> bytes_tree.concat_bit_arrays
+  |> push(conn, _)
 }
 
 fn push(conn: glisten.Connection(a), data: BytesTree) -> Nil {
