@@ -8,7 +8,7 @@ The architecture takes inspiration from [Kalevala](https://github.com/oestrich/k
 A good place to start with the codebase is the endpoint for the telnet
 connection at `src/lore/server/telnet/protocol.gleam`.
 
-## Features
+## Features (more or less in the order they were added)
 
 - ✅ Network I/O is fully async
 - ✅ Rooms, zones, and characters fully async
@@ -29,3 +29,7 @@ connection at `src/lore/server/telnet/protocol.gleam`.
 - ✅ Basic death handling
 - ✅ Containers
 - ✅ Spawn groups with resets
+- ✅ Accounts
+- ⬜ Basic Admin Commands (teleport to room, invisible, spawn item, god mode, slay monster, kick player)
+- ⬜ Wearable Equipment
+- ⬜ Corpses
