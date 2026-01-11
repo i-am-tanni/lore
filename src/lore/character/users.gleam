@@ -12,6 +12,7 @@ import gleam/string
 import glets/table
 import lore/world.{type Mobile, type StringId}
 import lore/world/communication
+import lore/world/event
 
 /// A message received by the registry process to insert the room subject
 /// into the cache keyed by the room instance id.
@@ -19,18 +20,23 @@ import lore/world/communication
 pub type Message {
   /// Insert is called when a character logs in.
   ///
-  Insert(pid: process.Pid, id: StringId(Mobile), user: User)
+  Insert(pid: process.Pid, id: StringId(Mobile), name: String)
 
   /// Deregister the subject when a character process goes down.
   ///
   Down(process.Down)
+
+  NameLookup(
+    subject: Subject(event.CharacterMessage),
+    reply_to: Subject(String),
+  )
 }
 
 type State {
   State(
-    table: table.Set(StringId(Mobile), User),
+    table: table.Set(String, User),
     comms: process.Name(communication.Message),
-    ids: Dict(process.Pid, StringId(Mobile)),
+    name_lookup: Dict(process.Pid, String),
   )
 }
 
@@ -54,12 +60,13 @@ pub fn start(
 ///
 pub fn insert(
   table_name: process.Name(Message),
-  connection_pid: process.Pid,
-  mobile_id: StringId(Mobile),
-  user: User,
+  pid pid: process.Pid,
+  name name: String,
+  id id: StringId(Mobile),
 ) {
+  let name = string.lowercase(name)
   process.named_subject(table_name)
-  |> process.send(Insert(connection_pid, mobile_id, user))
+  |> process.send(Insert(pid:, id:, name:))
 }
 
 /// Returns the subject given a registered character instance id.
@@ -67,6 +74,13 @@ pub fn insert(
 pub fn players_logged_in(table_name: process.Name(Message)) -> List(User) {
   table.to_list(table_name)
   |> list.map(pair.second)
+}
+
+pub fn lookup(
+  table_name: process.Name(Message),
+  name: String,
+) -> Result(User, Nil) {
+  table.lookup(table_name, name)
 }
 
 fn init(
@@ -89,7 +103,7 @@ fn init(
     |> process.select_monitors(fn(down) { Down(down) })
     |> process.select(self)
 
-  State(table:, comms:, ids: dict.new())
+  State(table:, comms:, name_lookup: dict.new())
   |> actor.initialised()
   |> actor.selecting(selector)
   |> actor.returning(self)
@@ -99,25 +113,32 @@ fn init(
 fn recv(state: State, msg: Message) -> actor.Next(State, Message) {
   let table = state.table
   let result = case msg {
-    Insert(pid:, id:, user:) -> {
+    Insert(pid:, id:, name:) -> {
       use <- bool.guard(result.is_ok(table.lookup(table, id)), Error(Nil))
-      table.insert(table, id, user)
+      table.insert(table, name, User(id:, name:))
       process.monitor(pid)
-      let update = dict.insert(state.ids, pid, id)
-      Ok(State(..state, ids: update))
+      let update = dict.insert(state.name_lookup, pid, name)
+      Ok(State(..state, name_lookup: update))
     }
 
     // drop a pid from the table when the process exits
     Down(process.ProcessDown(monitor:, pid:, ..)) -> {
       process.demonitor_process(monitor)
-      let ids = state.ids
-      use id <- result.try(dict.get(ids, pid))
+      let names = state.name_lookup
+      use id <- result.try(dict.get(names, pid))
       table.delete(table, id)
-      let update = dict.delete(ids, pid)
-      Ok(State(..state, ids: update))
+      let update = dict.delete(names, pid)
+      Ok(State(..state, name_lookup: update))
     }
 
     Down(_) -> Error(Nil)
+
+    NameLookup(subject:, reply_to:) -> {
+      use pid <- result.try(process.subject_owner(subject))
+      use name <- result.try(dict.get(state.name_lookup, pid))
+      process.send(reply_to, name)
+      Ok(state)
+    }
   }
 
   case result {

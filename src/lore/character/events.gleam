@@ -55,7 +55,7 @@ pub fn route_player(
     event.MobileInspectRequest(by: requester) ->
       conn.character_event(
         conn,
-        event.MobileInspectResponse(conn.get_character(conn)),
+        event.MobileInspectResponse(conn.character_get(conn)),
         send: requester,
       )
 
@@ -63,6 +63,14 @@ pub fn route_player(
       conn
       |> conn.renderln(character_view.look_at(character))
       |> conn.prompt()
+
+    event.Kick(initiated_by:) ->
+      conn
+      |> conn.renderln(
+        ["You have been kicked by ", initiated_by, "."]
+        |> view.Leaves,
+      )
+      |> conn.terminate()
   }
 }
 
@@ -72,7 +80,7 @@ fn notify(
   data: data,
   render_fun: fn(world.MobileInternal, world.Mobile, data) -> view.View,
 ) -> Conn {
-  let view = render_fun(conn.get_character(conn), event.acting_character, data)
+  let view = render_fun(conn.character_get(conn), event.acting_character, data)
   conn
   |> conn.renderln(view)
   |> conn.prompt()
@@ -90,11 +98,11 @@ fn move_commit(
   // The zone communicates to the character that the move is official,
   // so the first thing they do is update their room id to the destination room.
   //
-  let character = conn.get_character(conn)
+  let character = conn.character_get(conn)
   let update = world.MobileInternal(..character, room_id: to_room_id)
 
   conn
-  |> conn.put_character(update)
+  |> conn.character_put(update)
 }
 
 fn notify_arrive(
@@ -102,7 +110,7 @@ fn notify_arrive(
   event: Event(CharacterEvent, RoomMessage),
   data: event.NotifyArriveData,
 ) -> Conn {
-  let self = conn.get_character(conn)
+  let self = conn.character_get(conn)
   // Discard if acting_character
   use <- bool.guard(event.is_from_acting_character(event, self), conn)
   let event.NotifyArriveData(enter_keyword:, ..) = data
@@ -135,13 +143,13 @@ fn item_get(
 ) -> Conn {
   let result = {
     use item <- result.try(item_load(conn, item_instance))
-    let self = conn.get_character(conn)
+    let self = conn.character_get(conn)
     case event.is_from_acting_character(event, self) {
       True -> {
         let update = [item_instance, ..self.inventory]
 
         conn
-        |> conn.put_character(world.MobileInternal(..self, inventory: update))
+        |> conn.character_put(world.MobileInternal(..self, inventory: update))
         |> conn.renderln(item_view.get(self, event.acting_character, item))
         |> Ok
       }
@@ -165,14 +173,14 @@ fn item_drop(
 ) -> Conn {
   let result = {
     use item <- result.try(item_load(conn, item_instance))
-    let self = conn.get_character(conn)
+    let self = conn.character_get(conn)
     case event.is_from_acting_character(event, self) {
       True -> {
         let update =
           list.filter(self.inventory, fn(x) { item_instance.id != x.id })
 
         conn
-        |> conn.put_character(world.MobileInternal(..self, inventory: update))
+        |> conn.character_put(world.MobileInternal(..self, inventory: update))
         |> conn.renderln(item_view.drop(self, event.acting_character, item))
         |> Ok
       }
@@ -225,7 +233,7 @@ fn item_load(
 //
 
 fn combat_commit(conn: Conn, data: event.CombatCommitData) -> Conn {
-  let self = conn.get_character(conn)
+  let self = conn.character_get(conn)
   let event.CombatCommitData(attacker:, victim:, ..) = data
   let victim_id = victim.id
   let is_victim_dead = victim.hp <= 0
@@ -234,11 +242,11 @@ fn combat_commit(conn: Conn, data: event.CombatCommitData) -> Conn {
 
     self_id if self_id == victim_id ->
       sync_mobile(victim, self)
-      |> conn.put_character(conn, _)
+      |> conn.character_put(conn, _)
 
     self_id if self_id == attacker.id ->
       sync_mobile(attacker, self)
-      |> conn.put_character(conn, _)
+      |> conn.character_put(conn, _)
 
     _ -> conn
   }
@@ -250,7 +258,7 @@ fn combat_commit(conn: Conn, data: event.CombatCommitData) -> Conn {
 }
 
 fn combat_round_poll(conn: Conn) -> Conn {
-  let self = conn.get_character(conn)
+  let self = conn.character_get(conn)
   case self.fighting {
     world.Fighting(victim_id) -> auto_attack(conn, victim_id)
     _ -> conn
@@ -263,7 +271,7 @@ fn combat_commit_round(
   commits: List(event.CombatPollData),
 ) -> Conn {
   let result = {
-    let self = conn.get_character(conn)
+    let self = conn.character_get(conn)
     use self <- try(
       dict.get(participants, self.id)
       |> result.map(sync_mobile(_, self)),
@@ -271,7 +279,7 @@ fn combat_commit_round(
 
     let conn =
       conn
-      |> conn.put_character(self)
+      |> conn.character_put(self)
       |> conn.renderln(combat_view.round_report(self, participants, commits))
 
     case self.fighting {

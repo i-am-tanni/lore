@@ -4,9 +4,10 @@
 import gleam/bool
 import gleam/list
 import gleam/option
-import gleam/result
+import gleam/result.{try}
 import gleam/string
 import lore/character/act
+import lore/character/character_registry
 import lore/character/conn.{type Conn}
 import lore/character/events
 import lore/character/socials
@@ -38,6 +39,7 @@ type Verb {
   Kill
   Inventory
   Social
+  Kick
 }
 
 type LookAt {
@@ -79,6 +81,12 @@ pub fn parse(conn: Conn, input: String) -> Conn {
     "quit" -> quit_command(conn)
     "i" | "inventory" -> command_nil(conn, Inventory, inventory_command)
     "" -> conn.prompt(conn)
+    // admin commands are prefixed with '@' to not conflict with skills
+    "@" -> unknown_command(conn)
+    "@kick" ->
+      admin_command(conn, role(conn), kick_command, fn() {
+        victim_arg(rest, word, "Who do you want to kick?")
+      })
     social ->
       command(conn, social_command, social_args(conn, social, rest, word))
   }
@@ -90,6 +98,20 @@ fn command(
   args_result: Result(data, String),
 ) -> Conn {
   case args_result {
+    Ok(data) -> command_fun(conn, data)
+    Error(error) ->
+      conn.renderln(conn, error_view.render_error(error)) |> conn.prompt
+  }
+}
+
+fn admin_command(
+  conn: Conn,
+  role: world.Role,
+  command_fun: fn(Conn, data) -> Conn,
+  args_fun: fn() -> Result(data, String),
+) -> Conn {
+  use <- bool.lazy_guard(role != world.Admin, fn() { unknown_command(conn) })
+  case args_fun() {
     Ok(data) -> command_fun(conn, data)
     Error(error) ->
       conn.renderln(conn, error_view.render_error(error)) |> conn.prompt
@@ -216,7 +238,7 @@ fn social_args(
   )
   let data = case victim(rest, word) {
     Ok(#(victim, _)) ->
-      case is_auto(conn.get_character(conn), victim) {
+      case is_auto(conn.character_get(conn), victim) {
         True -> SocialAuto(social)
         False -> SocialAt(social, victim)
       }
@@ -224,6 +246,17 @@ fn social_args(
   }
 
   Ok(Command(Social, data))
+}
+
+fn victim_arg(
+  s: String,
+  word: Splitter,
+  err_msg: String,
+) -> Result(Command(String), String) {
+  case victim(s, word) {
+    Ok(#(victim, _)) -> Ok(Command(Kick, victim))
+    Error(_) -> Error(err_msg)
+  }
 }
 
 fn quote(s: String) -> String {
@@ -312,7 +345,7 @@ fn adverb(s: String, word: Splitter) -> Result(#(String, String), Nil) {
 //
 
 fn move_command(conn: Conn, direction: world.Direction) -> Conn {
-  let character = conn.get_character(conn)
+  let character = conn.character_get(conn)
   case character.fighting {
     world.NoTarget -> conn.action(conn, act.move(direction))
     world.Fighting(..) ->
@@ -328,7 +361,7 @@ fn look_command(conn: Conn, _: Command(Nil)) -> Conn {
 
 fn look_at_command(conn: Conn, command: Command(String)) -> Conn {
   let search_term = command.data
-  let self = conn.get_character(conn)
+  let self = conn.character_get(conn)
   let found_result = {
     use <- bool.guard(
       search_term == "self"
@@ -405,7 +438,7 @@ fn get_command(conn: Conn, command: Command(String)) -> Conn {
 
 fn drop_command(conn: Conn, command: Command(String)) -> Conn {
   let keyword = command.data
-  let world.MobileInternal(inventory:, ..) = conn.get_character(conn)
+  let world.MobileInternal(inventory:, ..) = conn.character_get(conn)
   let result = {
     use item <- list.find(inventory)
     use item_keyword <- list.any(item.keywords)
@@ -422,7 +455,7 @@ fn drop_command(conn: Conn, command: Command(String)) -> Conn {
 }
 
 fn kill_command(conn: Conn, command: Command(String)) -> Conn {
-  let self = conn.get_character(conn)
+  let self = conn.character_get(conn)
   case !is_auto(self, command.data) {
     True if self.fighting == world.NoTarget ->
       event.CombatRequestData(
@@ -455,15 +488,15 @@ fn is_auto(self: world.MobileInternal, search_term: String) -> Bool {
 
 fn inventory_command(conn: Conn, _command: Command(Nil)) -> Conn {
   let system_tables.Lookup(items:, ..) = conn.system_tables(conn)
-  let character = conn.get_character(conn)
+  let character = conn.character_get(conn)
 
   conn.renderln(conn, item_view.inventory(items, character))
   |> conn.prompt()
 }
 
 fn who_command(conn: Conn) -> Conn {
-  let system_tables.Lookup(users:, ..) = conn.system_tables(conn)
-  conn.render(conn, character_view.who_list(users.players_logged_in(users)))
+  let system_tables.Lookup(user:, ..) = conn.system_tables(conn)
+  conn.render(conn, character_view.who_list(users.players_logged_in(user)))
 }
 
 fn quit_command(conn: Conn) -> Conn {
@@ -494,6 +527,34 @@ fn social_command(conn: Conn, command: Command(SocialData)) -> Conn {
   conn.action(conn, act.communicate(comm_data))
 }
 
+fn kick_command(conn: Conn, command: Command(String)) -> Conn {
+  let system_tables.Lookup(user:, character:, ..) = conn.system_tables(conn)
+  let user_name = command.data
+  let result = {
+    use user <- try(users.lookup(user, user_name))
+    character_registry.whereis(character, user.id)
+  }
+  case result {
+    Ok(user_subject) -> {
+      let world.MobileInternal(name:, ..) = conn.character_get(conn)
+      let user_name = string.capitalise(user_name)
+      conn
+      |> conn.character_event(event.Kick(initiated_by: name), user_subject)
+      |> conn.renderln(["Kicking ", user_name, "..."] |> view.Leaves)
+      |> conn.prompt
+    }
+
+    _ ->
+      conn |> conn.renderln(error_view.user_not_found(user_name)) |> conn.prompt
+  }
+}
+
+fn unknown_command(conn: Conn) -> Conn {
+  conn
+  |> conn.renderln(view.Leaf("Huh?"))
+  |> conn.prompt
+}
+
 //
 // Helper Functions
 //
@@ -507,4 +568,8 @@ fn string_to_direction(exit_keyword: String) -> world.Direction {
     "d" | "down" -> world.Down
     custom -> world.CustomExit(custom)
   }
+}
+
+fn role(conn: Conn) -> world.Role {
+  conn.character_get(conn).role
 }

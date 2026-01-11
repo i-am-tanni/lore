@@ -68,6 +68,11 @@ pub fn already_fighting() {
   "You are fighting for your life!" |> view.Leaf
 }
 
+pub fn user_not_found(name: String) -> View {
+  ["User ", name, " not found."]
+  |> view.Leaves
+}
+
 fn direction_to_string(direction: world.Direction) -> String {
   case direction {
     world.North -> "north"

@@ -177,6 +177,7 @@ pub type CharacterEvent {
   )
   CombatRoundPoll
   ActFailed(world.ErrorRoomRequest)
+  Kick(initiated_by: String)
 }
 
 pub type CharacterToRoomEvent {

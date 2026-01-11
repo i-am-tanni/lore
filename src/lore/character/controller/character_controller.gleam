@@ -9,7 +9,7 @@ import lore/world/system_tables
 
 pub fn init(conn: Conn, _flash: CharacterFlash) -> Conn {
   let system_tables.Lookup(character:, ..) = conn.system_tables(conn)
-  let world.MobileInternal(id:, ..) = conn.get_character(conn)
+  let world.MobileInternal(id:, ..) = conn.character_get(conn)
   let self = conn.self(conn)
   character_registry.register(character, id, self)
   conn.spawn(conn, Id(1))

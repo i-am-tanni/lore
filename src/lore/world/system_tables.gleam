@@ -42,7 +42,7 @@ pub type Lookup {
     character: process.Name(character_registry.Message),
     communication: process.Name(communication.Message),
     presence: process.Name(presence.Message),
-    users: process.Name(users.Message),
+    user: process.Name(users.Message),
     mapper: process.Name(mapper.Message),
     items: process.Name(items.Message),
     socials: process.Name(socials.Message),
@@ -62,7 +62,7 @@ pub fn supervised(
   |> add(worker(fn() { character_registry.start(name.character) }))
   |> add(worker(fn() { communication.start(name.communication) }))
   |> add(worker(fn() { presence.start(name.presence, name.room) }))
-  |> add(worker(fn() { users.start(name.users, name.communication) }))
+  |> add(worker(fn() { users.start(name.user, name.communication) }))
   |> add(worker(fn() { socials.start(name.socials, name.db) }))
   |> add(worker(fn() { janitor.start(name.janitor, name.room) }))
   |> static_supervisor.supervised

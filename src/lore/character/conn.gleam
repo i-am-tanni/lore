@@ -172,7 +172,7 @@ pub fn prompt(conn: Conn) -> Conn {
 
 /// Returns mobile context.
 ///
-pub fn get_character(conn: Conn) -> world.MobileInternal {
+pub fn character_get(conn: Conn) -> world.MobileInternal {
   case conn.update_character {
     Some(updated_character) -> updated_character
     _ -> conn.character
@@ -181,7 +181,7 @@ pub fn get_character(conn: Conn) -> world.MobileInternal {
 
 /// Stages changes to the character state.
 ///
-pub fn put_character(conn: Conn, character: world.MobileInternal) -> Conn {
+pub fn character_put(conn: Conn, character: world.MobileInternal) -> Conn {
   Conn(..conn, update_character: Some(character))
 }
 
@@ -245,7 +245,7 @@ pub fn terminate(conn: Conn) -> Conn {
 /// Send an event to the room.
 ///
 pub fn event(conn: Conn, event: CharacterToRoomEvent) -> Conn {
-  let acting_character = world.trim_character(get_character(conn))
+  let acting_character = world.trim_character(character_get(conn))
   let event = event.new(from: conn.self, acting_character:, data: event)
 
   Conn(..conn, events: [ToRoom(event), ..conn.events])
@@ -260,7 +260,7 @@ pub fn character_event(
   event: event.CharacterEvent,
   send to: Subject(CharacterMessage),
 ) -> Conn {
-  let acting_character = world.trim_character(get_character(conn))
+  let acting_character = world.trim_character(character_get(conn))
   let event = ToCharacter(event:, to:, acting_character:)
   Conn(..conn, events: [event, ..conn.events])
 }
@@ -302,7 +302,7 @@ pub fn move_request(conn: Conn, exit_keyword: world.Direction) -> Conn {
 /// Spawns a character into a room.
 ///
 pub fn spawn(conn: Conn, to to_room_id: Id(Room)) -> Conn {
-  let character = get_character(conn)
+  let character = character_get(conn)
   case to_room_id == character.room_id {
     True -> {
       let data =
@@ -403,7 +403,7 @@ pub fn to_response(conn: Conn) -> Response {
         |> output.Text(text: _, newline: True)
 
       let prompt =
-        prompt_view.prompt(get_character(conn))
+        prompt_view.prompt(character_get(conn))
         |> view.to_string_tree
         |> output.Text(text: _, newline: False)
 

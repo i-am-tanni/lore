@@ -6,17 +6,17 @@ import lore/world/room/presence
 
 pub fn init(conn: Conn, flash: SpawnFlash) -> Conn {
   let room_id = flash.at
-  let world.MobileInternal(id: mobile_id, ..) = conn.get_character(conn)
+  let world.MobileInternal(id: mobile_id, ..) = conn.character_get(conn)
   let presence = flash.presence
   case presence.lookup(presence, mobile_id) {
     // Did character restart?
     Ok(present_location) if present_location != room_id -> {
       presence.notify_restart(presence, conn.self(conn), mobile_id)
-      let character = conn.get_character(conn)
+      let character = conn.character_get(conn)
       let update = world.MobileInternal(..character, room_id: present_location)
 
       conn
-      |> conn.put_character(update)
+      |> conn.character_put(update)
       |> conn.event(event.RejoinRoom)
     }
 

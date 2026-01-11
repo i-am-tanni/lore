@@ -44,8 +44,8 @@ pub fn recv(conn: Conn, flash: LoginFlash, msg: controller.Request) -> Conn {
 
 fn handle_text(conn: Conn, flash: LoginFlash, input: String) -> Conn {
   case flash.stage {
-    controller.LoginName -> login_name(conn, flash, input)
-    controller.LoginPassword -> login_password(conn, flash, input)
+    controller.LoginName -> account_name(conn, flash, input)
+    controller.LoginPassword -> password(conn, flash, input)
     controller.LoginConfirmNewAccount -> new_account_confirm(conn, flash, input)
     controller.LoginNewPassword -> new_password(conn, flash, input)
     controller.LoginConfirmNewPassword ->
@@ -53,9 +53,10 @@ fn handle_text(conn: Conn, flash: LoginFlash, input: String) -> Conn {
   }
 }
 
-fn login_name(conn: Conn, flash: LoginFlash, input: String) -> Conn {
+fn account_name(conn: Conn, flash: LoginFlash, input: String) -> Conn {
   let result = {
     use name <- try(parse(flash.splitter, input))
+    let name = name |> string.lowercase |> string.capitalise
     let system_tables.Lookup(db:, ..) = conn.system_tables(conn)
     let db = pog.named_connection(db)
     use account <- try(query1(sql.account_get(db, name), name))
@@ -191,7 +192,7 @@ fn new_password_confirm(conn: Conn, flash: LoginFlash, input: String) -> Conn {
   }
 }
 
-fn login_password(conn: Conn, flash: LoginFlash, input: String) -> Conn {
+fn password(conn: Conn, flash: LoginFlash, input: String) -> Conn {
   let result = {
     use input <- try(
       parse(flash.splitter, input) |> result.replace_error(Blank),
@@ -216,7 +217,7 @@ fn login_password(conn: Conn, flash: LoginFlash, input: String) -> Conn {
 
 fn login(conn: Conn, flash: LoginFlash) -> Conn {
   let name = flash.name
-  let world.MobileInternal(id:, ..) = conn.get_character(conn)
+  let world.MobileInternal(id:, ..) = conn.character_get(conn)
 
   let update =
     world.MobileInternal(
@@ -224,7 +225,7 @@ fn login(conn: Conn, flash: LoginFlash) -> Conn {
       name:,
       room_id: Id(1),
       template_id: world.Player(Id(0)),
-      role: world.User,
+      role: world.Admin,
       keywords: [string.lowercase(name)],
       pronouns: pronoun.Feminine,
       short: name <> " is standing here.",
@@ -234,13 +235,13 @@ fn login(conn: Conn, flash: LoginFlash) -> Conn {
       hp_max: 20,
     )
 
-  let system_tables.Lookup(users:, ..) = conn.system_tables(conn)
-  users.insert(users, flash.endpoint, id, users.User(name:, id:))
+  let system_tables.Lookup(user:, ..) = conn.system_tables(conn)
+  users.insert(user, flash.endpoint, name:, id:)
 
   let next_flash = CharacterFlash(name)
   conn
   |> conn.echo_enable
-  |> conn.put_character(update)
+  |> conn.character_put(update)
   |> conn.subscribe(world.General)
   |> conn.next_controller(controller.Character(next_flash))
 }

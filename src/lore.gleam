@@ -37,7 +37,7 @@ pub fn main() {
         communication: process.new_name("comms"),
         presence: process.new_name("presence"),
         mapper: process.new_name("mapper"),
-        users: process.new_name("users"),
+        user: process.new_name("users"),
         items: process.new_name("items"),
         socials: process.new_name("socials"),
         janitor: process.new_name("janitor"),

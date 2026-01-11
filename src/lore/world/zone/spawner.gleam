@@ -104,7 +104,7 @@ fn reset_mobs_with_despawn(
 
   // Instance must be in a room depopulated of players to despawn
   let rooms_occupied_by_player = {
-    users.players_logged_in(system_tables.users)
+    users.players_logged_in(system_tables.user)
     |> list.filter_map(fn(user) {
       use room_id <- try(presence.lookup(presence, user.id))
       Ok(room_id)
