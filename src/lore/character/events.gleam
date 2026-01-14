@@ -64,10 +64,10 @@ pub fn route_player(
       |> conn.renderln(character_view.look_at(character))
       |> conn.prompt()
 
-    event.Kick(initiated_by:) ->
+    event.Kick(initiated_by: admin) ->
       conn
       |> conn.renderln(
-        ["You have been kicked by ", initiated_by, "."]
+        ["You have been kicked by ", admin, "!"]
         |> view.Leaves,
       )
       |> conn.terminate()

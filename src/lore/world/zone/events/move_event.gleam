@@ -1,13 +1,13 @@
 //// A zone processes a mobile's move from one room to another.
-//// 
+////
 //// ## Steps to complete a move:
 //// 1. Poll the receiving room whether it accepts or rejects the move.
-//// 2. If the receiving room accepts, notify the character to update their 
+//// 2. If the receiving room accepts, notify the character to update their
 //// room_id location.
 //// 3. Update the character's location in the presence table
 //// 4. Send a `MoveDepart` event to the departure room and block until response.
 //// 5. Finally, send a `MoveArrive` event to the arrival room.
-//// 
+////
 
 import gleam/erlang/process.{type Subject}
 import gleam/option.{Some}
@@ -104,14 +104,14 @@ fn abort(
 fn depart(self: Subject(event.Done), data: event.MoveKickoffData) -> RoomMessage {
   let event.MoveKickoffData(acting_character:, exit_keyword:, ..) = data
   let data =
-    event.MoveDepartData(exit_keyword: Some(exit_keyword), subject: data.from)
+    event.MoveDepartData(exit_keyword: exit_keyword, subject: data.from)
     |> event.MoveDepart
 
   event.new(from: self, acting_character:, data:)
   |> event.InterRoom
 }
 
-// Note we "fake" that this event is generated and sent from the 
+// Note we "fake" that this event is generated and sent from the
 // acting_character so that the room will reply to them.
 //
 fn arrive(
@@ -123,7 +123,7 @@ fn arrive(
   let data =
     event.MoveArriveData(
       from_room_id: Some(from_room_id),
-      from_exit_keyword: Some(exit_keyword),
+      from_exit_keyword: exit_keyword,
     )
     |> event.MoveArrive
 

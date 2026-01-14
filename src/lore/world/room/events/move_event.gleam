@@ -7,7 +7,7 @@ import gleam/option.{None, Some}
 import gleam/result
 import lore/character/view/move_view
 import lore/world.{
-  type Direction, type ErrorRoomRequest, type RoomExit, UnknownExit,
+  type Direction, type ErrorRoomRequest, type Id, type RoomExit, UnknownExit,
 }
 import lore/world/event.{
   type CharacterMessage, type CharacterToRoomEvent, type Event,
@@ -40,7 +40,39 @@ pub fn request(
         acting_character:,
         from_room_id:,
         to_room_id:,
-        exit_keyword:,
+        exit_keyword: Some(exit_keyword),
+      )
+      |> event.MoveKickoff
+
+    event.new(from: response.self(builder), acting_character:, data:)
+    |> Ok
+  }
+
+  case result {
+    Ok(move_kickoff) -> response.zone_event(builder, move_kickoff)
+    Error(reason) -> response.reply_character(builder, event.ActFailed(reason))
+  }
+}
+
+/// The initial movement request by a character for an exit keyword.
+///
+pub fn request_teleport(
+  builder: response.Builder(CharacterMessage),
+  event: Event(CharacterToRoomEvent, CharacterMessage),
+  to_room_id: Id(world.Room),
+) -> response.Builder(CharacterMessage) {
+  let result = {
+    // If exit exists, kickoff, lookup room subject and send to zone
+    // This cannot fail as only characters can initiate move events
+    let world.Room(id:, ..) = response.room(builder)
+    let acting_character = event.acting_character
+    let data =
+      event.MoveKickoffData(
+        from: event.from,
+        acting_character:,
+        from_room_id: id,
+        to_room_id:,
+        exit_keyword: None,
       )
       |> event.MoveKickoff
 

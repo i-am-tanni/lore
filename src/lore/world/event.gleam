@@ -185,6 +185,7 @@ pub type CharacterToRoomEvent {
   LookAt(keyword: String)
   MoveRequest(exit_keyword: Direction)
   MoveArrive(MoveArriveData)
+  TeleportRequest(to_room_id: Id(Room))
   ItemGet(keyword: String)
   ItemDrop(item_instance: world.ItemInstance)
   RejoinRoom
@@ -308,7 +309,7 @@ pub type MoveKickoffData {
     acting_character: Mobile,
     from_room_id: Id(Room),
     to_room_id: Id(Room),
-    exit_keyword: Direction,
+    exit_keyword: Option(Direction),
   )
 }
 

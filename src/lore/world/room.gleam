@@ -145,6 +145,8 @@ fn route_from_character(
   let builder = to_builder(state, event)
   let builder = case event.data {
     event.MoveRequest(data) -> move_event.request(builder, event, data)
+    event.TeleportRequest(data) ->
+      move_event.request_teleport(builder, event, data)
     event.MoveArrive(data) -> move_event.arrive(builder, event, data)
     event.Look -> look_event.room_look(builder, event)
     event.LookAt(data) -> look_event.look_at(builder, event, data)

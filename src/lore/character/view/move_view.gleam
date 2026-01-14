@@ -1,17 +1,20 @@
 import gleam/option.{type Option, None, Some}
-import gleam/string
 import lore/character/view.{type View}
 import lore/world.{type Direction, type Mobile}
 
 pub fn notify_arrive(character: Mobile, room_exit: Option(Direction)) -> View {
-  case room_exit {
-    Some(keyword) -> [
+  let exit = case room_exit {
+    Some(direction) -> direction
+    None -> world.CustomExit("some unseen corner.")
+  }
+
+  case exit {
+    world.CustomExit(custom_message) -> [
       character.name,
-      " arrives from the ",
-      string.inspect(keyword),
-      ".",
+      " arrives from ",
+      custom_message,
     ]
-    None -> [character.name, " arrives from some unseen corner."]
+    _ -> [character.name, " arrives from the ", world.direction_to_string(exit)]
   }
   |> view.Leaves
 }

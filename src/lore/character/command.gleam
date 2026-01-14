@@ -2,6 +2,7 @@
 ////
 
 import gleam/bool
+import gleam/int
 import gleam/list
 import gleam/option
 import gleam/result.{try}
@@ -17,13 +18,13 @@ import lore/character/view/character_view
 import lore/character/view/communication_view
 import lore/character/view/error_view
 import lore/character/view/item_view
-import lore/world
+import lore/world.{type Id, type Room, Id}
 import lore/world/event
 import lore/world/system_tables
 import splitter.{type Splitter}
 
-type Command(a) {
-  Command(verb: Verb, data: a)
+type Command(data) {
+  Command(verb: Verb, data: data)
 }
 
 type Verb {
@@ -40,11 +41,17 @@ type Verb {
   Inventory
   Social
   Kick
+  Teleport
+}
+
+type Victim {
+  Self
+  Victim(String)
 }
 
 type LookAt {
-  Self
-  Item(world.ItemInstance)
+  LookSelf
+  LookItem(world.ItemInstance)
 }
 
 type SocialData {
@@ -69,14 +76,14 @@ pub fn parse(conn: Conn, input: String) -> Conn {
     "say" -> command(conn, room_comms, say_args(rest, word))
     "whisper" -> command(conn, room_comms, whisper_args(rest, word))
     "emote" -> command(conn, room_comms, emote_text(rest))
-    "k" | "kill" -> command(conn, kill_command, kill_args(rest, word))
+    "k" | "kill" -> command(conn, kill_command, keyword_arg(Get, rest, word))
     "op" | "open" ->
       command(conn, door_command, door_args(world.Open, rest, word))
     "cl" | "close" ->
       command(conn, door_command, door_args(world.Closed, rest, word))
     "chat" -> command(conn, chat_command, chat_args(world.General, rest))
-    "g" | "get" -> command(conn, get_command, get_args(rest, word))
-    "dr" | "drop" -> command(conn, drop_command, drop_args(rest, word))
+    "g" | "get" -> command(conn, get_command, keyword_arg(Get, rest, word))
+    "dr" | "drop" -> command(conn, drop_command, keyword_arg(Drop, rest, word))
     "who" -> who_command(conn)
     "quit" -> quit_command(conn)
     "i" | "inventory" -> command_nil(conn, Inventory, inventory_command)
@@ -85,7 +92,11 @@ pub fn parse(conn: Conn, input: String) -> Conn {
     "@" -> unknown_command(conn)
     "@kick" ->
       admin_command(conn, role(conn), kick_command, fn() {
-        victim_arg(rest, word, "Who do you want to kick?")
+        victim_arg(conn, Kick, rest, word)
+      })
+    "@tele" ->
+      admin_command(conn, role(conn), tele_command, fn() {
+        tele_arg(rest, word)
       })
     social ->
       command(conn, social_command, social_args(conn, social, rest, word))
@@ -204,27 +215,6 @@ fn chat_args(
   }
 }
 
-fn get_args(s: String, word: Splitter) -> Result(Command(String), String) {
-  case keyword(s, word) {
-    Ok(#(keyword, _)) -> Ok(Command(Get, keyword))
-    Error(_) -> Error("What do you want to get?")
-  }
-}
-
-fn drop_args(s: String, word: Splitter) -> Result(Command(String), String) {
-  case keyword(s, word) {
-    Ok(#(keyword, _)) -> Ok(Command(Drop, keyword))
-    Error(_) -> Error("What do you want to drop?")
-  }
-}
-
-fn kill_args(s: String, word: Splitter) -> Result(Command(String), String) {
-  case keyword(s, word) {
-    Ok(#(keyword, _)) -> Ok(Command(Kill, keyword))
-    Error(_) -> Error("What do you want to kill?")
-  }
-}
-
 fn social_args(
   conn: Conn,
   verb: String,
@@ -238,7 +228,7 @@ fn social_args(
   )
   let data = case victim(rest, word) {
     Ok(#(victim, _)) ->
-      case is_auto(conn.character_get(conn), victim) {
+      case is_auto(conn, victim) {
         True -> SocialAuto(social)
         False -> SocialAt(social, victim)
       }
@@ -248,20 +238,45 @@ fn social_args(
   Ok(Command(Social, data))
 }
 
+fn tele_arg(s: String, word: Splitter) -> Result(Command(Id(Room)), String) {
+  let #(slice, _) = splitter.split_before(word, s)
+  case int.parse(slice) {
+    Ok(room_id) -> Ok(Command(Teleport, Id(room_id)))
+    Error(_) -> Error(verb_missing_arg_err(Teleport))
+  }
+}
+
 fn victim_arg(
+  conn: Conn,
+  verb: Verb,
   s: String,
   word: Splitter,
-  err_msg: String,
-) -> Result(Command(String), String) {
-  case victim(s, word) {
-    Ok(#(victim, _)) -> Ok(Command(Kick, victim))
-    Error(_) -> Error(err_msg)
+) -> Result(Command(Victim), String) {
+  use #(victim, _) <- result.try(
+    victim(s, word)
+    |> result.replace_error(verb_missing_arg_err(verb)),
+  )
+  case is_auto(conn, victim) {
+    True -> Command(verb, Self)
+    False -> Command(verb, Victim(victim))
   }
+  |> Ok
 }
 
 fn quote(s: String) -> String {
   let #(text, _) = splitter.new(["\r\n", "\n"]) |> splitter.split_before(s)
   string.capitalise(text)
+}
+
+fn keyword_arg(
+  verb: Verb,
+  s: String,
+  word: Splitter,
+) -> Result(Command(String), String) {
+  case keyword(s, word) {
+    Ok(#(keyword, _)) -> Ok(Command(verb, keyword))
+    Error(_) -> Error(verb_missing_arg_err(verb))
+  }
 }
 
 fn keyword(s: String, word: Splitter) -> Result(#(String, String), Nil) {
@@ -366,21 +381,21 @@ fn look_at_command(conn: Conn, command: Command(String)) -> Conn {
     use <- bool.guard(
       search_term == "self"
         || list.any(self.keywords, fn(keyword) { search_term == keyword }),
-      Ok(Self),
+      Ok(LookSelf),
     )
     list.find(self.inventory, fn(item_instance) {
       list.any(item_instance.keywords, fn(keyword) { search_term == keyword })
     })
-    |> result.map(Item)
+    |> result.map(LookItem)
   }
 
   case found_result {
-    Ok(Self) ->
+    Ok(LookSelf) ->
       conn
       |> conn.renderln(character_view.look_at(self))
       |> conn.prompt()
 
-    Ok(Item(item_instance)) -> events.item_look_at(conn, item_instance)
+    Ok(LookItem(item_instance)) -> events.item_look_at(conn, item_instance)
 
     Error(Nil) -> conn.event(conn, event.LookAt(search_term))
   }
@@ -456,7 +471,7 @@ fn drop_command(conn: Conn, command: Command(String)) -> Conn {
 
 fn kill_command(conn: Conn, command: Command(String)) -> Conn {
   let self = conn.character_get(conn)
-  case !is_auto(self, command.data) {
+  case !is_auto(conn, command.data) {
     True if self.fighting == world.NoTarget ->
       event.CombatRequestData(
         victim: event.Keyword(command.data),
@@ -478,7 +493,8 @@ fn kill_command(conn: Conn, command: Command(String)) -> Conn {
   }
 }
 
-fn is_auto(self: world.MobileInternal, search_term: String) -> Bool {
+fn is_auto(conn: Conn, search_term: String) -> Bool {
+  let self = conn.character_get(conn)
   case search_term {
     "self" -> True
     search_term ->
@@ -527,26 +543,42 @@ fn social_command(conn: Conn, command: Command(SocialData)) -> Conn {
   conn.action(conn, act.communicate(comm_data))
 }
 
-fn kick_command(conn: Conn, command: Command(String)) -> Conn {
+fn kick_command(conn: Conn, command: Command(Victim)) -> Conn {
   let system_tables.Lookup(user:, character:, ..) = conn.system_tables(conn)
-  let user_name = command.data
-  let result = {
-    use user <- try(users.lookup(user, user_name))
-    character_registry.whereis(character, user.id)
-  }
-  case result {
-    Ok(user_subject) -> {
-      let world.MobileInternal(name:, ..) = conn.character_get(conn)
-      let user_name = string.capitalise(user_name)
+  case command.data {
+    Self ->
       conn
-      |> conn.character_event(event.Kick(initiated_by: name), user_subject)
-      |> conn.renderln(["Kicking ", user_name, "..."] |> view.Leaves)
+      |> conn.renderln("You cannot do that to yourself!" |> view.Leaf)
       |> conn.prompt
-    }
 
-    _ ->
-      conn |> conn.renderln(error_view.user_not_found(user_name)) |> conn.prompt
+    Victim(victim) -> {
+      let result = {
+        use user <- try(users.lookup(user, victim))
+        use user_subject <- try(character_registry.whereis(character, user.id))
+        let world.MobileInternal(name:, ..) = conn.character_get(conn)
+        let user_name = string.capitalise(victim)
+        conn
+        |> conn.character_event(event.Kick(initiated_by: name), user_subject)
+        |> conn.renderln(["Kicking ", user_name, "..."] |> view.Leaves)
+        |> conn.prompt
+        |> Ok
+      }
+
+      case result {
+        Ok(conn) -> conn
+
+        Error(_) ->
+          conn
+          |> conn.renderln(error_view.user_not_found(victim))
+          |> conn.prompt
+      }
+    }
   }
+}
+
+fn tele_command(conn: Conn, command: Command(Id(Room))) -> Conn {
+  let room_id = command.data
+  conn.event(conn, event.TeleportRequest(room_id))
 }
 
 fn unknown_command(conn: Conn) -> Conn {
@@ -572,4 +604,23 @@ fn string_to_direction(exit_keyword: String) -> world.Direction {
 
 fn role(conn: Conn) -> world.Role {
   conn.character_get(conn).role
+}
+
+fn verb_missing_arg_err(verb: Verb) -> String {
+  case verb {
+    Say -> "What do you want to look at?"
+    Whisper -> "Who do you want to whisper to?"
+    Emote -> "What do you want to emote?"
+    Open -> "What do you want to open?"
+    Close -> "What do you want to close?"
+    Chat -> "What do you want to chat?"
+    Get -> "What do you want to get?"
+    Drop -> "What do you want to drop?"
+    Kill -> "Who do you want to kill?"
+    Kick -> "Who do you want to kick?"
+    Teleport -> "Where do you want to teleport?"
+    Look -> ""
+    Inventory -> ""
+    Social -> ""
+  }
 }
