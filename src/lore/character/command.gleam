@@ -20,6 +20,7 @@ import lore/character/view/error_view
 import lore/character/view/item_view
 import lore/world.{type Id, type Room, Id}
 import lore/world/event
+import lore/world/room/presence
 import lore/world/system_tables
 import splitter.{type Splitter}
 
@@ -102,6 +103,10 @@ pub fn parse(conn: Conn, input: String) -> Conn {
     "@tele" ->
       admin_command(conn, role(conn), tele_command, fn() {
         tele_arg(rest, word)
+      })
+    "@tele_to" ->
+      admin_command(conn, role(conn), tele_to_command, fn() {
+        victim_arg(conn, Teleport, rest, word)
       })
     "@tele_other" ->
       admin_command(conn, role(conn), tele_other_command, fn() {
@@ -619,6 +624,34 @@ fn kick_command(conn: Conn, command: Command(Victim)) -> Conn {
 fn tele_command(conn: Conn, command: Command(Id(Room))) -> Conn {
   let room_id = command.data
   conn.event(conn, event.TeleportRequest(room_id))
+}
+
+fn tele_to_command(conn: Conn, command: Command(Victim)) -> Conn {
+  let system_tables.Lookup(user:, presence:, ..) = conn.system_tables(conn)
+  case command.data {
+    Self -> conn.renderln(conn, view.Leaf("You're already there!"))
+    Victim(victim) -> {
+      let result = {
+        use users.User(id:, ..) <- try(users.lookup(user, victim))
+        use room_id <- try(presence.lookup(presence, id))
+        conn.event(conn, event.TeleportRequest(room_id))
+        |> Ok
+      }
+
+      let result = {
+        use _ <- result.try_recover(result)
+        let victim_id = world.StringId(string.uppercase(victim))
+        use room_id <- try(presence.lookup(presence, victim_id))
+        conn.event(conn, event.TeleportRequest(room_id))
+        |> Ok
+      }
+
+      case result {
+        Ok(update) -> update
+        Error(_) -> conn.renderln(conn, view.Leaf("Cannot find that user."))
+      }
+    }
+  }
 }
 
 fn tele_other_command(conn: Conn, command: Command(TeleOtherArgs)) -> Conn {
