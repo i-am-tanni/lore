@@ -232,6 +232,27 @@ fn round_process_action(
   }
 }
 
+pub fn slay(
+  builder: response.Builder(CharacterMessage),
+  event: Event(CharacterToRoomEvent, CharacterMessage),
+  victim: String,
+) -> response.Builder(CharacterMessage) {
+  let result = {
+    use victim <- try(find_local_character(builder, event.Keyword(victim)))
+    let attacker = event.acting_character
+    event.CombatCommitData(victim:, attacker:, damage: victim.hp)
+    |> event.CombatCommit
+    |> response.broadcast(builder, attacker, _)
+    |> response.character_update(victim)
+    |> Ok
+  }
+
+  case result {
+    Ok(update) -> update
+    Error(error) -> response.reply_character(builder, event.ActFailed(error))
+  }
+}
+
 fn is_pvp(attacker: Mobile, victim: Mobile) -> Bool {
   case attacker.template_id, victim.template_id {
     Player(_), Player(_) -> True

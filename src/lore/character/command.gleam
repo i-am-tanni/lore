@@ -41,6 +41,7 @@ type Verb {
   Inventory
   Social
   Kick
+  Slay
   Teleport
 }
 
@@ -105,6 +106,10 @@ pub fn parse(conn: Conn, input: String) -> Conn {
     "@tele_other" ->
       admin_command(conn, role(conn), tele_other_command, fn() {
         tele_other_arg(conn, rest, word)
+      })
+    "@slay" ->
+      admin_command(conn, role(conn), slay_command, fn() {
+        victim_arg(conn, Slay, rest, word)
       })
     social ->
       command(conn, social_command, social_args(conn, social, rest, word))
@@ -636,6 +641,13 @@ fn tele_other_command(conn: Conn, command: Command(TeleOtherArgs)) -> Conn {
   }
 }
 
+fn slay_command(conn: Conn, command: Command(Victim)) -> Conn {
+  case command.data {
+    Victim(victim) -> conn.event(conn, event.Slay(victim))
+    Self -> conn.renderln(conn, view.Leaf("That would be unwise."))
+  }
+}
+
 fn unknown_command(conn: Conn) -> Conn {
   conn
   |> conn.renderln(view.Leaf("Huh?"))
@@ -674,7 +686,8 @@ fn verb_missing_arg_err(verb: Verb) -> String {
     Kill -> "Who do you want to kill?"
     Kick -> "Who do you want to kick?"
     Teleport -> "Where do you want to teleport?"
-    Look -> ""
+    Slay -> "Who do you want to slay?"
+    Look -> "What do you want to look at?"
     Inventory -> ""
     Social -> ""
   }
