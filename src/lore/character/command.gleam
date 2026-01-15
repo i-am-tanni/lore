@@ -60,6 +60,10 @@ type SocialData {
   SocialNoArg(social: socials.Social)
 }
 
+type TeleOtherArgs {
+  TeleOther(room_id: Id(Room), victim: Victim)
+}
+
 pub fn parse(conn: Conn, input: String) -> Conn {
   let word = splitter.new([" ", "\r\n", "\n"])
   let #(verb, _, rest) = splitter.split(word, input)
@@ -97,6 +101,10 @@ pub fn parse(conn: Conn, input: String) -> Conn {
     "@tele" ->
       admin_command(conn, role(conn), tele_command, fn() {
         tele_arg(rest, word)
+      })
+    "@tele_other" ->
+      admin_command(conn, role(conn), tele_other_command, fn() {
+        tele_other_arg(conn, rest, word)
       })
     social ->
       command(conn, social_command, social_args(conn, social, rest, word))
@@ -239,11 +247,32 @@ fn social_args(
 }
 
 fn tele_arg(s: String, word: Splitter) -> Result(Command(Id(Room)), String) {
-  let #(slice, _) = splitter.split_before(word, s)
-  case int.parse(slice) {
-    Ok(room_id) -> Ok(Command(Teleport, Id(room_id)))
+  case room_id(s, word) {
+    Ok(#(room_id, _)) -> Ok(Command(Teleport, room_id))
     Error(_) -> Error(verb_missing_arg_err(Teleport))
   }
+}
+
+fn tele_other_arg(
+  conn: Conn,
+  s: String,
+  word: Splitter,
+) -> Result(Command(TeleOtherArgs), String) {
+  use #(victim, rest) <- result.try(
+    victim(s, word)
+    |> result.replace_error(verb_missing_arg_err(Teleport)),
+  )
+  let victim = case is_auto(conn, victim) {
+    True -> Self
+    False -> Victim(victim)
+  }
+  use #(room_id, _) <- try(
+    room_id(rest, word)
+    |> result.replace_error("Where do you want to teleport this person to?"),
+  )
+  TeleOther(room_id:, victim:)
+  |> Command(Teleport, _)
+  |> Ok
 }
 
 fn victim_arg(
@@ -353,6 +382,12 @@ fn adverb(s: String, word: Splitter) -> Result(#(String, String), Nil) {
     ">" <> adverb -> Ok(#(adverb, rest))
     _ -> Error(Nil)
   }
+}
+
+fn room_id(s: String, word: Splitter) -> Result(#(Id(Room), String), Nil) {
+  let #(slice, _, rest) = splitter.split(word, s)
+  use parsed <- result.try(int.parse(slice))
+  Ok(#(Id(parsed), rest))
 }
 
 //
@@ -579,6 +614,26 @@ fn kick_command(conn: Conn, command: Command(Victim)) -> Conn {
 fn tele_command(conn: Conn, command: Command(Id(Room))) -> Conn {
   let room_id = command.data
   conn.event(conn, event.TeleportRequest(room_id))
+}
+
+fn tele_other_command(conn: Conn, command: Command(TeleOtherArgs)) -> Conn {
+  let TeleOther(room_id:, victim:) = command.data
+  let system_tables.Lookup(user:, character:, ..) = conn.system_tables(conn)
+  case victim {
+    Self -> tele_command(conn, Command(Teleport, room_id))
+    Victim(victim) -> {
+      let result = {
+        use users.User(id:, ..) <- try(users.lookup(user, victim))
+        character_registry.whereis(character, id)
+      }
+
+      case result {
+        Ok(subject) ->
+          conn.character_event(conn, event.Teleport(room_id:), subject)
+        Error(_) -> conn
+      }
+    }
+  }
 }
 
 fn unknown_command(conn: Conn) -> Conn {

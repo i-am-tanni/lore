@@ -71,6 +71,8 @@ pub fn route_player(
         |> view.Leaves,
       )
       |> conn.terminate()
+
+    event.Teleport(room_id:) -> conn.event(conn, event.TeleportRequest(room_id))
   }
 }
 
