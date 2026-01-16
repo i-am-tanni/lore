@@ -2,6 +2,7 @@ import gleam/bit_array
 import gleam/int
 import gleam/list
 import gleam/option.{type Option}
+import lore/character/flag
 import lore/character/pronoun
 
 pub type RoomTemplate
@@ -104,6 +105,7 @@ pub type Mobile {
     pronouns: pronoun.PronounChoice,
     short: String,
     fighting: Fighting,
+    affects: flag.Affects,
     hp: Int,
     hp_max: Int,
   )
@@ -112,6 +114,10 @@ pub type Mobile {
 pub type Role {
   Admin
   User
+}
+
+pub type Affects {
+  Affects(flags: flag.Affects)
 }
 
 /// Private internal mobile data.
@@ -130,6 +136,7 @@ pub type MobileInternal {
     pronouns: pronoun.PronounChoice,
     short: String,
     fighting: Fighting,
+    affects: Affects,
     hp: Int,
     hp_max: Int,
   )
@@ -279,6 +286,8 @@ pub fn trim_character(character: MobileInternal) -> Mobile {
     ..,
   ) = character
 
+  let Affects(flags: affects) = character.affects
+
   Mobile(
     id:,
     room_id:,
@@ -288,6 +297,7 @@ pub fn trim_character(character: MobileInternal) -> Mobile {
     pronouns:,
     short:,
     fighting:,
+    affects:,
     hp:,
     hp_max:,
   )
@@ -305,4 +315,8 @@ pub fn item_id(instance: ItemInstance) -> Id(Item) {
     Loading(item_id) -> item_id
     Loaded(Item(id:, ..)) -> id
   }
+}
+
+pub fn affects_init() -> Affects {
+  Affects(flags: flag.Affects(0))
 }

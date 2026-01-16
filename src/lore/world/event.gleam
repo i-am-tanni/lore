@@ -195,6 +195,7 @@ pub type CharacterToRoomEvent {
   RoomCommunication(RoomCommunicationData)
   CombatRequest(CombatRequestData)
   Slay(SearchTerm(Mobile))
+  UpdateCharacter
 }
 
 /// The zone polls the desination room whether it accepts or rejects the move.

@@ -79,3 +79,12 @@ pub fn drop(
 pub fn inspect(item: world.Item) -> View {
   [item.name, "\n  ", item.long] |> view.Leaves
 }
+
+pub fn spawn_item(item: world.Item) -> View {
+  [
+    "You weave stray threads of light together, manifesting ",
+    item.name,
+    " from the ether.",
+  ]
+  |> view.Leaves
+}

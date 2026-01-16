@@ -11,6 +11,7 @@ import lore/character/act
 import lore/character/character_registry
 import lore/character/conn.{type Conn}
 import lore/character/events
+import lore/character/flag
 import lore/character/socials
 import lore/character/users
 import lore/character/view
@@ -19,8 +20,9 @@ import lore/character/view/combat_view
 import lore/character/view/communication_view
 import lore/character/view/error_view
 import lore/character/view/item_view
-import lore/world.{type Id, type Room, Id, StringId}
+import lore/world.{type Id, type Item, type Room, Id, StringId}
 import lore/world/event
+import lore/world/items
 import lore/world/room/presence
 import lore/world/system_tables
 import splitter.{type Splitter}
@@ -42,10 +44,13 @@ type Verb {
   Kill
   Inventory
   Social
+  // Admin Commands
   Kick
   Slay
   Smite
   Teleport
+  ItemSpawn
+  SuperInvisible
 }
 
 type Victim {
@@ -122,6 +127,16 @@ pub fn parse(conn: Conn, input: String) -> Conn {
       admin_command(conn, role(conn), smite_command, fn() {
         victim_arg(conn, Smite, rest, word)
       })
+    "@spawn_item" ->
+      admin_command(conn, role(conn), item_spawn_command, fn() {
+        item_id(rest, word)
+        |> result.map(fn(item_id) { Command(ItemSpawn, item_id) })
+      })
+    "@invis" ->
+      admin_command(conn, role(conn), invis_command, fn() {
+        Ok(Command(SuperInvisible, Nil))
+      })
+
     social ->
       command(conn, social_command, social_args(conn, social, rest, word))
   }
@@ -400,6 +415,15 @@ fn adverb(s: String, word: Splitter) -> Result(#(String, String), Nil) {
   }
 }
 
+fn item_id(s: String, word: Splitter) -> Result(Id(Item), String) {
+  let #(slice, _, _rest) = splitter.split(word, s)
+  use <- bool.guard(slice == "", Error(verb_missing_arg_err(ItemSpawn)))
+  case int.parse(slice) {
+    Ok(parsed) -> Ok(Id(parsed))
+    Error(_) -> Error("Invalid item id.")
+  }
+}
+
 fn room_id(s: String, word: Splitter) -> Result(#(Id(Room), String), Nil) {
   let #(slice, _, rest) = splitter.split(word, s)
   use parsed <- result.try(int.parse(slice))
@@ -636,7 +660,9 @@ fn tele_command(conn: Conn, command: Command(Id(Room))) -> Conn {
 fn tele_to_command(conn: Conn, command: Command(Victim)) -> Conn {
   let system_tables.Lookup(user:, presence:, ..) = conn.system_tables(conn)
   case command.data {
-    Self -> conn.renderln(conn, view.Leaf("You're already there!"))
+    Self ->
+      conn |> conn.renderln(view.Leaf("You're already there!")) |> conn.prompt
+
     Victim(victim) -> {
       let result = {
         use users.User(id:, ..) <- try(users.lookup(user, victim))
@@ -718,6 +744,46 @@ fn smite_command(conn: Conn, command: Command(Victim)) -> Conn {
   }
 }
 
+fn item_spawn_command(conn: Conn, command: Command(Id(Item))) -> Conn {
+  let result = {
+    let item_id = command.data
+    let system_tables.Lookup(items:, ..) = conn.system_tables(conn)
+    use item_instance <- try(items.instance(items, item_id))
+    use loaded <- try(items.load(items, item_id))
+    let character = conn.character_get(conn)
+    let inventory = [item_instance, ..character.inventory]
+    world.MobileInternal(..character, inventory:)
+    |> conn.character_put(conn, _)
+    |> conn.renderln(item_view.spawn_item(loaded))
+    |> conn.prompt
+    |> Ok
+  }
+
+  case result {
+    Ok(update) -> update
+
+    Error(_) ->
+      conn |> conn.renderln("Invalid item id." |> view.Leaf) |> conn.prompt
+  }
+}
+
+fn invis_command(conn: Conn, _: Command(_)) -> Conn {
+  let self = conn.character_get(conn)
+  let affects = self.affects
+  let flags = flag.affect_toggle(affects.flags, flag.SuperInvisible)
+  let msg = case flag.affect_has(flags, flag.SuperInvisible) {
+    True -> "You cloak yourself in night. You are now invisible!"
+    False ->
+      "You remove your nighted cloak and walk in the light. You are visible!"
+  }
+
+  world.MobileInternal(..self, affects: world.Affects(flags:))
+  |> conn.character_put(conn, _)
+  |> conn.renderln(view.Leaf(msg))
+  |> conn.prompt
+  |> conn.event(event.UpdateCharacter)
+}
+
 fn unknown_command(conn: Conn) -> Conn {
   conn
   |> conn.renderln(view.Leaf("Huh?"))
@@ -745,7 +811,7 @@ fn role(conn: Conn) -> world.Role {
 
 fn verb_missing_arg_err(verb: Verb) -> String {
   case verb {
-    Say -> "What do you want to look at?"
+    Say -> "What do you want to say?"
     Whisper -> "Who do you want to whisper to?"
     Emote -> "What do you want to emote?"
     Open -> "What do you want to open?"
@@ -759,7 +825,10 @@ fn verb_missing_arg_err(verb: Verb) -> String {
     Slay -> "Who do you want to slay?"
     Smite -> "Who do you want to smite from afar?"
     Look -> "What do you want to look at?"
+    ItemSpawn -> "What item do you want to spawn?"
+    // verbs without args
     Inventory -> ""
     Social -> ""
+    SuperInvisible -> ""
   }
 }

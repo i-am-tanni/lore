@@ -197,6 +197,7 @@ fn to_mobile(
     short: row.short,
     inventory: [],
     fighting: world.NoTarget,
+    affects: world.affects_init(),
     hp: hp_max,
     hp_max:,
   )

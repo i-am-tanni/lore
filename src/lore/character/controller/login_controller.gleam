@@ -218,7 +218,7 @@ fn password(conn: Conn, flash: LoginFlash, input: String) -> Conn {
 fn login(conn: Conn, flash: LoginFlash) -> Conn {
   let name = flash.name
   let world.MobileInternal(id:, ..) = conn.character_get(conn)
-  echo id
+
   let update =
     world.MobileInternal(
       id:,
@@ -231,6 +231,7 @@ fn login(conn: Conn, flash: LoginFlash) -> Conn {
       short: name <> " is standing here.",
       inventory: [],
       fighting: world.NoTarget,
+      affects: world.affects_init(),
       hp: 20,
       hp_max: 20,
     )

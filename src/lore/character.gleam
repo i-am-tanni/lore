@@ -105,6 +105,7 @@ fn init_reception(
       pronouns: pronoun.Feminine,
       inventory: [],
       fighting: world.NoTarget,
+      affects: world.affects_init(),
       hp: 20,
       hp_max: 20,
     )

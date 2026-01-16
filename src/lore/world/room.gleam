@@ -158,6 +158,8 @@ fn route_from_character(
     event.ItemDrop(data) -> item_event.drop(builder, event, data)
     event.CombatRequest(data) -> combat_event.request(builder, event, data)
     event.Slay(data) -> combat_event.slay(builder, event, data)
+    event.UpdateCharacter ->
+      response.character_update(builder, event.acting_character)
   }
 
   builder

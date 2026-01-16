@@ -1,6 +1,7 @@
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/string_tree.{type StringTree}
+import lore/character/flag
 import lore/character/view.{type View}
 import lore/world.{type Room}
 
@@ -38,7 +39,10 @@ pub fn room(room: Room, observer: world.Mobile) -> View {
   let mobiles =
     room.characters
     // filter out observer
-    |> list.filter(fn(character) { observer_id != character.id })
+    |> list.filter(fn(character) {
+      observer_id != character.id
+      && !flag.affect_has(character.affects, flag.SuperInvisible)
+    })
     |> list.map(fn(character) {
       [character.short, "\n"]
       |> string_tree.from_strings
