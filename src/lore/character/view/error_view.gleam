@@ -36,6 +36,8 @@ pub fn room_request_error(error: world.ErrorRoomRequest) -> View {
       ["Unable to find '", keyword, "'."] |> view.Leaves
 
     world.PvpForbidden -> "You cannot attack other players." |> view.Leaf
+
+    world.GodMode -> "You are forbidden to attack an immortal" |> view.Leaf
   }
 }
 

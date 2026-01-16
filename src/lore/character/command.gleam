@@ -51,6 +51,7 @@ type Verb {
   Teleport
   ItemSpawn
   SuperInvisible
+  GodMode
 }
 
 type Victim {
@@ -135,6 +136,10 @@ pub fn parse(conn: Conn, input: String) -> Conn {
     "@invis" ->
       admin_command(conn, role(conn), invis_command, fn() {
         Ok(Command(SuperInvisible, Nil))
+      })
+    "@god_mode" ->
+      admin_command(conn, role(conn), god_mode_command, fn() {
+        Ok(Command(GodMode, Nil))
       })
 
     social ->
@@ -784,6 +789,24 @@ fn invis_command(conn: Conn, _: Command(_)) -> Conn {
   |> conn.event(event.UpdateCharacter)
 }
 
+fn god_mode_command(conn: Conn, _: Command(_)) -> Conn {
+  let self = conn.character_get(conn)
+  let affects = self.affects
+  let flags = flag.affect_toggle(affects.flags, flag.GodMode)
+  let msg = case flag.affect_has(flags, flag.GodMode) {
+    True ->
+      "Your flesh no longer knows pain or death. You have activated god mode!"
+    False ->
+      "You make yourself vulnerable to the biting sting of mortality. You have deactivated god mode!"
+  }
+
+  world.MobileInternal(..self, affects: world.Affects(flags:))
+  |> conn.character_put(conn, _)
+  |> conn.renderln(view.Leaf(msg))
+  |> conn.prompt
+  |> conn.event(event.UpdateCharacter)
+}
+
 fn unknown_command(conn: Conn) -> Conn {
   conn
   |> conn.renderln(view.Leaf("Huh?"))
@@ -830,5 +853,6 @@ fn verb_missing_arg_err(verb: Verb) -> String {
     Inventory -> ""
     Social -> ""
     SuperInvisible -> ""
+    GodMode -> ""
   }
 }

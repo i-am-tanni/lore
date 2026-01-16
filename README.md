@@ -1,7 +1,6 @@
 # Lore
 
-This is a multi-user dungeon (MUD - aka a text based MMO) server written in
-Gleam. It's still early stages and a work in process.
+This is an experimental multi-user dungeon (MUD - aka a text based MMO) server written in Gleam. It's still early stages and a work in process.
 
 The architecture takes inspiration from [Kalevala](https://github.com/oestrich/kalevala) written in Elixir by Eric Oestrich. Thanks Eric!
 

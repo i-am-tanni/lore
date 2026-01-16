@@ -4,6 +4,7 @@ import gleam/list
 import gleam/option.{None, Some}
 import gleam/result.{try}
 import gleam/set
+import lore/character/flag
 import lore/world.{type Mobile, type StringId, NoTarget, Player}
 import lore/world/event.{
   type CharacterMessage, type CharacterToRoomEvent, type Event,
@@ -27,7 +28,10 @@ pub fn request(
 
   let result = {
     use victim <- try(find_local_character(builder, data.victim))
-
+    use <- bool.guard(
+      flag.affect_has(victim.affects, flag.GodMode),
+      Error(world.GodMode),
+    )
     use <- bool.guard(is_pvp(attacker, victim), Error(world.PvpForbidden))
     event.CombatPollData(
       attacker_id: event.acting_character.id,
@@ -186,6 +190,7 @@ fn round_process_action(
     use attacker <- try(dict.get(participants, attacker_id))
     use victim <- try(dict.get(participants, victim_id))
     use <- bool.guard(attacker.hp <= 0, Error(Nil))
+    use <- bool.guard(flag.affect_has(victim.affects, flag.GodMode), Error(Nil))
     let victim = case victim.hp - dam_roll {
       hp if hp > 0 -> world.Mobile(..victim, hp:)
       hp -> world.Mobile(..victim, hp:, fighting: NoTarget)
@@ -231,6 +236,10 @@ pub fn slay(
 ) -> response.Builder(CharacterMessage) {
   let result = {
     use victim <- try(find_local_character(builder, victim))
+    use <- bool.guard(
+      flag.affect_has(victim.affects, flag.GodMode),
+      Error(world.GodMode),
+    )
     let damage = victim.hp_max * 6
     let victim = world.Mobile(..victim, hp: victim.hp - damage)
     let attacker = event.acting_character
