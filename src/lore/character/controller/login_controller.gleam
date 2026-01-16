@@ -218,7 +218,7 @@ fn password(conn: Conn, flash: LoginFlash, input: String) -> Conn {
 fn login(conn: Conn, flash: LoginFlash) -> Conn {
   let name = flash.name
   let world.MobileInternal(id:, ..) = conn.character_get(conn)
-
+  echo id
   let update =
     world.MobileInternal(
       id:,

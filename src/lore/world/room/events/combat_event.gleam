@@ -4,7 +4,7 @@ import gleam/list
 import gleam/option.{None, Some}
 import gleam/result.{try}
 import gleam/set
-import lore/world.{type Mobile, type StringId, Fighting, NoTarget, Player}
+import lore/world.{type Mobile, type StringId, NoTarget, Player}
 import lore/world/event.{
   type CharacterMessage, type CharacterToRoomEvent, type Event,
 }
@@ -122,14 +122,6 @@ pub fn process_combat(
     ))
     use victim <- try(find_local_character(builder, event.SearchId(victim_id)))
 
-    let builder = case attacker.fighting == NoTarget {
-      True ->
-        world.Mobile(..attacker, fighting: Fighting(victim.id))
-        |> response.character_update(builder, _)
-
-      False -> builder
-    }
-
     let #(victim, is_victim_alive) = case victim.hp - dam_roll {
       hp if hp > 0 && victim.fighting == world.NoTarget -> #(
         world.Mobile(..victim, hp:, fighting: world.Fighting(attacker.id)),
@@ -168,7 +160,7 @@ pub fn process_combat(
       |> response.broadcast(builder, attacker, _)
       |> response.character_update(victim)
 
-    case victim.hp > 0 && !response.is_in_combat(builder) {
+    case is_victim_alive && !response.is_in_combat(builder) {
       True -> response.combat_commence(builder, attacker)
       False -> builder
     }
@@ -235,12 +227,14 @@ fn round_process_action(
 pub fn slay(
   builder: response.Builder(CharacterMessage),
   event: Event(CharacterToRoomEvent, CharacterMessage),
-  victim: String,
+  victim: event.SearchTerm(Mobile),
 ) -> response.Builder(CharacterMessage) {
   let result = {
-    use victim <- try(find_local_character(builder, event.Keyword(victim)))
+    use victim <- try(find_local_character(builder, victim))
+    let damage = victim.hp_max * 6
+    let victim = world.Mobile(..victim, hp: victim.hp - damage)
     let attacker = event.acting_character
-    event.CombatCommitData(victim:, attacker:, damage: victim.hp)
+    event.CombatCommitData(victim:, attacker:, damage:)
     |> event.CombatCommit
     |> response.broadcast(builder, attacker, _)
     |> response.character_update(victim)

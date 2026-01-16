@@ -375,8 +375,8 @@ fn push_events(
       conn.ToRoom(event:) ->
         process.send(current_room_subject, event.CharacterToRoom(event))
 
-      conn.ToRoomId(event:, id:) -> {
-        case room_registry.whereis(table_name, id) {
+      conn.ToRoomId(event:, room_id:) -> {
+        case room_registry.whereis(table_name, room_id) {
           Ok(room_subject) ->
             process.send(room_subject, event.CharacterToRoom(event))
           Error(Nil) -> Nil

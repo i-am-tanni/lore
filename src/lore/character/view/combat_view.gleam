@@ -82,6 +82,11 @@ pub fn round_summary(
   view.join([prelude, ..rest], "\n")
 }
 
+pub fn smite_1p(name: String) -> View {
+  ["You hurl a thunderbolt in ", name, "'s direction."]
+  |> view.Leaves
+}
+
 fn damage_notify(perspective: Perspective, data: event.CombatCommitData) -> View {
   let event.CombatCommitData(victim:, attacker:, damage:) = data
   let victim_hp_max = victim.hp_max

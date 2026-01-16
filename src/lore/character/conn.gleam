@@ -68,7 +68,10 @@ pub type CharacterInit {
 ///
 pub type EventToSend {
   ToRoom(event: Event(CharacterToRoomEvent, CharacterMessage))
-  ToRoomId(event: Event(CharacterToRoomEvent, CharacterMessage), id: Id(Room))
+  ToRoomId(
+    event: Event(CharacterToRoomEvent, CharacterMessage),
+    room_id: Id(Room),
+  )
   ToCharacter(
     event: event.CharacterEvent,
     to: Subject(CharacterMessage),
@@ -263,6 +266,17 @@ pub fn character_event(
   let acting_character = world.trim_character(character_get(conn))
   let event = ToCharacter(event:, to:, acting_character:)
   Conn(..conn, events: [event, ..conn.events])
+}
+
+pub fn event_to_room(
+  conn: Conn,
+  room_id: Id(Room),
+  event: event.CharacterToRoomEvent,
+) -> Conn {
+  let acting_character = world.trim_character(character_get(conn))
+  let event = event.new(from: conn.self, acting_character:, data: event)
+
+  Conn(..conn, events: [ToRoomId(event:, room_id:), ..conn.events])
 }
 
 /// If more than one action is required, it is recommended to use `conn.actions`

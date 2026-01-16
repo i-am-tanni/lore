@@ -15,10 +15,11 @@ import lore/character/socials
 import lore/character/users
 import lore/character/view
 import lore/character/view/character_view
+import lore/character/view/combat_view
 import lore/character/view/communication_view
 import lore/character/view/error_view
 import lore/character/view/item_view
-import lore/world.{type Id, type Room, Id}
+import lore/world.{type Id, type Room, Id, StringId}
 import lore/world/event
 import lore/world/room/presence
 import lore/world/system_tables
@@ -43,6 +44,7 @@ type Verb {
   Social
   Kick
   Slay
+  Smite
   Teleport
 }
 
@@ -115,6 +117,10 @@ pub fn parse(conn: Conn, input: String) -> Conn {
     "@slay" ->
       admin_command(conn, role(conn), slay_command, fn() {
         victim_arg(conn, Slay, rest, word)
+      })
+    "@smite" ->
+      admin_command(conn, role(conn), smite_command, fn() {
+        victim_arg(conn, Smite, rest, word)
       })
     social ->
       command(conn, social_command, social_args(conn, social, rest, word))
@@ -543,7 +549,8 @@ fn is_auto(conn: Conn, search_term: String) -> Bool {
   case search_term {
     "self" -> True
     search_term ->
-      list.any(self.keywords, fn(keyword) { search_term == keyword })
+      self.id == StringId(string.uppercase(search_term))
+      || list.any(self.keywords, fn(keyword) { search_term == keyword })
   }
 }
 
@@ -640,7 +647,7 @@ fn tele_to_command(conn: Conn, command: Command(Victim)) -> Conn {
 
       let result = {
         use _ <- result.try_recover(result)
-        let victim_id = world.StringId(string.uppercase(victim))
+        let victim_id = StringId(string.uppercase(victim))
         use room_id <- try(presence.lookup(presence, victim_id))
         conn.event(conn, event.TeleportRequest(room_id))
         |> Ok
@@ -676,8 +683,38 @@ fn tele_other_command(conn: Conn, command: Command(TeleOtherArgs)) -> Conn {
 
 fn slay_command(conn: Conn, command: Command(Victim)) -> Conn {
   case command.data {
-    Victim(victim) -> conn.event(conn, event.Slay(victim))
-    Self -> conn.renderln(conn, view.Leaf("That would be unwise."))
+    Victim(victim) -> conn.event(conn, event.Slay(event.Keyword(victim)))
+    Self ->
+      conn
+      |> conn.renderln(view.Leaf("That would be unwise."))
+      |> conn.prompt
+  }
+}
+
+fn smite_command(conn: Conn, command: Command(Victim)) -> Conn {
+  case command.data {
+    Victim(victim) -> {
+      let result = {
+        let system_tables.Lookup(presence:, ..) = conn.system_tables(conn)
+        let victim_id = StringId(string.uppercase(victim))
+        use room_id <- try(presence.lookup(presence, victim_id))
+        conn.event_to_room(conn, room_id, event.Slay(event.SearchId(victim_id)))
+        |> conn.renderln(combat_view.smite_1p(victim))
+        |> conn.prompt
+        |> Ok
+      }
+
+      case result {
+        Ok(conn) -> conn
+        Error(_) ->
+          conn
+          |> conn.renderln(["Unable to find id '", victim, "'"] |> view.Leaves)
+          |> conn.prompt
+      }
+    }
+
+    Self ->
+      conn |> conn.renderln(view.Leaf("That would be unwise.")) |> conn.prompt
   }
 }
 
@@ -720,6 +757,7 @@ fn verb_missing_arg_err(verb: Verb) -> String {
     Kick -> "Who do you want to kick?"
     Teleport -> "Where do you want to teleport?"
     Slay -> "Who do you want to slay?"
+    Smite -> "Who do you want to smite from afar?"
     Look -> "What do you want to look at?"
     Inventory -> ""
     Social -> ""
