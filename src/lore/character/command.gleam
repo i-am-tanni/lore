@@ -131,14 +131,14 @@ pub fn parse(conn: Conn, input: String) -> Conn {
       admin_command(conn, role(conn), smite_command, fn() {
         victim_arg(conn, Smite, rest, word)
       })
-    "@spawn_item" ->
+    "@item" ->
       admin_command(conn, role(conn), item_spawn_command, fn() {
         case id(rest, word) {
           Ok(#(item_id, _)) -> Ok(Command(ItemSpawn, item_id))
           Error(_) -> Error(verb_missing_arg_err(ItemSpawn))
         }
       })
-    "@spawn_mobile" ->
+    "@mob" ->
       admin_command(conn, role(conn), mobile_spawn_command, fn() {
         case id(rest, word) {
           Ok(#(mobile_id, _)) -> Ok(Command(MobileSpawn, mobile_id))
@@ -149,7 +149,7 @@ pub fn parse(conn: Conn, input: String) -> Conn {
       admin_command(conn, role(conn), invis_command, fn() {
         Ok(Command(SuperInvisible, Nil))
       })
-    "@god_mode" ->
+    "@god" ->
       admin_command(conn, role(conn), god_mode_command, fn() {
         Ok(Command(GodMode, Nil))
       })
