@@ -78,7 +78,6 @@ pub fn round_trigger(
     })
     |> dict.from_list()
 
-  echo actions as "ACTIONS"
   // update participants and generate commits to broadcast
   let CombatRoundTemp(participants:, commits:, continue:) =
     CombatRoundTemp(participants:, commits: [], continue: False)
@@ -219,6 +218,7 @@ fn round_process_action(
       event.CombatPollData(attacker_id:, victim_id:, dam_roll: dam_roll)
       |> list.prepend(commits, _)
 
+    // Continue only if any victims have hp > 0
     let continue = continue || victim.hp > 0
 
     Ok(CombatRoundTemp(participants:, commits:, continue:))

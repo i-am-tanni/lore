@@ -256,7 +256,6 @@ fn handle_response(state: State, response: Response(c)) -> State {
   }
 
   let Response(is_in_combat:, combat_queue:, ..) = response
-  let is_in_combat = combat_queue != [] || is_in_combat
 
   let combat_timer = case state.combat_timer {
     Cancelled if is_in_combat ->
