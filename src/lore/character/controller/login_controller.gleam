@@ -274,7 +274,7 @@ fn parse(
   }
 }
 
-// Add a penalty to the connection with control flow
+// Add a penalty to the connection with control flow for misbehavior
 // This is a substitute for a bool.lazy_guard()
 //
 fn penalize(
