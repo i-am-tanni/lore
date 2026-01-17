@@ -7,6 +7,7 @@ import gleam/list
 import gleam/result.{try}
 import lore/character/act
 import lore/character/conn.{type Conn}
+import lore/character/flag
 import lore/character/view
 import lore/character/view/character_view
 import lore/character/view/combat_view
@@ -239,8 +240,10 @@ fn combat_commit(conn: Conn, data: event.CombatCommitData) -> Conn {
   let event.CombatCommitData(attacker:, victim:, ..) = data
   let victim_id = victim.id
   let is_victim_dead = victim.hp <= 0
+  let has_auto_revive = flag.affect_has(self.affects.flags, flag.AutoRevive)
   let conn = case self.id {
-    self_id if self_id == victim_id && is_victim_dead -> conn.terminate(conn)
+    self_id if self_id == victim_id && is_victim_dead && !has_auto_revive ->
+      conn.terminate(conn)
 
     self_id if self_id == victim_id ->
       sync_mobile(victim, self)
@@ -279,13 +282,14 @@ fn combat_commit_round(
       |> result.map(sync_mobile(_, self)),
     )
 
+    let has_auto_revive = flag.affect_has(self.affects.flags, flag.AutoRevive)
     let conn =
       conn
       |> conn.character_put(self)
       |> conn.renderln(combat_view.round_report(self, participants, commits))
 
     case self.fighting {
-      _ if self.hp <= 0 -> conn.terminate(conn)
+      _ if self.hp <= 0 && !has_auto_revive -> conn.terminate(conn)
 
       world.Fighting(victim_id) ->
         conn
@@ -299,7 +303,7 @@ fn combat_commit_round(
   }
 
   case result {
-    Ok(conn) -> conn
+    Ok(update) -> update
     _ -> conn
   }
 }
@@ -318,6 +322,12 @@ fn sync_mobile(
   update: world.Mobile,
   self: world.MobileInternal,
 ) -> world.MobileInternal {
-  let world.Mobile(hp:, fighting:, ..) = update
-  world.MobileInternal(..self, hp:, fighting:)
+  case update.hp <= 0 && flag.affect_has(self.affects.flags, flag.AutoRevive) {
+    True -> world.MobileInternal(..self, hp: self.hp_max)
+
+    _ -> {
+      let world.Mobile(hp:, fighting:, ..) = update
+      world.MobileInternal(..self, hp:, fighting:)
+    }
+  }
 }

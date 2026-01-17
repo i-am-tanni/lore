@@ -78,6 +78,7 @@ pub fn round_trigger(
     })
     |> dict.from_list()
 
+  echo actions as "ACTIONS"
   // update participants and generate commits to broadcast
   let CombatRoundTemp(participants:, commits:, continue:) =
     CombatRoundTemp(participants:, commits: [], continue: False)

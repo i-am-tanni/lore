@@ -453,10 +453,3 @@ pub fn round_push(
 ) -> Builder(a) {
   Builder(..builder, combat_queue: [combat_data, ..builder.combat_queue])
 }
-
-pub fn round_flush(
-  builder: Builder(a),
-) -> #(List(event.CombatPollData), Builder(a)) {
-  let combat_queue = builder.combat_queue
-  #(combat_queue, Builder(..builder, combat_queue: []))
-}

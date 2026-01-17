@@ -3,12 +3,10 @@
 
 import gleam/int
 
-pub type Bitfield =
-  Int
-
 pub type AffectFlag {
   SuperInvisible
   GodMode
+  AutoRevive
 }
 
 pub type Affects {
@@ -53,7 +51,8 @@ fn has(flags: Int, flag: Int) -> Bool {
 
 fn affect_to_int(flag: AffectFlag) -> Int {
   case flag {
-    SuperInvisible -> 0b0001
-    GodMode -> 0b0010
+    SuperInvisible -> int.bitwise_shift_left(1, 0)
+    GodMode -> int.bitwise_shift_left(1, 1)
+    AutoRevive -> int.bitwise_shift_left(1, 2)
   }
 }

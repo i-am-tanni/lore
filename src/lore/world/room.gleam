@@ -10,6 +10,7 @@ import gleam/list
 import gleam/option.{None, Some}
 import gleam/otp/actor
 import gleam/result
+import gleam/time/duration
 import gleam/time/timestamp
 import lore/character/character_registry
 import lore/server/my_list
@@ -31,7 +32,7 @@ import lore/world/zone/zone_registry
 const combat_round_len_in_ms = 3000
 
 type Timer {
-  Timer(process.Timer)
+  Timer(timer: process.Timer, fire_at: timestamp.Timestamp)
   Cancelled
 }
 
@@ -125,11 +126,12 @@ fn recv(state: State, msg: RoomMessage) -> actor.Next(State, RoomMessage) {
 
     event.RoomToRoom(..) -> state
     event.CombatRoundTrigger -> {
-      let state = State(..state, combat_timer: Cancelled)
-      let builder = to_builder_room_msg(state)
+      let round_actions = state.combat_queue
+      let state = State(..state, combat_timer: Cancelled, combat_queue: [])
 
-      let #(round_actions, builder) = response.round_flush(builder)
-      combat_event.round_trigger(builder, round_actions)
+      state
+      |> to_builder_room_msg
+      |> combat_event.round_trigger(round_actions)
       |> response.build
       |> handle_response(state, _)
     }
@@ -253,24 +255,21 @@ fn handle_response(state: State, response: Response(c)) -> State {
     None -> room.exits
   }
 
-  let combat_timer = {
-    let is_in_combat = response.is_in_combat
-
-    case state.combat_timer {
-      Cancelled if is_in_combat ->
-        schedule_combat_round(state.self, combat_round_len_in_ms)
-
-      Timer(timer) if !is_in_combat -> {
-        process.cancel_timer(timer)
-        Cancelled
-      }
-
-      Timer(_) as timer -> timer
-
-      Cancelled -> Cancelled
-    }
-  }
   let Response(is_in_combat:, combat_queue:, ..) = response
+  let is_in_combat = combat_queue != [] || is_in_combat
+
+  let combat_timer = case state.combat_timer {
+    Cancelled if is_in_combat ->
+      schedule_combat_round(state.self, combat_round_len_in_ms)
+
+    Timer(timer:, ..) if !is_in_combat -> {
+      process.cancel_timer(timer)
+      Cancelled
+    }
+
+    no_change -> no_change
+  }
+
   let room = world.Room(..room, characters:, items:, exits:)
   State(..state, room:, combat_timer:, combat_queue:, is_in_combat:)
 }
@@ -383,17 +382,21 @@ fn schedule_combat_round(
   self: process.Subject(RoomMessage),
   combat_round_len_in_ms: Int,
 ) -> Timer {
+  let now = timestamp.system_time()
   let delay =
-    timestamp.system_time()
+    now
     |> timestamp.to_unix_seconds
+    // convert to ms
     |> float.multiply(1000.0)
     |> float.truncate
     |> int.modulo(combat_round_len_in_ms)
     |> result.unwrap(0)
     |> int.subtract(combat_round_len_in_ms, _)
 
-  process.send_after(self, delay, event.CombatRoundTrigger)
-  |> Timer
+  Timer(
+    timer: process.send_after(self, delay, event.CombatRoundTrigger),
+    fire_at: timestamp.add(now, duration.milliseconds(delay)),
+  )
 }
 
 fn item_exists(

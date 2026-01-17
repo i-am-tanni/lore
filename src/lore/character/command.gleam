@@ -54,6 +54,7 @@ type Verb {
   MobileSpawn
   SuperInvisible
   GodMode
+  AutoRevive
 }
 
 type Victim {
@@ -151,6 +152,10 @@ pub fn parse(conn: Conn, input: String) -> Conn {
     "@god_mode" ->
       admin_command(conn, role(conn), god_mode_command, fn() {
         Ok(Command(GodMode, Nil))
+      })
+    "@autorevive" ->
+      admin_command(conn, role(conn), auto_revive_command, fn() {
+        Ok(Command(AutoRevive, Nil))
       })
 
     social ->
@@ -808,9 +813,9 @@ fn god_mode_command(conn: Conn, _: Command(_)) -> Conn {
   let flags = flag.affect_toggle(affects.flags, flag.GodMode)
   let msg = case flag.affect_has(flags, flag.GodMode) {
     True ->
-      "Your flesh no longer knows pain or death. You have activated god mode!"
+      "Your flesh no longer knows the sting of steel. You have activated god mode!"
     False ->
-      "You make yourself vulnerable to the biting sting of mortality. You have deactivated god mode!"
+      "You make yourself vulnerable to the string of steel. You have deactivated god mode!"
   }
 
   world.MobileInternal(..self, affects: world.Affects(flags:))
@@ -818,6 +823,22 @@ fn god_mode_command(conn: Conn, _: Command(_)) -> Conn {
   |> conn.renderln(view.Leaf(msg))
   |> conn.prompt
   |> conn.event(event.UpdateCharacter)
+}
+
+fn auto_revive_command(conn: Conn, _: Command(_)) -> Conn {
+  let self = conn.character_get(conn)
+  let affects = self.affects
+  let flags = flag.affect_toggle(affects.flags, flag.AutoRevive)
+  let msg = case flag.affect_has(flags, flag.AutoRevive) {
+    True -> "Your flesh no longer knows death. You have activated auto-revive!"
+    False ->
+      "You make yourself vulnerable to death's embrace. You have deactivated auto-revive!"
+  }
+
+  world.MobileInternal(..self, affects: world.Affects(flags:))
+  |> conn.character_put(conn, _)
+  |> conn.renderln(view.Leaf(msg))
+  |> conn.prompt
 }
 
 fn unknown_command(conn: Conn) -> Conn {
@@ -868,5 +889,6 @@ fn verb_missing_arg_err(verb: Verb) -> String {
     Social -> ""
     SuperInvisible -> ""
     GodMode -> ""
+    AutoRevive -> ""
   }
 }
