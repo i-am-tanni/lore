@@ -25,6 +25,7 @@ import lore/world/event
 import lore/world/items
 import lore/world/room/presence
 import lore/world/system_tables
+import lore/world/zone/spawner
 import splitter.{type Splitter}
 
 type Command(data) {
@@ -50,6 +51,7 @@ type Verb {
   Smite
   Teleport
   ItemSpawn
+  MobileSpawn
   SuperInvisible
   GodMode
 }
@@ -130,8 +132,17 @@ pub fn parse(conn: Conn, input: String) -> Conn {
       })
     "@spawn_item" ->
       admin_command(conn, role(conn), item_spawn_command, fn() {
-        item_id(rest, word)
-        |> result.map(fn(item_id) { Command(ItemSpawn, item_id) })
+        case id(rest, word) {
+          Ok(#(item_id, _)) -> Ok(Command(ItemSpawn, item_id))
+          Error(_) -> Error(verb_missing_arg_err(ItemSpawn))
+        }
+      })
+    "@spawn_mobile" ->
+      admin_command(conn, role(conn), mobile_spawn_command, fn() {
+        case id(rest, word) {
+          Ok(#(mobile_id, _)) -> Ok(Command(MobileSpawn, mobile_id))
+          Error(_) -> Error(verb_missing_arg_err(MobileSpawn))
+        }
       })
     "@invis" ->
       admin_command(conn, role(conn), invis_command, fn() {
@@ -283,7 +294,7 @@ fn social_args(
 }
 
 fn tele_arg(s: String, word: Splitter) -> Result(Command(Id(Room)), String) {
-  case room_id(s, word) {
+  case id(s, word) {
     Ok(#(room_id, _)) -> Ok(Command(Teleport, room_id))
     Error(_) -> Error(verb_missing_arg_err(Teleport))
   }
@@ -303,7 +314,7 @@ fn tele_other_arg(
     False -> Victim(victim)
   }
   use #(room_id, _) <- try(
-    room_id(rest, word)
+    id(rest, word)
     |> result.replace_error("Where do you want to teleport this person to?"),
   )
   TeleOther(room_id:, victim:)
@@ -420,16 +431,7 @@ fn adverb(s: String, word: Splitter) -> Result(#(String, String), Nil) {
   }
 }
 
-fn item_id(s: String, word: Splitter) -> Result(Id(Item), String) {
-  let #(slice, _, _rest) = splitter.split(word, s)
-  use <- bool.guard(slice == "", Error(verb_missing_arg_err(ItemSpawn)))
-  case int.parse(slice) {
-    Ok(parsed) -> Ok(Id(parsed))
-    Error(_) -> Error("Invalid item id.")
-  }
-}
-
-fn room_id(s: String, word: Splitter) -> Result(#(Id(Room), String), Nil) {
+fn id(s: String, word: Splitter) -> Result(#(Id(a), String), Nil) {
   let #(slice, _, rest) = splitter.split(word, s)
   use parsed <- result.try(int.parse(slice))
   Ok(#(Id(parsed), rest))
@@ -772,6 +774,17 @@ fn item_spawn_command(conn: Conn, command: Command(Id(Item))) -> Conn {
   }
 }
 
+fn mobile_spawn_command(conn: Conn, command: Command(Id(world.Npc))) -> Conn {
+  let lookup = conn.system_tables(conn)
+  let mobile_id = command.data
+  let self = conn.character_get(conn)
+  case spawner.spawn_mobile_ad_hoc(lookup, mobile_id, self.room_id) {
+    Ok(_) -> conn
+    Error(_) ->
+      conn |> conn.renderln("Spawn failed." |> view.Leaf) |> conn.prompt()
+  }
+}
+
 fn invis_command(conn: Conn, _: Command(_)) -> Conn {
   let self = conn.character_get(conn)
   let affects = self.affects
@@ -849,6 +862,7 @@ fn verb_missing_arg_err(verb: Verb) -> String {
     Smite -> "Who do you want to smite from afar?"
     Look -> "What do you want to look at?"
     ItemSpawn -> "What item do you want to spawn?"
+    MobileSpawn -> "What mobile do you want to spawn?"
     // verbs without args
     Inventory -> ""
     Social -> ""

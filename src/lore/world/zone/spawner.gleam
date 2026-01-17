@@ -24,7 +24,7 @@ import lore/world/sql
 import lore/world/system_tables
 import pog
 
-type SpawnError(a) {
+pub type SpawnError(a) {
   DatabaseError(pog.QueryError)
   NotStarted(actor.StartError)
   IdNotFound(Int)
@@ -48,6 +48,22 @@ pub fn reset_group(
       |> reset_mobs(system_tables)
       |> reset_items(system_tables)
   }
+}
+
+pub fn spawn_mobile_ad_hoc(
+  system_tables: system_tables.Lookup,
+  mobile_id: Id(Npc),
+  room_id: Id(Room),
+) -> Result(String, SpawnError(Mobile)) {
+  let db = pog.named_connection(system_tables.db)
+  let mob_factory = system_tables.mob_factory
+  let instance_id = generate_mob_instance_id(system_tables.character)
+  use mobile <- try(generate_mobile(db, mobile_id, instance_id, in: room_id))
+  use _ <- try(
+    mob_factory.start_child(mob_factory, mobile)
+    |> result.map_error(NotStarted),
+  )
+  Ok(mobile.name)
 }
 
 fn reset_items(
