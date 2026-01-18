@@ -6,12 +6,12 @@ import gleam/dict.{type Dict}
 import gleam/erlang/process
 import gleam/list
 import gleam/otp/actor
-import gleam/pair
 import gleam/result
 import gleam/set.{type Set}
 import gleam/string
 import gleam/string_tree.{type StringTree}
 import logging
+import lore/server/my_list
 import lore/world.{type Id, type Room, Id}
 import lore/world/sql
 import pog
@@ -72,7 +72,7 @@ const uncharted = [
 ]
 
 /// Generates a 5x5 map where `@` is the player's position
-/// 
+///
 pub fn render_mini_map(
   name: process.Name(Message),
   room_id: Id(Room),
@@ -180,7 +180,7 @@ fn mini_map(state: State, room_id: Id(Room)) -> List(StringTree) {
     })
     |> list.prepend(#(center_index, MapNode(..center, symbol: you_are_here)))
     |> dict.from_list()
-    // Orders vector symbols by index and inserts the default where there is 
+    // Orders vector symbols by index and inserts the default where there is
     // no symbol.
     //
     // index references:
@@ -206,10 +206,6 @@ fn mini_map(state: State, room_id: Id(Room)) -> List(StringTree) {
   |> list.map(string_tree.from_strings)
 }
 
-type DepthFirstSearch {
-  DepthFirstSearch(visiting: List(Id(Room)), visited: Set(Id(Room)))
-}
-
 // Depth first search neighbor ids.
 //
 fn neighbors(
@@ -218,46 +214,56 @@ fn neighbors(
   z_coord: Int,
   origin: Id(Room),
 ) -> List(MapNode) {
-  let init = DepthFirstSearch(visiting: [origin], visited: set.new())
-  // for each iteration (depth) up to the max depth
-  list.map_fold(list.range(0, max_depth), init, fn(acc, _) {
-    case acc {
-      DepthFirstSearch(visiting:, visited:) if visiting != [] -> {
-        // first, update visited so the current visiting members are visited
-        // only once.
-        let visited = set.union(set.from_list(visiting), visited)
+  neighbors_loop(max_depth, graph, nodes, z_coord, [origin], set.new(), [])
+}
 
-        // for each room, get list of neighbor ids and filter unvisited
-        // on this z-plane
-        let neighbors =
-          {
-            use room_id <- list.flat_map(visiting)
-            use neighbor_id <- list.filter_map(out_neighbors(graph, room_id))
-            use vertex <- result.try(dict.get(nodes, neighbor_id))
-            // reject if neighbor_id is on a different z-plane or already 
-            // visited.
-            use <- bool.guard(
-              vertex.z != z_coord || set.contains(visited, neighbor_id),
-              Error(Nil),
-            )
+// - depth: number of iterations remaining
+// - visiting: nodes are are visiting this iteration of the loop
+// - visited: tracks nodes already visited so they are not visited twice
+// Consts: graph, nodes, z_coord
+fn neighbors_loop(
+  depth: Int,
+  graph: Digraph,
+  nodes: Dict(Id(Room), MapNode),
+  z_coord: Int,
+  visiting_this_time: List(Id(Room)),
+  visited: Set(Id(Room)),
+  acc: List(List(MapNode)),
+) -> List(MapNode) {
+  // nodes we are visiting this iteration
+  case visiting_this_time == [] || depth <= 0 {
+    True -> list.flatten(acc)
+    False -> {
+      // first, update visited so the current visiting members are visited
+      // only once.
+      let visited = set.union(set.from_list(visiting_this_time), visited)
+
+      // for each room, get list of neighbor ids and filter unvisited
+      // on this z-plane
+      let neighbors =
+        {
+          use room_id <- list.flat_map(visiting_this_time)
+          use neighbor_id <- list.filter_map(out_neighbors(graph, room_id))
+          use vertex <- result.try(dict.get(nodes, neighbor_id))
+          // reject if neighbor_id is on a different z-plane or already
+          // visited.
+          case vertex.z != z_coord || set.contains(visited, neighbor_id) {
+            // if already visited
+            True -> Error(Nil)
             // ...else add to the list of nodes to visit the next iteration
-            Ok(vertex)
+            False -> Ok(vertex)
           }
-          |> list.unique()
+        }
+        |> my_list.unique_by(fn(vertex) { vertex.id })
 
-        // list of ids next to visit
-        let visiting = list.map(neighbors, fn(vertex) { vertex.id })
-
-        #(DepthFirstSearch(visiting:, visited:), neighbors)
-      }
-
-      _else_nothing_left_to_visit -> #(acc, [])
+      // list of ids next to visit
+      let visiting_next = list.map(neighbors, fn(vertex) { vertex.id })
+      neighbors_loop(depth - 1, graph, nodes, z_coord, visiting_next, visited, [
+        neighbors,
+        ..acc
+      ])
     }
-  })
-  |> pair.second()
-  // each member is the list of neighbors for each iteration of the loop
-  // and we'll flatten to get a list of all neighbors
-  |> list.flatten()
+  }
 }
 
 @external(erlang, "digraph", "new")

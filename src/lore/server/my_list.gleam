@@ -150,3 +150,34 @@ fn insert_when_loop(
       }
   }
 }
+
+/// Like list.unique(), but includes a function for generating a key
+/// Warning! This does NOT preserve list order
+///
+pub fn unique_by(list: List(a), key_fun: fn(a) -> b) -> List(a) {
+  unique_by_loop(list, dict.new(), [], key_fun)
+}
+
+fn unique_by_loop(
+  list: List(a),
+  seen: Dict(b, Nil),
+  acc: List(a),
+  key_fun: fn(a) -> b,
+) -> List(a) {
+  case list {
+    [] -> acc
+    [first, ..rest] -> {
+      let key = key_fun(first)
+      case dict.has_key(seen, key) {
+        True -> unique_by_loop(rest, seen, acc, key_fun)
+        False ->
+          unique_by_loop(
+            rest,
+            dict.insert(seen, key, Nil),
+            [first, ..acc],
+            key_fun,
+          )
+      }
+    }
+  }
+}
