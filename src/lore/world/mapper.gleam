@@ -206,7 +206,7 @@ fn mini_map(state: State, room_id: Id(Room)) -> List(StringTree) {
   |> list.map(string_tree.from_strings)
 }
 
-// Depth first search neighbor ids.
+// Depth first search for neighbor ids.
 //
 fn neighbors(
   graph: Digraph,
@@ -214,35 +214,31 @@ fn neighbors(
   z_coord: Int,
   origin: Id(Room),
 ) -> List(MapNode) {
-  neighbors_loop(max_depth, graph, nodes, z_coord, [origin], set.new(), [])
+  neighbors_loop(graph, nodes, z_coord, max_depth, [origin], set.new(), [])
 }
 
-// - depth: number of iterations remaining
-// - visiting: nodes are are visiting this iteration of the loop
-// - visited: tracks nodes already visited so they are not visited twice
-// Consts: graph, nodes, z_coord
 fn neighbors_loop(
-  depth: Int,
   graph: Digraph,
   nodes: Dict(Id(Room), MapNode),
   z_coord: Int,
-  visiting_this_time: List(Id(Room)),
+  loops_left: Int,
+  visiting_this_loop: List(Id(Room)),
   visited: Set(Id(Room)),
   acc: List(List(MapNode)),
 ) -> List(MapNode) {
   // nodes we are visiting this iteration
-  case visiting_this_time == [] || depth <= 0 {
+  case visiting_this_loop == [] || loops_left <= 0 {
     True -> list.flatten(acc)
     False -> {
       // first, update visited so the current visiting members are visited
       // only once.
-      let visited = set.union(set.from_list(visiting_this_time), visited)
+      let visited = set.union(set.from_list(visiting_this_loop), visited)
 
       // for each room, get list of neighbor ids and filter unvisited
       // on this z-plane
       let neighbors =
         {
-          use room_id <- list.flat_map(visiting_this_time)
+          use room_id <- list.flat_map(visiting_this_loop)
           use neighbor_id <- list.filter_map(out_neighbors(graph, room_id))
           use vertex <- result.try(dict.get(nodes, neighbor_id))
           // reject if neighbor_id is on a different z-plane or already
@@ -258,10 +254,15 @@ fn neighbors_loop(
 
       // list of ids next to visit
       let visiting_next = list.map(neighbors, fn(vertex) { vertex.id })
-      neighbors_loop(depth - 1, graph, nodes, z_coord, visiting_next, visited, [
-        neighbors,
-        ..acc
-      ])
+      neighbors_loop(
+        graph,
+        nodes,
+        z_coord,
+        loops_left - 1,
+        visiting_next,
+        visited,
+        [neighbors, ..acc],
+      )
     }
   }
 }
