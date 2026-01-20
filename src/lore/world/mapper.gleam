@@ -230,8 +230,7 @@ fn neighbors_loop(
   case visiting_this_loop == [] || loops_left <= 0 {
     True -> list.flatten(acc)
     False -> {
-      // first, update visited so the current visiting members are visited
-      // only once.
+      // update visited so we don't visit twice
       let visited = set.union(set.from_list(visiting_this_loop), visited)
 
       // for each room, get list of neighbor ids and filter unvisited
@@ -252,14 +251,12 @@ fn neighbors_loop(
         }
         |> my_list.unique_by(fn(vertex) { vertex.id })
 
-      // list of ids next to visit
-      let visiting_next = list.map(neighbors, fn(vertex) { vertex.id })
       neighbors_loop(
         graph,
         nodes,
         z_coord,
         loops_left - 1,
-        visiting_next,
+        list.map(neighbors, fn(vertex) { vertex.id }),
         visited,
         [neighbors, ..acc],
       )
