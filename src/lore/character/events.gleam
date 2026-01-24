@@ -251,8 +251,7 @@ fn combat_commit(conn: Conn, data: event.CombatCommitData) -> Conn {
   let conn = {
     let self = option.unwrap(self_update, self)
     case is_victim_dead {
-      True ->
-        conn.renderln(conn, combat_view.notify(self, data)) |> conn.prompt()
+      True -> conn.renderln(conn, combat_view.notify(self, data)) |> conn.prompt
       False -> conn.render(conn, combat_view.notify(self, data))
     }
   }
