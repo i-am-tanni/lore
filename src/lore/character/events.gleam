@@ -4,6 +4,7 @@
 import gleam/bool
 import gleam/dict.{type Dict}
 import gleam/list
+import gleam/option.{None, Some}
 import gleam/result.{try}
 import lore/character/act
 import lore/character/conn.{type Conn}
@@ -236,29 +237,30 @@ fn item_load(
 //
 
 fn combat_commit(conn: Conn, data: event.CombatCommitData) -> Conn {
-  let self = conn.character_get(conn)
   let event.CombatCommitData(attacker:, victim:, ..) = data
   let victim_id = victim.id
+  let self = conn.character_get(conn)
   let is_victim_dead = victim.hp <= 0
-  let has_auto_revive = flag.affect_has(self.affects.flags, flag.AutoRevive)
-  let conn = case self.id {
-    self_id if self_id == victim_id && is_victim_dead && !has_auto_revive ->
-      conn.terminate(conn)
 
-    self_id if self_id == victim_id ->
-      sync_mobile(victim, self)
-      |> conn.character_put(conn, _)
-
-    self_id if self_id == attacker.id ->
-      sync_mobile(attacker, self)
-      |> conn.character_put(conn, _)
-
-    _ -> conn
+  let self_update = case self.id {
+    self_id if self_id == victim_id -> Some(sync_mobile(victim, self))
+    self_id if self_id == attacker.id -> Some(sync_mobile(attacker, self))
+    _ -> None
   }
 
-  case is_victim_dead {
-    True -> conn.renderln(conn, combat_view.notify(self, data)) |> conn.prompt()
-    False -> conn.render(conn, combat_view.notify(self, data))
+  let conn = {
+    let self = option.unwrap(self_update, self)
+    case is_victim_dead {
+      True ->
+        conn.renderln(conn, combat_view.notify(self, data)) |> conn.prompt()
+      False -> conn.render(conn, combat_view.notify(self, data))
+    }
+  }
+
+  case self_update {
+    Some(update) if update.hp <= 0 -> conn.terminate(conn)
+    Some(update) -> conn.character_put(conn, update)
+    None -> conn
   }
 }
 
@@ -322,12 +324,9 @@ fn sync_mobile(
   update: world.Mobile,
   self: world.MobileInternal,
 ) -> world.MobileInternal {
-  case update.hp <= 0 && flag.affect_has(self.affects.flags, flag.AutoRevive) {
-    True -> world.MobileInternal(..self, hp: self.hp_max)
-
-    _ -> {
-      let world.Mobile(hp:, fighting:, ..) = update
-      world.MobileInternal(..self, hp:, fighting:)
-    }
+  let world.Mobile(hp:, fighting:, ..) = update
+  case flag.affect_has(self.affects.flags, flag.AutoRevive) {
+    True -> world.MobileInternal(..self, hp: self.hp_max, fighting:)
+    False -> world.MobileInternal(..self, hp:, fighting:)
   }
 }
