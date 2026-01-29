@@ -2,6 +2,7 @@
 ////
 
 import gleam/bool
+import gleam/dict
 import gleam/int
 import gleam/list
 import gleam/option
@@ -45,6 +46,9 @@ type Verb {
   Kill
   Inventory
   Social
+  Wear
+  Remove
+  Equipment
   // Admin Commands
   Kick
   Slay
@@ -104,6 +108,9 @@ pub fn parse(conn: Conn, input: String) -> Conn {
     "who" -> who_command(conn)
     "quit" -> quit_command(conn)
     "i" | "inventory" -> command_nil(conn, Inventory, inventory_command)
+    "wear" -> command(conn, wear_command, keyword_arg(Wear, rest, word))
+    "remove" -> command(conn, remove_command, keyword_arg(Remove, rest, word))
+    "eq" | "equipment" -> command_nil(conn, Equipment, equipment_command)
     "" -> conn.prompt(conn)
     // admin commands are prefixed with '@' to not conflict with skills
     "@" -> unknown_command(conn)
@@ -157,7 +164,6 @@ pub fn parse(conn: Conn, input: String) -> Conn {
       admin_command(conn, role(conn), auto_revive_command, fn() {
         Ok(Command(AutoRevive, Nil))
       })
-
     social ->
       command(conn, social_command, social_args(conn, social, rest, word))
   }
@@ -192,9 +198,9 @@ fn admin_command(
 fn command_nil(
   conn: Conn,
   verb: Verb,
-  command_fun: fn(Conn, Command(Nil)) -> Conn,
+  command_fun: fn(Conn, Verb) -> Conn,
 ) -> Conn {
-  command_fun(conn, Command(verb, Nil))
+  command_fun(conn, verb)
 }
 
 fn look_args(s: String, word: Splitter) -> Result(Command(String), String) {
@@ -457,7 +463,7 @@ fn move_command(conn: Conn, direction: world.Direction) -> Conn {
   }
 }
 
-fn look_command(conn: Conn, _: Command(Nil)) -> Conn {
+fn look_command(conn: Conn, _: Verb) -> Conn {
   conn.event(conn, event.Look)
 }
 
@@ -470,9 +476,7 @@ fn look_at_command(conn: Conn, command: Command(String)) -> Conn {
         || list.any(self.keywords, fn(keyword) { search_term == keyword }),
       Ok(LookSelf),
     )
-    list.find(self.inventory, fn(item_instance) {
-      list.any(item_instance.keywords, fn(keyword) { search_term == keyword })
-    })
+    list.find(self.inventory, item_matches(_, search_term))
     |> result.map(LookItem)
   }
 
@@ -590,12 +594,111 @@ fn is_auto(conn: Conn, search_term: String) -> Bool {
   }
 }
 
-fn inventory_command(conn: Conn, _command: Command(Nil)) -> Conn {
+fn inventory_command(conn: Conn, _verb: Verb) -> Conn {
   let system_tables.Lookup(items:, ..) = conn.system_tables(conn)
   let character = conn.character_get(conn)
 
   conn.renderln(conn, item_view.inventory(items, character))
   |> conn.prompt()
+}
+
+fn wear_command(conn: Conn, command: Command(String)) -> Conn {
+  let self = conn.character_get(conn)
+  let search_term = command.data
+  let result = {
+    use item_instance <- result.try(
+      list.find(self.inventory, item_matches(_, search_term))
+      |> result.map_error(fn(_) {
+        world.UnknownItem(search_term:, verb: "carrying")
+      }),
+    )
+    let lookup = conn.system_tables(conn)
+    use item <- result.try(items.load_from_instance(lookup.items, item_instance))
+    let wear_slot = item.wear_slot
+    use <- bool.lazy_guard(wear_slot == world.CannotWear, fn() {
+      Error(world.CannotBeWorn(item:))
+    })
+    case dict.get(self.equipment, wear_slot) {
+      // Update if wear slot is empty and available..
+      Ok(world.EmptySlot) -> {
+        Ok(#(wear_slot, item_instance, item))
+      }
+      // ..else if already occupied..
+      Ok(world.Wearing(worn_item_instance)) ->
+        case items.load_from_instance(lookup.items, worn_item_instance) {
+          Ok(item) -> Error(world.WearSlotFull(wear_slot:, item:))
+          Error(error) -> Error(error)
+        }
+      //..or missing
+      Error(Nil) -> Error(world.WearSlotMissing(wear_slot:))
+    }
+  }
+
+  case result {
+    Ok(#(wear_slot, item_instance, item)) -> {
+      let updated_character = {
+        let equipment =
+          dict.insert(self.equipment, wear_slot, world.Wearing(item_instance))
+        let instance_id = item_instance.id
+        let inventory =
+          list.filter(self.inventory, fn(x) { x.id != instance_id })
+        world.MobileInternal(..self, equipment:, inventory:)
+      }
+
+      conn
+      |> conn.character_put(updated_character)
+      |> conn.renderln(item_view.item_wear(item))
+      |> conn.prompt
+    }
+
+    Error(error) ->
+      conn |> conn.renderln(error_view.item_error(error)) |> conn.prompt
+  }
+}
+
+fn remove_command(conn: Conn, command: Command(String)) -> Conn {
+  let self = conn.character_get(conn)
+  let search_term = command.data
+  let equipment = self.equipment
+
+  let result =
+    dict_find_map_nth(equipment, 1, fn(wear_slot, wearing) {
+      case wearing {
+        world.EmptySlot -> Error(Nil)
+        world.Wearing(item) ->
+          case item_matches(item, search_term) {
+            True -> Ok(#(wear_slot, item))
+            False -> Error(Nil)
+          }
+      }
+    })
+    |> result.map_error(fn(_) {
+      world.UnknownItem(search_term:, verb: "wearing")
+    })
+
+  case result {
+    Ok(#(wear_slot, item_instance)) -> {
+      let system_tables.Lookup(items:, ..) = conn.system_tables(conn)
+      world.MobileInternal(
+        ..self,
+        equipment: dict.insert(equipment, wear_slot, world.EmptySlot),
+        inventory: [item_instance, ..self.inventory],
+      )
+      |> conn.character_put(conn, _)
+      |> conn.renderln(item_view.item_remove(items, item_instance))
+      |> conn.prompt
+    }
+
+    Error(error) -> {
+      conn |> conn.renderln(error_view.item_error(error)) |> conn.prompt
+    }
+  }
+}
+
+fn equipment_command(conn: Conn, _verb: Verb) -> Conn {
+  let self = conn.character_get(conn)
+  let system_tables.Lookup(items:, ..) = conn.system_tables(conn)
+  conn |> conn.renderln(item_view.equipment(items, self)) |> conn.prompt
 }
 
 fn who_command(conn: Conn) -> Conn {
@@ -866,6 +969,16 @@ fn role(conn: Conn) -> world.Role {
   conn.character_get(conn).role
 }
 
+fn item_matches(item_instance: world.ItemInstance, search_term: String) -> Bool {
+  list.any(item_instance.keywords, fn(keyword) { search_term == keyword })
+  || search_term == string_id_unwrap(item_instance.id)
+}
+
+fn string_id_unwrap(id: world.StringId(a)) -> String {
+  let StringId(raw_id) = id
+  raw_id
+}
+
 fn verb_missing_arg_err(verb: Verb) -> String {
   case verb {
     Say -> "What do you want to say?"
@@ -884,11 +997,42 @@ fn verb_missing_arg_err(verb: Verb) -> String {
     Look -> "What do you want to look at?"
     ItemSpawn -> "What item do you want to spawn?"
     MobileSpawn -> "What mobile do you want to spawn?"
-    // verbs without args
+    Wear -> "What would you like to wear?"
+    Remove ->
+      "What would you like to remove? Provide either a wear location or item keyword."
+    // verbs without args that will never have this error
     Inventory -> ""
+    Equipment -> ""
     Social -> ""
     SuperInvisible -> ""
     GodMode -> ""
     AutoRevive -> ""
   }
+}
+
+// Like list.find_map with an ordinal, but for dicts.
+//
+fn dict_find_map_nth(
+  dict: dict.Dict(a, b),
+  ordinal: Int,
+  one_that_is_desired: fn(a, b) -> Result(c, Nil),
+) -> Result(c, Nil) {
+  let ordinal = case ordinal < 0 {
+    True -> ordinal * -1
+    False -> ordinal
+  }
+
+  let #(result, _) =
+    // This can be improved with a short circuit on success
+    dict.fold(dict, #(Error(Nil), ordinal), fn(acc, key, val) {
+      let #(finding, ordinal) = acc
+      use <- bool.guard(result.is_ok(finding), acc)
+      case one_that_is_desired(key, val) {
+        Ok(_) if ordinal > 1 -> #(Error(Nil), ordinal - 1)
+        Ok(result) -> #(Ok(result), 1)
+        Error(Nil) -> acc
+      }
+    })
+
+  result
 }

@@ -76,7 +76,16 @@ fn init(
       }
 
       let id = world.Id(item_id)
-      let item = world.Item(id:, name:, short:, long:, keywords:, contains:)
+      let item =
+        world.Item(
+          id:,
+          name:,
+          short:,
+          long:,
+          keywords:,
+          wear_slot: world.Arms,
+          contains:,
+        )
       #(id, item)
     })
 
@@ -109,6 +118,17 @@ pub fn load(
   item_id: Id(Item),
 ) -> Result(Item, Nil) {
   cache.lookup(table_name, item_id)
+}
+
+pub fn load_from_instance(
+  table_name: process.Name(Message),
+  item_instance: world.ItemInstance,
+) -> Result(Item, world.ErrorItem) {
+  case item_instance.item {
+    world.Loading(id) ->
+      result.replace_error(load(table_name, id), world.InvalidItemId(id))
+    world.Loaded(item) -> Ok(item)
+  }
 }
 
 pub fn load_items(

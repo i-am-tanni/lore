@@ -2,6 +2,7 @@
 ////
 
 import gleam/bool
+import gleam/dict
 import gleam/erlang/process
 import gleam/list
 import gleam/otp/actor
@@ -212,6 +213,7 @@ fn to_mobile(
     pronouns: pronoun.Masculine,
     short: row.short,
     inventory: [],
+    equipment: dict.new(),
     fighting: world.NoTarget,
     affects: world.affects_init(),
     hp: hp_max,

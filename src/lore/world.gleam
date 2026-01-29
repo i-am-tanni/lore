@@ -1,4 +1,5 @@
 import gleam/bit_array
+import gleam/dict.{type Dict}
 import gleam/int
 import gleam/list
 import gleam/option.{type Option}
@@ -125,6 +126,7 @@ pub type Affects {
 pub type MobileInternal {
   /// ## Private fields
   /// - inventory
+  /// - equipment
   MobileInternal(
     id: StringId(Mobile),
     room_id: Id(Room),
@@ -133,6 +135,7 @@ pub type MobileInternal {
     name: String,
     keywords: List(String),
     inventory: List(ItemInstance),
+    equipment: Dict(WearSlot, Wearing),
     pronouns: pronoun.PronounChoice,
     short: String,
     fighting: Fighting,
@@ -156,6 +159,16 @@ pub type Container(a) {
   NotContainer
 }
 
+pub type WearSlot {
+  Arms
+  CannotWear
+}
+
+pub type Wearing {
+  Wearing(ItemInstance)
+  EmptySlot
+}
+
 pub type Item {
   Item(
     id: Id(Item),
@@ -163,6 +176,7 @@ pub type Item {
     name: String,
     short: String,
     long: String,
+    wear_slot: WearSlot,
     contains: Container(Id(Item)),
   )
 }
@@ -227,6 +241,15 @@ pub fn generate_id() -> StringId(a) {
   |> bit_array.concat
   |> bit_array.base16_encode
   |> StringId
+}
+
+pub type ErrorItem {
+  UnknownItem(search_term: String, verb: String)
+  CannotBeWorn(item: Item)
+  CannotWield(item: Item)
+  WearSlotFull(wear_slot: WearSlot, item: Item)
+  WearSlotMissing(wear_slot: WearSlot)
+  InvalidItemId(item_id: Id(Item))
 }
 
 pub type ErrorRoomRequest {

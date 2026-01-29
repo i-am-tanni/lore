@@ -4,6 +4,7 @@
 ////
 
 import gleam/bool
+import gleam/dict
 import gleam/erlang/process.{type Subject}
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -104,6 +105,7 @@ fn init_reception(
       short: "",
       pronouns: pronoun.Feminine,
       inventory: [],
+      equipment: dict.new(),
       fighting: world.NoTarget,
       affects: world.affects_init(),
       hp: 20,

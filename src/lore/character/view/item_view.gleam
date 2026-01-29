@@ -1,5 +1,7 @@
+import gleam/dict
 import gleam/erlang/process
 import gleam/list
+import gleam/result
 import lore/character/view.{type View}
 import lore/character/view/character_view
 import lore/world
@@ -16,6 +18,46 @@ pub fn inventory(
 
     _ -> view.Leaf("You are carrying:\n    Nothing.")
   }
+}
+
+pub fn equipment(
+  item_table: process.Name(items.Message),
+  self: world.MobileInternal,
+) -> View {
+  let equipment = self.equipment
+  let is_naked =
+    dict.is_empty(equipment)
+    || list.all(dict.values(equipment), fn(wearing) {
+      wearing == world.EmptySlot
+    })
+
+  let equipment =
+    equipment
+    |> dict.to_list
+    |> list.filter_map(fn(key_val) {
+      let #(wear_slot, wearing) = key_val
+      let wear_slot = wear_slot_to_string(wear_slot)
+      case wearing {
+        world.Wearing(item_instance) ->
+          item_load(item_table, item_instance)
+          |> result.map(fn(item) { view.Leaves([wear_slot, ": ", item.name]) })
+
+        world.EmptySlot ->
+          [
+            wear_slot,
+            ": Empty",
+          ]
+          |> view.Leaves
+          |> Ok
+      }
+    })
+
+  let prelude = case is_naked {
+    True -> ["You are NAKED!"] |> view.Leaves
+    False -> ["You are wearing:"] |> view.Leaves
+  }
+
+  view.join([prelude, ..equipment], "\n")
 }
 
 pub fn item_contains(
@@ -35,12 +77,7 @@ pub fn container_contents(
   item_table: process.Name(items.Message),
   instances: List(world.ItemInstance),
 ) -> List(View) {
-  list.filter_map(instances, fn(item_instance) {
-    case item_instance.item {
-      world.Loading(id) -> items.load(item_table, id)
-      world.Loaded(item) -> Ok(item)
-    }
-  })
+  list.filter_map(instances, item_load(item_table, _))
   |> list.map(fn(item) { view.Leaves(["  ", item.name]) })
 }
 
@@ -87,4 +124,35 @@ pub fn spawn_item(item: world.Item) -> View {
     " from the ether.",
   ]
   |> view.Leaves
+}
+
+pub fn item_wear(item: world.Item) -> View {
+  view.Leaves(["You wear ", item.name, "."])
+}
+
+pub fn item_remove(
+  items_table: process.Name(items.Message),
+  item: world.ItemInstance,
+) -> View {
+  case item_load(items_table, item) {
+    Ok(item) -> view.Leaves(["You take off ", item.name, "."])
+    Error(Nil) -> view.Leaf("Unable to load item name.")
+  }
+}
+
+pub fn wear_slot_to_string(wear_slot: world.WearSlot) -> String {
+  case wear_slot {
+    world.Arms -> "arms"
+    world.CannotWear -> "error"
+  }
+}
+
+fn item_load(
+  item_table: process.Name(items.Message),
+  item_instance: world.ItemInstance,
+) -> Result(world.Item, Nil) {
+  case item_instance.item {
+    world.Loading(item_id) -> items.load(item_table, item_id)
+    world.Loaded(item) -> Ok(item)
+  }
 }

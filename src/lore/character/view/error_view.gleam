@@ -1,3 +1,4 @@
+import gleam/int
 import lore/character/view.{type View}
 import lore/world
 
@@ -39,6 +40,38 @@ pub fn room_request_error(error: world.ErrorRoomRequest) -> View {
 
     world.GodMode -> "You are forbidden to attack an immortal" |> view.Leaf
   }
+}
+
+pub fn item_error(err: world.ErrorItem) -> View {
+  case err {
+    world.UnknownItem(search_term:, verb:) -> [
+      "You are not ",
+      verb,
+      " anything that matches ",
+      search_term,
+      ".",
+    ]
+    world.CannotBeWorn(item:) -> [item.name, " cannot be worn."]
+    world.CannotWield(item:) -> ["You cannot be wield ", item.name]
+    world.WearSlotFull(wear_slot:, item:) -> [
+      "You must remove ",
+      item.name,
+      " from your ",
+      wear_slot_to_string(wear_slot),
+      " to wear that.",
+    ]
+    world.WearSlotMissing(wear_slot:) -> [
+      "You lack the ",
+      wear_slot_to_string(wear_slot),
+      " to wear that.",
+    ]
+    world.InvalidItemId(item_id: world.Id(item_id)) -> [
+      "Item id ",
+      int.to_string(item_id),
+      " is invalid.",
+    ]
+  }
+  |> view.Leaves
 }
 
 pub fn not_carrying_error() -> View {
@@ -91,5 +124,12 @@ fn access_to_string(access: world.AccessState) -> String {
   case access {
     world.Open -> "open"
     world.Closed -> "closed"
+  }
+}
+
+fn wear_slot_to_string(wear_slot: world.WearSlot) -> String {
+  case wear_slot {
+    world.Arms -> "arms"
+    world.CannotWear -> "[invalid wear slot]"
   }
 }

@@ -1,4 +1,5 @@
 import argus
+import gleam/dict
 import gleam/result.{try}
 import gleam/string
 import lore/character/conn.{type Conn}
@@ -218,6 +219,9 @@ fn password(conn: Conn, flash: LoginFlash, input: String) -> Conn {
 fn login(conn: Conn, flash: LoginFlash) -> Conn {
   let name = flash.name
   let world.MobileInternal(id:, ..) = conn.character_get(conn)
+  let equipment =
+    [#(world.Arms, world.EmptySlot)]
+    |> dict.from_list
 
   let update =
     world.MobileInternal(
@@ -230,6 +234,7 @@ fn login(conn: Conn, flash: LoginFlash) -> Conn {
       pronouns: pronoun.Feminine,
       short: name <> " is standing here.",
       inventory: [],
+      equipment:,
       fighting: world.NoTarget,
       affects: world.affects_init(),
       hp: 20,
