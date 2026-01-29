@@ -39,7 +39,7 @@ pub fn equipment(
       let wear_slot = wear_slot_to_string(wear_slot)
       case wearing {
         world.Wearing(item_instance) ->
-          item_load(item_table, item_instance)
+          items.load_from_instance(item_table, item_instance)
           |> result.map(fn(item) { view.Leaves([wear_slot, ": ", item.name]) })
 
         world.EmptySlot ->
@@ -77,7 +77,7 @@ pub fn container_contents(
   item_table: process.Name(items.Message),
   instances: List(world.ItemInstance),
 ) -> List(View) {
-  list.filter_map(instances, item_load(item_table, _))
+  list.filter_map(instances, items.load_from_instance(item_table, _))
   |> list.map(fn(item) { view.Leaves(["  ", item.name]) })
 }
 
@@ -134,9 +134,9 @@ pub fn item_remove(
   items_table: process.Name(items.Message),
   item: world.ItemInstance,
 ) -> View {
-  case item_load(items_table, item) {
+  case items.load_from_instance(items_table, item) {
     Ok(item) -> view.Leaves(["You take off ", item.name, "."])
-    Error(Nil) -> view.Leaf("Unable to load item name.")
+    Error(_) -> view.Leaf("Unable to load item name.")
   }
 }
 
@@ -144,15 +144,5 @@ pub fn wear_slot_to_string(wear_slot: world.WearSlot) -> String {
   case wear_slot {
     world.Arms -> "arms"
     world.CannotWear -> "error"
-  }
-}
-
-fn item_load(
-  item_table: process.Name(items.Message),
-  item_instance: world.ItemInstance,
-) -> Result(world.Item, Nil) {
-  case item_instance.item {
-    world.Loading(item_id) -> items.load(item_table, item_id)
-    world.Loaded(item) -> Ok(item)
   }
 }
