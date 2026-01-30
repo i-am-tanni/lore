@@ -5,6 +5,7 @@ import gleam/bool
 import gleam/dict.{type Dict}
 import gleam/list.{Continue, Stop}
 import gleam/pair
+import gleam/result
 
 /// Returns the nth match in the list.
 /// Like the `gleam/list` function `find`, but allows you to elect a match
@@ -179,5 +180,55 @@ fn unique_by_loop(
           )
       }
     }
+  }
+}
+
+/// Similar to list.key_pop but with a function for the filter instead of a key
+///
+pub fn pop_nth_match(
+  list: List(a),
+  ordinal: Int,
+  one_that_is_desired: fn(a) -> Bool,
+) -> Result(#(a, List(a)), Nil) {
+  case ordinal > 0 {
+    True -> pop_nth_match_loop(list, ordinal, one_that_is_desired, [])
+    False ->
+      pop_nth_match_loop(list.reverse(list), ordinal, one_that_is_desired, [])
+      |> result.map(fn(tuple) {
+        let #(item, filtered) = tuple
+        #(item, list.reverse(filtered))
+      })
+  }
+}
+
+fn pop_nth_match_loop(
+  list: List(a),
+  ordinal: Int,
+  one_that_is_desired: fn(a) -> Bool,
+  checked: List(a),
+) -> Result(#(a, List(a)), Nil) {
+  case list {
+    [] -> Error(Nil)
+    [first, ..rest] ->
+      case one_that_is_desired(first) {
+        True if ordinal <= 1 -> Ok(#(first, reverse_and_prepend(checked, rest)))
+        True ->
+          pop_nth_match_loop(rest, ordinal - 1, one_that_is_desired, [
+            first,
+            ..checked
+          ])
+        False ->
+          pop_nth_match_loop(rest, ordinal, one_that_is_desired, [
+            first,
+            ..checked
+          ])
+      }
+  }
+}
+
+fn reverse_and_prepend(list prefix: List(a), to suffix: List(a)) -> List(a) {
+  case prefix {
+    [] -> suffix
+    [first, ..rest] -> reverse_and_prepend(list: rest, to: [first, ..suffix])
   }
 }
