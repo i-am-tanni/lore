@@ -1017,22 +1017,21 @@ fn dict_find_map_nth(
   ordinal: Int,
   one_that_is_desired: fn(a, b) -> Result(c, Nil),
 ) -> Result(c, Nil) {
-  let ordinal = case ordinal < 0 {
-    True -> ordinal * -1
-    False -> ordinal
-  }
-
   let #(result, _) =
     // This can be improved with a short circuit on success
-    dict.fold(dict, #(Error(Nil), ordinal), fn(acc, key, val) {
-      let #(finding, ordinal) = acc
-      use <- bool.guard(result.is_ok(finding), acc)
-      case one_that_is_desired(key, val) {
-        Ok(_) if ordinal > 1 -> #(Error(Nil), ordinal - 1)
-        Ok(result) -> #(Ok(result), 1)
-        Error(Nil) -> acc
-      }
-    })
+    dict.fold(
+      dict,
+      #(Error(Nil), int.absolute_value(ordinal)),
+      fn(acc, key, val) {
+        let #(finding, ordinal) = acc
+        use <- bool.guard(result.is_ok(finding), acc)
+        case one_that_is_desired(key, val) {
+          Ok(result) if ordinal <= 1 -> #(Ok(result), 1)
+          Ok(_) -> #(Error(Nil), ordinal - 1)
+          Error(Nil) -> acc
+        }
+      },
+    )
 
   result
 }
