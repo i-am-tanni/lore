@@ -7,7 +7,6 @@ import gleam/bit_array
 import gleam/bool
 import gleam/bytes_tree.{type BytesTree}
 import gleam/erlang/process.{type Selector, type Subject}
-import gleam/function.{tap}
 import gleam/list
 import gleam/option.{type Option, Some}
 import gleam/order
@@ -254,10 +253,13 @@ fn handle_packet(state: State, stream: BitArray) -> Result(State, ProtocolError)
     State(..state, buffer:, last_message_received: timestamp.system_time())
 
   list.fold(lines, state, fn(acc, line) {
-    acc
-    |> handle_options(options)
-    |> handle_subnegotiations(subnegotiations)
-    |> tap(fn(state) { handle_text(state.endpoint, line) })
+    let state =
+      acc
+      |> handle_options(options)
+      |> handle_subnegotiations(subnegotiations)
+
+    handle_text(state.endpoint, line)
+    state
   })
   |> Ok
 }
