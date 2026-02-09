@@ -1,6 +1,6 @@
 //// This module contains the code to run the sql queries defined in
 //// `./src/lore/world/sql`.
-//// > 🐿️ This module was generated automatically using v4.4.2 of
+//// > 🐿️ This module was generated automatically using v4.6.0 of
 //// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ////
 
@@ -11,7 +11,7 @@ import pog
 /// A row you get from running the `account_get` query
 /// defined in `./src/lore/world/sql/account_get.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > 🐿️ This type definition was generated automatically using v4.6.0 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type AccountGetRow {
@@ -26,7 +26,7 @@ pub type AccountGetRow {
 /// Runs the `account_get` query
 /// defined in `./src/lore/world/sql/account_get.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > 🐿️ This function was generated automatically using v4.6.0 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn account_get(
@@ -53,7 +53,7 @@ WHERE LOWER(name) = LOWER($1);
 /// Runs the `account_put` query
 /// defined in `./src/lore/world/sql/account_put.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > 🐿️ This function was generated automatically using v4.6.0 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn account_put(
@@ -83,7 +83,7 @@ VALUES ($1, $2,
 /// A row you get from running the `containers` query
 /// defined in `./src/lore/world/sql/containers.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > 🐿️ This type definition was generated automatically using v4.6.0 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type ContainersRow {
@@ -93,7 +93,7 @@ pub type ContainersRow {
 /// Runs the `containers` query
 /// defined in `./src/lore/world/sql/containers.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > 🐿️ This function was generated automatically using v4.6.0 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn containers(
@@ -105,7 +105,7 @@ pub fn containers(
     decode.success(ContainersRow(container_id:, item_id:))
   }
 
-  "SELECT container_id, item_id FROM container_item;
+  "SELECT container_id, item_id FROM container_kit;
 "
   |> pog.query
   |> pog.returning(decoder)
@@ -115,7 +115,7 @@ pub fn containers(
 /// A row you get from running the `doors` query
 /// defined in `./src/lore/world/sql/doors.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > 🐿️ This type definition was generated automatically using v4.6.0 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type DoorsRow {
@@ -125,7 +125,7 @@ pub type DoorsRow {
 /// Runs the `doors` query
 /// defined in `./src/lore/world/sql/doors.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > 🐿️ This function was generated automatically using v4.6.0 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn doors(
@@ -148,7 +148,7 @@ WHERE is_active = TRUE;
 /// A row you get from running the `exits` query
 /// defined in `./src/lore/world/sql/exits.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > 🐿️ This type definition was generated automatically using v4.6.0 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type ExitsRow {
@@ -164,7 +164,7 @@ pub type ExitsRow {
 /// Runs the `exits` query
 /// defined in `./src/lore/world/sql/exits.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > 🐿️ This function was generated automatically using v4.6.0 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn exits(
@@ -204,7 +204,7 @@ WHERE e.is_active = TRUE;
 /// A row you get from running the `item_spawns` query
 /// defined in `./src/lore/world/sql/item_spawns.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > 🐿️ This type definition was generated automatically using v4.6.0 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type ItemSpawnsRow {
@@ -219,7 +219,7 @@ pub type ItemSpawnsRow {
 /// Runs the `item_spawns` query
 /// defined in `./src/lore/world/sql/item_spawns.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > 🐿️ This function was generated automatically using v4.6.0 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn item_spawns(
@@ -248,7 +248,7 @@ pub fn item_spawns(
 /// A row you get from running the `items` query
 /// defined in `./src/lore/world/sql/items.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > 🐿️ This type definition was generated automatically using v4.6.0 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type ItemsRow {
@@ -265,7 +265,7 @@ pub type ItemsRow {
 /// Runs the `items` query
 /// defined in `./src/lore/world/sql/items.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > 🐿️ This function was generated automatically using v4.6.0 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn items(
@@ -296,7 +296,7 @@ pub fn items(
   i.keywords,
   c.container_id
 FROM item as i
-LEFT JOIN container as c
+LEFT JOIN container_kit as c
   ON c.item_id = i.item_id;
 "
   |> pog.query
@@ -307,7 +307,7 @@ LEFT JOIN container as c
 /// A row you get from running the `map_edges` query
 /// defined in `./src/lore/world/sql/map_edges.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > 🐿️ This type definition was generated automatically using v4.6.0 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type MapEdgesRow {
@@ -317,7 +317,7 @@ pub type MapEdgesRow {
 /// Runs the `map_edges` query
 /// defined in `./src/lore/world/sql/map_edges.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > 🐿️ This function was generated automatically using v4.6.0 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn map_edges(
@@ -338,7 +338,7 @@ pub fn map_edges(
 /// A row you get from running the `map_nodes` query
 /// defined in `./src/lore/world/sql/map_nodes.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > 🐿️ This type definition was generated automatically using v4.6.0 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type MapNodesRow {
@@ -348,7 +348,7 @@ pub type MapNodesRow {
 /// Runs the `map_nodes` query
 /// defined in `./src/lore/world/sql/map_nodes.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > 🐿️ This function was generated automatically using v4.6.0 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn map_nodes(
@@ -372,7 +372,7 @@ pub fn map_nodes(
 /// A row you get from running the `mob_spawns` query
 /// defined in `./src/lore/world/sql/mob_spawns.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > 🐿️ This type definition was generated automatically using v4.6.0 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type MobSpawnsRow {
@@ -387,7 +387,7 @@ pub type MobSpawnsRow {
 /// Runs the `mob_spawns` query
 /// defined in `./src/lore/world/sql/mob_spawns.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > 🐿️ This function was generated automatically using v4.6.0 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn mob_spawns(
@@ -416,7 +416,7 @@ pub fn mob_spawns(
 /// A row you get from running the `mobile_by_id` query
 /// defined in `./src/lore/world/sql/mobile_by_id.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > 🐿️ This type definition was generated automatically using v4.6.0 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type MobileByIdRow {
@@ -432,7 +432,7 @@ pub type MobileByIdRow {
 /// Runs the `mobile_by_id` query
 /// defined in `./src/lore/world/sql/mobile_by_id.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > 🐿️ This function was generated automatically using v4.6.0 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn mobile_by_id(
@@ -459,7 +459,7 @@ pub fn mobile_by_id(
 /// A row you get from running the `rooms` query
 /// defined in `./src/lore/world/sql/rooms.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > 🐿️ This type definition was generated automatically using v4.6.0 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type RoomsRow {
@@ -478,7 +478,7 @@ pub type RoomsRow {
 /// Runs the `rooms` query
 /// defined in `./src/lore/world/sql/rooms.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > 🐿️ This function was generated automatically using v4.6.0 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn rooms(
@@ -515,7 +515,7 @@ pub fn rooms(
 /// A row you get from running the `rooms_by_zone_id` query
 /// defined in `./src/lore/world/sql/rooms_by_zone_id.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > 🐿️ This type definition was generated automatically using v4.6.0 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type RoomsByZoneIdRow {
@@ -534,7 +534,7 @@ pub type RoomsByZoneIdRow {
 /// Runs the `rooms_by_zone_id` query
 /// defined in `./src/lore/world/sql/rooms_by_zone_id.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > 🐿️ This function was generated automatically using v4.6.0 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn rooms_by_zone_id(
@@ -574,7 +574,7 @@ WHERE zone_id = $1
 /// A row you get from running the `socials` query
 /// defined in `./src/lore/world/sql/socials.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > 🐿️ This type definition was generated automatically using v4.6.0 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type SocialsRow {
@@ -593,7 +593,7 @@ pub type SocialsRow {
 /// Runs the `socials` query
 /// defined in `./src/lore/world/sql/socials.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > 🐿️ This function was generated automatically using v4.6.0 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn socials(
@@ -631,7 +631,7 @@ FROM social
 /// A row you get from running the `spawn_groups` query
 /// defined in `./src/lore/world/sql/spawn_groups.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > 🐿️ This type definition was generated automatically using v4.6.0 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type SpawnGroupsRow {
@@ -646,7 +646,7 @@ pub type SpawnGroupsRow {
 /// Runs the `spawn_groups` query
 /// defined in `./src/lore/world/sql/spawn_groups.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > 🐿️ This function was generated automatically using v4.6.0 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn spawn_groups(
@@ -675,7 +675,7 @@ pub fn spawn_groups(
 /// A row you get from running the `zones` query
 /// defined in `./src/lore/world/sql/zones.sql`.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > 🐿️ This type definition was generated automatically using v4.6.0 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type ZonesRow {
@@ -685,7 +685,7 @@ pub type ZonesRow {
 /// Runs the `zones` query
 /// defined in `./src/lore/world/sql/zones.sql`.
 ///
-/// > 🐿️ This function was generated automatically using v4.4.2 of
+/// > 🐿️ This function was generated automatically using v4.6.0 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub fn zones(
@@ -707,7 +707,7 @@ pub fn zones(
 
 /// Corresponds to the Postgres `access_state` enum.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > 🐿️ This type definition was generated automatically using v4.6.0 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type AccessState {
@@ -724,7 +724,7 @@ fn access_state_decoder() -> decode.Decoder(AccessState) {
   }
 }/// Corresponds to the Postgres `role_enum` enum.
 ///
-/// > 🐿️ This type definition was generated automatically using v4.4.2 of the
+/// > 🐿️ This type definition was generated automatically using v4.6.0 of the
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type RoleEnum {

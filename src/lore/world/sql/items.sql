@@ -6,5 +6,5 @@ SELECT
   i.keywords,
   c.container_id
 FROM item as i
-LEFT JOIN container as c
+LEFT JOIN container_kit as c
   ON c.item_id = i.item_id;
