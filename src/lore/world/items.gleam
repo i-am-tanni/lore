@@ -47,7 +47,7 @@ fn init(
     |> result.replace_error("Failed to start ets table: 'items'"),
   )
   let db = pog.named_connection(db)
-  use pog.Returned(rows:, ..) <- result.try(
+  use pog.Returned(rows: item_rows, ..) <- result.try(
     sql.items(db)
     |> result.replace_error("Could not get items from the database!"),
   )
@@ -55,46 +55,51 @@ fn init(
     sql.containers(db)
     |> result.replace_error("Could not get items from the database!"),
   )
+
+  // populate table
   let containers =
     my_list.group_by(containers, fn(container) {
       #(container.container_id, container.item_id)
     })
 
-  let items =
-    list.map(rows, fn(row) {
-      let sql.ItemsRow(item_id:, name:, short:, long:, keywords:, container_id:) =
-        row
-
-      let contains = case container_id {
-        Some(container_id) ->
-          dict.get(containers, container_id)
-          |> result.unwrap([])
-          |> list.map(world.Id)
-          |> world.Contains
-
-        None -> world.NotContainer
-      }
-
-      let id = world.Id(item_id)
-      let item =
-        world.Item(
-          id:,
-          name:,
-          short:,
-          long:,
-          keywords:,
-          wear_slot: world.Arms,
-          contains:,
-        )
-      #(id, item)
-    })
-
-  table.insert_many(table, items)
+  list.map(item_rows, fn(row) {
+    let item = to_item(row, containers)
+    #(item.id, item)
+  })
+  |> table.insert_many(table, _)
 
   table
   |> actor.initialised
   |> actor.returning(self)
   |> Ok
+}
+
+fn to_item(
+  row: sql.ItemsRow,
+  containers: dict.Dict(Int, List(Int)),
+) -> world.Item {
+  let sql.ItemsRow(item_id:, name:, short:, long:, keywords:, container_id:) =
+    row
+
+  let contains = case container_id {
+    Some(container_id) ->
+      dict.get(containers, container_id)
+      |> result.unwrap([])
+      |> list.map(world.Id)
+      |> world.Contains
+
+    None -> world.NotContainer
+  }
+
+  world.Item(
+    id: world.Id(item_id),
+    name:,
+    short:,
+    long:,
+    keywords:,
+    wear_slot: world.Arms,
+    contains:,
+  )
 }
 
 pub fn insert_many(table_name: process.Name(Message), items: List(Item)) -> Nil {
