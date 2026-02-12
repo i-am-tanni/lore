@@ -11,10 +11,13 @@ import lore/world/room/response
 pub fn item_get(
   builder: response.Builder(CharacterMessage),
   event: Event(CharacterToRoomEvent, CharacterMessage),
-  item_keyword: String,
+  search_term: String,
 ) -> response.Builder(CharacterMessage) {
   let result = {
-    use item_instance <- result.try(find_local_item(builder, item_keyword))
+    use item_instance <- result.try(response.find_local_item(
+      builder,
+      search_term,
+    ))
     case item_instance.was_touched {
       // If item instance was previously touched by a mobile
       // then it was dropped and thus scheduled for clean up. Cancel that.
@@ -58,11 +61,4 @@ pub fn item_drop(
   builder
   |> response.item_insert(item_instance)
   |> response.broadcast(event.acting_character, ItemDropNotify(item_instance))
-}
-
-fn find_local_item(
-  builder: response.Builder(CharacterMessage),
-  search_term: String,
-) -> Result(world.ItemInstance, world.ErrorRoomRequest) {
-  response.find_local_item(builder, search_term)
 }
