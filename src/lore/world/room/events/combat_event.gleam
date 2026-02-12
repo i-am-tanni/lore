@@ -19,7 +19,7 @@ type CombatRoundTemp {
   )
 }
 
-pub fn request(
+pub fn combat_request(
   builder: response.Builder(CharacterMessage),
   event: Event(CharacterToRoomEvent, CharacterMessage),
   data: event.CombatRequestData,
@@ -51,13 +51,13 @@ pub fn request(
 
     Ok(round_data) if is_round_based -> response.round_push(builder, round_data)
 
-    Ok(combat_data) -> process_combat(builder, combat_data)
+    Ok(combat_data) -> combat_process(builder, combat_data)
 
     Error(error) -> response.reply_character(builder, event.ActFailed(error))
   }
 }
 
-pub fn round_trigger(
+pub fn combat_round_trigger(
   builder: response.Builder(event.RoomMessage),
   actions: List(event.CombatPollData),
 ) -> response.Builder(event.RoomMessage) {
@@ -112,7 +112,7 @@ pub fn round_trigger(
   }
 }
 
-pub fn process_combat(
+pub fn combat_process(
   builder: response.Builder(CharacterMessage),
   data: event.CombatPollData,
 ) -> response.Builder(CharacterMessage) {

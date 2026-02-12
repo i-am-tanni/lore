@@ -131,7 +131,7 @@ fn recv(state: State, msg: RoomMessage) -> actor.Next(State, RoomMessage) {
 
       state
       |> to_builder_room_msg
-      |> combat_event.round_trigger(round_actions)
+      |> combat_event.combat_round_trigger(round_actions)
       |> response.build
       |> handle_response(state, _)
     }
@@ -146,19 +146,20 @@ fn route_from_character(
 ) -> State {
   let builder = to_builder(state, event)
   let builder = case event.data {
-    event.MoveRequest(data) -> move_event.request(builder, event, data)
+    event.MoveRequest(data) -> move_event.move_request(builder, event, data)
     event.TeleportRequest(data) ->
-      move_event.request_teleport(builder, event, data)
-    event.MoveArrive(data) -> move_event.arrive(builder, event, data)
-    event.Look -> look_event.room_look(builder, event)
+      move_event.teleport_request(builder, event, data)
+    event.MoveArrive(data) -> move_event.move_arrive(builder, event, data)
+    event.Look -> look_event.look_room(builder, event)
     event.LookAt(data) -> look_event.look_at(builder, event, data)
-    event.RejoinRoom -> move_event.rejoin(builder, event)
-    event.DoorToggle(data) -> door_event.request(builder, event, data)
-    event.DoorUpdateEnd(data) -> door_event.update(builder, event, data)
+    event.RejoinRoom -> move_event.rejoin_room(builder, event)
+    event.DoorToggle(data) -> door_event.door_request(builder, event, data)
+    event.DoorUpdateEnd(data) -> door_event.door_update(builder, event, data)
     event.RoomCommunication(data) -> comm_event.broadcast(builder, event, data)
-    event.ItemGet(data) -> item_event.get(builder, event, data)
-    event.ItemDrop(data) -> item_event.drop(builder, event, data)
-    event.CombatRequest(data) -> combat_event.request(builder, event, data)
+    event.ItemGet(data) -> item_event.item_get(builder, event, data)
+    event.ItemDrop(data) -> item_event.item_drop(builder, event, data)
+    event.CombatRequest(data) ->
+      combat_event.combat_request(builder, event, data)
     event.Slay(data) -> combat_event.slay(builder, event, data)
     event.UpdateCharacter ->
       response.character_update(builder, event.acting_character)
@@ -176,9 +177,9 @@ fn route_from_zone(
   let builder = to_builder(state, event)
 
   case event.data {
-    event.MoveDepart(data) -> move_event.depart(builder, event, data)
+    event.MoveDepart(data) -> move_event.move_depart(builder, event, data)
     event.DoorUpdateBegin(data) ->
-      door_event.update(builder, event, data)
+      door_event.door_update(builder, event, data)
       |> response.reply(event.Done)
   }
   |> response.build
@@ -192,7 +193,7 @@ fn poll_room(
   let builder = to_builder(state, event)
 
   case event.data {
-    event.MovePoll(data) -> move_event.vote(builder, event, data)
+    event.MovePoll(data) -> move_event.move_vote(builder, event, data)
   }
   |> response.build
   |> handle_response(state, _)

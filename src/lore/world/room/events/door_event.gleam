@@ -10,7 +10,7 @@ import lore/world/event.{
 }
 import lore/world/room/response
 
-pub fn request(
+pub fn door_request(
   builder: response.Builder(CharacterMessage),
   event: Event(CharacterToRoomEvent, CharacterMessage),
   data: event.DoorToggleData,
@@ -23,8 +23,8 @@ pub fn request(
     use door_id <- result.try(case door.state, desired_state {
       Open, Closed -> Ok(door.id)
       Closed, Open -> Ok(door.id)
-      Open, Open -> door_error(NoChangeNeeded(Open))
-      Closed, Closed -> door_error(NoChangeNeeded(Closed))
+      Open, Open -> Error(DoorErr(NoChangeNeeded(Open)))
+      Closed, Closed -> Error(DoorErr(NoChangeNeeded(Closed)))
     })
     let acting_character = event.acting_character
     let world.Room(id:, ..) = response.room(builder)
@@ -47,7 +47,7 @@ pub fn request(
   }
 }
 
-pub fn update(
+pub fn door_update(
   builder: response.Builder(a),
   event: Event(b, a),
   data: event.DoorUpdateData,
@@ -85,10 +85,6 @@ pub fn update(
     // ..else no updates
     False -> builder
   }
-}
-
-fn door_error(error: world.ErrorDoor) -> Result(a, ErrorRoomRequest) {
-  Error(DoorErr(error))
 }
 
 fn door_get(exit: world.RoomExit) -> Result(world.Door, ErrorRoomRequest) {

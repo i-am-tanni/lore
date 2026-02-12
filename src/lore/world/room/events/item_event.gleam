@@ -8,7 +8,7 @@ import lore/world/event.{
 import lore/world/room/janitor
 import lore/world/room/response
 
-pub fn get(
+pub fn item_get(
   builder: response.Builder(CharacterMessage),
   event: Event(CharacterToRoomEvent, CharacterMessage),
   item_keyword: String,
@@ -40,7 +40,7 @@ pub fn get(
   }
 }
 
-pub fn drop(
+pub fn item_drop(
   builder: response.Builder(CharacterMessage),
   event: Event(CharacterToRoomEvent, CharacterMessage),
   item_instance: world.ItemInstance,

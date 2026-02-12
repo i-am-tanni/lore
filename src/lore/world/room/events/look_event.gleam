@@ -14,7 +14,7 @@ type Found {
   ExtraDesc(world.ExtraDesc)
 }
 
-pub fn room_look(
+pub fn look_room(
   builder: response.Builder(CharacterMessage),
   event: Event(event.CharacterToRoomEvent, CharacterMessage),
 ) -> response.Builder(CharacterMessage) {

@@ -21,7 +21,7 @@ import lore/world/system_tables
 
 /// The initial movement request by a character for an exit keyword.
 ///
-pub fn request(
+pub fn move_request(
   builder: response.Builder(CharacterMessage),
   event: Event(CharacterToRoomEvent, CharacterMessage),
   exit_keyword: world.Direction,
@@ -56,7 +56,7 @@ pub fn request(
 
 /// The initial movement request by a character for an exit keyword.
 ///
-pub fn request_teleport(
+pub fn teleport_request(
   builder: response.Builder(CharacterMessage),
   event: Event(CharacterToRoomEvent, CharacterMessage),
   to_room_id: Id(world.Room),
@@ -88,7 +88,7 @@ pub fn request_teleport(
 
 /// Destination room votes whether to accept the character's move.
 ///
-pub fn vote(
+pub fn move_vote(
   context: response.Builder(world.Vote(ErrorRoomRequest)),
   _event: Event(event.PollEvent, world.Vote(ErrorRoomRequest)),
   _data: world.Mobile,
@@ -98,7 +98,7 @@ pub fn vote(
 
 /// Remove departing character from room and notify occupants.
 ///
-pub fn depart(
+pub fn move_depart(
   builder: response.Builder(event.Done),
   event: Event(event.InterRoomEvent, event.Done),
   data: MoveDepartData,
@@ -118,7 +118,7 @@ pub fn depart(
 
 /// Add the arriving character to room and notify occupants.
 ///
-pub fn arrive(
+pub fn move_arrive(
   builder: response.Builder(CharacterMessage),
   event: Event(event.CharacterToRoomEvent, CharacterMessage),
   data: MoveArriveData,
@@ -160,7 +160,7 @@ pub fn arrive(
     True ->
       builder
       |> response.renderln(move_view.exit(from_exit_keyword))
-      |> look_event.room_look(event)
+      |> look_event.look_room(event)
 
     False -> builder
   }
@@ -168,7 +168,7 @@ pub fn arrive(
 
 /// Only called if character restarted and needs to resubscribe to the room.
 ///
-pub fn rejoin(
+pub fn rejoin_room(
   builder: response.Builder(CharacterMessage),
   event: Event(event.CharacterToRoomEvent, CharacterMessage),
 ) -> response.Builder(CharacterMessage) {
