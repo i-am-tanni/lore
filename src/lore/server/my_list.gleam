@@ -232,3 +232,24 @@ fn reverse_and_prepend(list prefix: List(a), to suffix: List(a)) -> List(a) {
     [first, ..rest] -> reverse_and_prepend(list: rest, to: [first, ..suffix])
   }
 }
+
+/// Similar to list.map but only performs the map if an Ok(update) is returned.
+///
+pub fn update(list: List(a), update_fun: fn(a) -> Result(a, b)) -> List(a) {
+  update_loop(list, update_fun, [])
+}
+
+fn update_loop(
+  list: List(a),
+  update_fun: fn(a) -> Result(a, b),
+  acc: List(a),
+) -> List(a) {
+  case list {
+    [] -> list.reverse(acc)
+    [first, ..rest] ->
+      case update_fun(first) {
+        Ok(update) -> update_loop(rest, update_fun, [update, ..acc])
+        Error(_) -> update_loop(rest, update_fun, [first, ..acc])
+      }
+  }
+}

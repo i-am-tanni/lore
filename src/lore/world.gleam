@@ -327,6 +327,22 @@ pub fn trim_character(character: MobileInternal) -> Mobile {
   )
 }
 
+pub fn mobile_identity() -> Mobile {
+  Mobile(
+    id: StringId("0"),
+    room_id: Id(0),
+    template_id: Npc(Id(0)),
+    name: "",
+    keywords: [],
+    pronouns: pronoun.Neutral,
+    short: "",
+    fighting: NoTarget,
+    affects: flag.Affects(0),
+    hp: 0,
+    hp_max: 0,
+  )
+}
+
 pub fn is_player(mobile: Mobile) -> Bool {
   case mobile.template_id {
     Player(_) -> True

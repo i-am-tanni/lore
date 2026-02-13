@@ -4,12 +4,31 @@ import gleam/string_tree.{type StringTree}
 import lore/character/flag
 import lore/character/view.{type View}
 import lore/world.{type Room}
+import lore/world/items
+import lore/world/mapper
+import lore/world/system_tables
 
 const color_room_title = "&189"
 
 const color_reset = "0;"
 
-pub fn room(room: Room, observer: world.Mobile) -> View {
+pub fn room_with_mini_map_impure(
+  room: Room,
+  observer: world.Mobile,
+  lookup: system_tables.Lookup,
+) -> View {
+  let loaded = items.load_instances(lookup.items, room.items)
+  let room = world.Room(..room, items: loaded)
+
+  [
+    view.blank(),
+    mini_map(mapper.render_mini_map(lookup.mapper, room.id)),
+    room_view(room, observer),
+  ]
+  |> view.join("\n")
+}
+
+pub fn room_view(room: Room, observer: world.Mobile) -> View {
   let preamble =
     [color_room_title, room.name, color_reset, "\n  ", room.description, "\n"]
     |> string_tree.from_strings
