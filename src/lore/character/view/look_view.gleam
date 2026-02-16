@@ -1,6 +1,6 @@
 import gleam/list
 import gleam/option.{None, Some}
-import gleam/string_tree.{type StringTree}
+import gleam/string_tree
 import lore/character/flag
 import lore/character/view.{type View}
 import lore/world.{type Room}
