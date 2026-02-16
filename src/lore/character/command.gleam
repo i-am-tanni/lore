@@ -16,11 +16,7 @@ import lore/character/flag
 import lore/character/socials
 import lore/character/users
 import lore/character/view
-import lore/character/view/character_view
-import lore/character/view/combat_view
-import lore/character/view/communication_view
-import lore/character/view/error_view
-import lore/character/view/item_view
+import lore/character/view/render
 import lore/world.{type Id, type Item, type Room, Id, StringId}
 import lore/world/event
 import lore/world/items
@@ -177,7 +173,7 @@ fn command(
   case args_result {
     Ok(data) -> command_fun(conn, data)
     Error(error) ->
-      conn.renderln(conn, error_view.render_error(error)) |> conn.prompt
+      conn.renderln(conn, render.render_error(error)) |> conn.prompt
   }
 }
 
@@ -191,7 +187,7 @@ fn admin_command(
   case args_fun() {
     Ok(data) -> command_fun(conn, data)
     Error(error) ->
-      conn.renderln(conn, error_view.render_error(error)) |> conn.prompt
+      conn.renderln(conn, render.render_error(error)) |> conn.prompt
   }
 }
 
@@ -458,7 +454,7 @@ fn move_command(conn: Conn, direction: world.Direction) -> Conn {
     world.NoTarget -> conn.action(conn, act.move(direction))
     world.Fighting(..) ->
       conn
-      |> conn.renderln(error_view.already_fighting())
+      |> conn.renderln(render.already_fighting())
       |> conn.prompt()
   }
 }
@@ -483,7 +479,7 @@ fn look_at_command(conn: Conn, command: Command(String)) -> Conn {
   case found_result {
     Ok(LookSelf) ->
       conn
-      |> conn.renderln(character_view.look_at(self))
+      |> conn.renderln(render.look_at(self))
       |> conn.prompt()
 
     Ok(LookItem(item_instance)) -> events.item_look_at(conn, item_instance)
@@ -497,22 +493,22 @@ fn room_comms(conn: Conn, command: Command(event.RoomCommunicationData)) {
   case data {
     event.SayData(text: "", ..) ->
       conn
-      |> conn.renderln(communication_view.empty("say"))
+      |> conn.renderln(render.empty("say"))
       |> conn.prompt()
 
     event.SayAtData(text: "", at:, ..) ->
       conn
-      |> conn.renderln(communication_view.empty("say to " <> at))
+      |> conn.renderln(render.empty("say to " <> at))
       |> conn.prompt()
 
     event.WhisperData(text: "", at:, ..) ->
       conn
-      |> conn.renderln(communication_view.empty("whisper to " <> at))
+      |> conn.renderln(render.empty("whisper to " <> at))
       |> conn.prompt()
 
     event.EmoteData(text: "") ->
       conn
-      |> conn.renderln(communication_view.empty("emote"))
+      |> conn.renderln(render.empty("emote"))
       |> conn.prompt()
 
     _ -> conn.action(conn, act.communicate(data))
@@ -533,7 +529,7 @@ fn chat_command(
     True -> conn.publish(conn, channel, message)
 
     False ->
-      conn.renderln(conn, communication_view.channel_not_subscribed(channel))
+      conn.renderln(conn, render.channel_not_subscribed(channel))
       |> conn.prompt()
   }
 }
@@ -555,7 +551,7 @@ fn drop_command(conn: Conn, command: Command(String)) -> Conn {
     Ok(item_instance) -> conn.action(conn, act.item_drop(item_instance))
     Error(Nil) ->
       conn
-      |> conn.renderln(error_view.not_carrying_error())
+      |> conn.renderln(render.not_carrying_error())
       |> conn.prompt()
   }
 }
@@ -574,12 +570,12 @@ fn kill_command(conn: Conn, command: Command(String)) -> Conn {
 
     True ->
       conn
-      |> conn.renderln(error_view.already_fighting())
+      |> conn.renderln(render.already_fighting())
       |> conn.prompt()
 
     False ->
       conn
-      |> conn.renderln(error_view.cannot_target_self())
+      |> conn.renderln(render.cannot_target_self())
       |> conn.prompt()
   }
 }
@@ -598,7 +594,7 @@ fn inventory_command(conn: Conn, _verb: Verb) -> Conn {
   let system_tables.Lookup(items:, ..) = conn.system_tables(conn)
   let character = conn.character_get(conn)
 
-  conn.renderln(conn, item_view.inventory(items, character))
+  conn.renderln(conn, render.inventory(items, character))
   |> conn.prompt()
 }
 
@@ -647,12 +643,12 @@ fn wear_command(conn: Conn, command: Command(String)) -> Conn {
 
       conn
       |> conn.character_put(updated_character)
-      |> conn.renderln(item_view.item_wear(item))
+      |> conn.renderln(render.item_wear(item))
       |> conn.prompt
     }
 
     Error(error) ->
-      conn |> conn.renderln(error_view.item_error(error)) |> conn.prompt
+      conn |> conn.renderln(render.item_error(error)) |> conn.prompt
   }
 }
 
@@ -685,12 +681,12 @@ fn remove_command(conn: Conn, command: Command(String)) -> Conn {
         inventory: [item_instance, ..self.inventory],
       )
       |> conn.character_put(conn, _)
-      |> conn.renderln(item_view.item_remove(items, item_instance))
+      |> conn.renderln(render.item_remove(items, item_instance))
       |> conn.prompt
     }
 
     Error(error) -> {
-      conn |> conn.renderln(error_view.item_error(error)) |> conn.prompt
+      conn |> conn.renderln(render.item_error(error)) |> conn.prompt
     }
   }
 }
@@ -698,17 +694,17 @@ fn remove_command(conn: Conn, command: Command(String)) -> Conn {
 fn equipment_command(conn: Conn, _verb: Verb) -> Conn {
   let self = conn.character_get(conn)
   let system_tables.Lookup(items:, ..) = conn.system_tables(conn)
-  conn |> conn.renderln(item_view.equipment(items, self)) |> conn.prompt
+  conn |> conn.renderln(render.equipment(items, self)) |> conn.prompt
 }
 
 fn who_command(conn: Conn) -> Conn {
   let system_tables.Lookup(user:, ..) = conn.system_tables(conn)
-  conn.render(conn, character_view.who_list(users.players_logged_in(user)))
+  conn.render(conn, render.who_list(users.players_logged_in(user)))
 }
 
 fn quit_command(conn: Conn) -> Conn {
   conn
-  |> conn.renderln(character_view.quit())
+  |> conn.renderln(render.quit())
   |> conn.terminate
 }
 
@@ -760,7 +756,7 @@ fn kick_command(conn: Conn, command: Command(Victim)) -> Conn {
 
         Error(_) ->
           conn
-          |> conn.renderln(error_view.user_not_found(victim))
+          |> conn.renderln(render.user_not_found(victim))
           |> conn.prompt
       }
     }
@@ -840,7 +836,7 @@ fn smite_command(conn: Conn, command: Command(Victim)) -> Conn {
         let victim_id = StringId(string.uppercase(victim))
         use room_id <- try(presence.lookup(presence, victim_id))
         conn.event_to_room(conn, room_id, event.Slay(event.SearchId(victim_id)))
-        |> conn.renderln(combat_view.smite_1p(victim))
+        |> conn.renderln(render.smite_1p(victim))
         |> conn.prompt
         |> Ok
       }
@@ -869,7 +865,7 @@ fn item_spawn_command(conn: Conn, command: Command(Id(Item))) -> Conn {
     let inventory = [item_instance, ..character.inventory]
     world.MobileInternal(..character, inventory:)
     |> conn.character_put(conn, _)
-    |> conn.renderln(item_view.spawn_item(loaded))
+    |> conn.renderln(render.spawn_item(loaded))
     |> conn.prompt
     |> Ok
   }

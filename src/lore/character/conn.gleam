@@ -14,8 +14,7 @@ import gleam/result
 import gleam/set.{type Set}
 import lore/character/controller.{type Controller}
 import lore/character/view.{type View}
-import lore/character/view/communication_view
-import lore/character/view/prompt_view
+import lore/character/view/render
 import lore/server/output.{type Text}
 import lore/world.{type Id, type Room, type StringId}
 import lore/world/communication
@@ -361,11 +360,10 @@ pub fn subscribe(conn: Conn, channel: world.ChatChannel) -> Conn {
   }
 
   case result {
-    Ok(conn) -> renderln(conn, communication_view.subscribe_success(channel))
-    Error(NotFound) ->
-      renderln(conn, communication_view.already_subscribed(channel))
+    Ok(conn) -> renderln(conn, render.subscribe_success(channel))
+    Error(NotFound) -> renderln(conn, render.already_subscribed(channel))
     Error(ChannelOperationFailed) ->
-      renderln(conn, communication_view.subscribe_fail(channel))
+      renderln(conn, render.subscribe_fail(channel))
   }
 }
 
@@ -383,11 +381,10 @@ pub fn unsubscribed(conn: Conn, channel: world.ChatChannel) -> Conn {
   }
 
   case result {
-    Ok(conn) -> renderln(conn, communication_view.subscribe_success(channel))
-    Error(NotFound) ->
-      renderln(conn, communication_view.already_unsubscribed(channel))
+    Ok(conn) -> renderln(conn, render.subscribe_success(channel))
+    Error(NotFound) -> renderln(conn, render.already_unsubscribed(channel))
     Error(ChannelOperationFailed) ->
-      renderln(conn, communication_view.unsubscribe_fail(channel))
+      renderln(conn, render.unsubscribe_fail(channel))
   }
 }
 
@@ -417,7 +414,7 @@ pub fn to_response(conn: Conn) -> Response {
         |> output.Text(text: _, newline: True)
 
       let prompt =
-        prompt_view.prompt(character_get(conn))
+        render.prompt(character_get(conn))
         |> view.to_string_tree
         |> output.Text(text: _, newline: False)
 

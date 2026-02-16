@@ -10,13 +10,7 @@ import lore/character/act
 import lore/character/conn.{type Conn}
 import lore/character/flag
 import lore/character/view
-import lore/character/view/character_view
-import lore/character/view/combat_view
-import lore/character/view/communication_view
-import lore/character/view/door_view
-import lore/character/view/error_view
-import lore/character/view/item_view
-import lore/character/view/move_view
+import lore/character/view/render
 import lore/world.{type Id, type Room}
 import lore/world/event.{type CharacterEvent, type Event, type RoomMessage}
 import lore/world/items
@@ -29,18 +23,17 @@ pub fn route_player(
   case event.data {
     event.ActFailed(reason) ->
       conn
-      |> conn.renderln(error_view.room_request_error(reason))
+      |> conn.renderln(render.room_request_error(reason))
       |> conn.prompt()
     // move events
     //
     event.MoveNotifyArrive(data) -> notify_arrive(conn, event, data)
     event.MoveNotifyDepart(data) -> notify_depart(conn, event, data)
     event.MoveCommit(data) -> move_commit(conn, event, data)
-    event.DoorNotify(data) -> notify(conn, event, data, door_view.notify)
+    event.DoorNotify(data) -> notify(conn, event, data, render.door_notify)
     // communication
     //
-    event.Communication(data) ->
-      notify(conn, event, data, communication_view.notify)
+    event.Communication(data) -> notify(conn, event, data, render.communication)
     // item events
     //
     event.ItemGetNotify(item) -> item_get(conn, event, item)
@@ -63,7 +56,7 @@ pub fn route_player(
 
     event.MobileInspectResponse(character:) ->
       conn
-      |> conn.renderln(character_view.look_at(character))
+      |> conn.renderln(render.look_at(character))
       |> conn.prompt()
 
     event.Kick(initiated_by: admin) ->
@@ -120,7 +113,7 @@ fn notify_arrive(
   let event.NotifyArriveData(enter_keyword:, ..) = data
   conn.renderln(
     conn,
-    move_view.notify_arrive(event.acting_character, enter_keyword),
+    render.notify_arrive(event.acting_character, enter_keyword),
   )
   |> conn.prompt()
 }
@@ -132,7 +125,7 @@ fn notify_depart(
 ) -> Conn {
   let event.NotifyDepartData(exit_keyword:, ..) = data
   conn
-  |> conn.renderln(move_view.notify_depart(event.acting_character, exit_keyword))
+  |> conn.renderln(render.notify_depart(event.acting_character, exit_keyword))
   |> conn.prompt()
 }
 
@@ -154,12 +147,12 @@ fn item_get(
 
         conn
         |> conn.character_put(world.MobileInternal(..self, inventory: update))
-        |> conn.renderln(item_view.get(self, event.acting_character, item))
+        |> conn.renderln(render.get(self, event.acting_character, item))
         |> Ok
       }
 
       False ->
-        conn.renderln(conn, item_view.get(self, event.acting_character, item))
+        conn.renderln(conn, render.get(self, event.acting_character, item))
         |> Ok
     }
   }
@@ -185,12 +178,12 @@ fn item_drop(
 
         conn
         |> conn.character_put(world.MobileInternal(..self, inventory: update))
-        |> conn.renderln(item_view.drop(self, event.acting_character, item))
+        |> conn.renderln(render.drop(self, event.acting_character, item))
         |> Ok
       }
 
       False ->
-        conn.renderln(conn, item_view.drop(self, event.acting_character, item))
+        conn.renderln(conn, render.drop(self, event.acting_character, item))
         |> Ok
     }
   }
@@ -205,15 +198,15 @@ pub fn item_look_at(conn: Conn, item_instance: world.ItemInstance) -> Conn {
   case item_load(conn, item_instance), item_instance.contains {
     Ok(item), world.NotContainer ->
       conn
-      |> conn.renderln(item_view.inspect(item))
+      |> conn.renderln(render.inspect(item))
       |> conn.prompt
 
     Ok(item), world.Contains(contents) -> {
       let system_tables.Lookup(items:, ..) = conn.system_tables(conn)
 
       conn
-      |> conn.renderln(item_view.inspect(item))
-      |> conn.renderln(item_view.item_contains(items, contents))
+      |> conn.renderln(render.inspect(item))
+      |> conn.renderln(render.item_contains(items, contents))
       |> conn.prompt
     }
 
@@ -251,8 +244,9 @@ fn combat_commit(conn: Conn, data: event.CombatCommitData) -> Conn {
   let conn = {
     let self = option.unwrap(self_update, self)
     case is_victim_dead {
-      True -> conn.renderln(conn, combat_view.notify(self, data)) |> conn.prompt
-      False -> conn.render(conn, combat_view.notify(self, data))
+      True ->
+        conn.renderln(conn, render.combat_notify(self, data)) |> conn.prompt
+      False -> conn.render(conn, render.combat_notify(self, data))
     }
   }
 
@@ -287,7 +281,7 @@ fn combat_commit_round(
     let conn =
       conn
       |> conn.character_put(self)
-      |> conn.renderln(combat_view.round_report(self, participants, commits))
+      |> conn.renderln(render.round_report(self, participants, commits))
 
     case self.fighting {
       _ if self.hp <= 0 && !has_auto_revive -> conn.terminate(conn)
@@ -295,7 +289,7 @@ fn combat_commit_round(
       world.Fighting(victim_id) ->
         conn
         |> auto_attack(victim_id)
-        |> conn.renderln(combat_view.round_summary(self, participants))
+        |> conn.renderln(render.round_summary(self, participants))
         |> conn.prompt
 
       world.NoTarget -> conn.prompt(conn)

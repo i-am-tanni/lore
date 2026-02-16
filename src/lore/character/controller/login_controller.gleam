@@ -9,7 +9,7 @@ import lore/character/controller.{
 import lore/character/pronoun
 import lore/character/users
 import lore/character/view
-import lore/character/view/login_view
+import lore/character/view/render
 import lore/world.{Id}
 import lore/world/sql
 import lore/world/system_tables
@@ -32,8 +32,8 @@ pub fn init(conn: Conn, flash: LoginFlash) -> Conn {
 
   conn
   |> flash_put(flash)
-  |> conn.renderln(login_view.login())
-  |> conn.renderln(login_view.name())
+  |> conn.renderln(render.login_greeting())
+  |> conn.renderln(render.login_name())
 }
 
 pub fn recv(conn: Conn, flash: LoginFlash, msg: controller.Request) -> Conn {
@@ -72,7 +72,7 @@ fn account_name(conn: Conn, flash: LoginFlash, input: String) -> Conn {
       ),
     )
     |> conn.echo_disable
-    |> conn.render(login_view.password(name))
+    |> conn.render(render.password(name))
     |> Ok
   }
 
@@ -85,7 +85,7 @@ fn account_name(conn: Conn, flash: LoginFlash, input: String) -> Conn {
         LoginFlash(..flash, name:, stage: controller.LoginConfirmNewAccount)
 
       conn
-      |> conn.render(login_view.new_name_confirm(name))
+      |> conn.render(render.new_name_confirm(name))
       |> flash_put(update)
     }
 
@@ -93,7 +93,7 @@ fn account_name(conn: Conn, flash: LoginFlash, input: String) -> Conn {
       use score <- penalize(conn, flash, amount: 3)
       conn
       |> flash_put(LoginFlash(..flash, score:))
-      |> conn.renderln(login_view.name())
+      |> conn.renderln(render.login_name())
     }
 
     Error(DatabaseError(_)) -> conn.terminate(conn)
@@ -106,14 +106,14 @@ fn new_account_confirm(conn: Conn, flash: LoginFlash, input: String) -> Conn {
   case string.lowercase(answer) {
     "y" | "ye" | "yes" | "" ->
       conn
-      |> conn.render(login_view.new_password1())
+      |> conn.render(render.new_password1())
       |> conn.echo_disable
       |> flash_put(LoginFlash(..flash, stage: controller.LoginNewPassword))
 
     "n" | "no" -> {
       use score <- penalize(conn, flash, amount: 4)
       conn
-      |> conn.render(login_view.name_abort())
+      |> conn.render(render.name_abort())
       |> flash_put(
         LoginFlash(..flash, score:, name: "", stage: controller.LoginName),
       )
@@ -122,7 +122,7 @@ fn new_account_confirm(conn: Conn, flash: LoginFlash, input: String) -> Conn {
     _ -> {
       use score <- penalize(conn, flash, amount: 3)
       conn
-      |> conn.render(login_view.new_name_confirm(flash.name))
+      |> conn.render(render.new_name_confirm(flash.name))
       |> flash_put(LoginFlash(..flash, score:))
     }
   }
@@ -146,7 +146,7 @@ fn new_password(conn: Conn, flash: LoginFlash, input: String) -> Conn {
 
     conn
     |> flash_put(update)
-    |> conn.render(login_view.new_password2())
+    |> conn.render(render.new_password2())
     |> Ok
   }
 
@@ -155,7 +155,7 @@ fn new_password(conn: Conn, flash: LoginFlash, input: String) -> Conn {
     Error(_) -> {
       use score <- penalize(conn, flash, amount: 4)
       conn
-      |> conn.render(login_view.password_invalid())
+      |> conn.render(render.password_invalid())
       |> flash_put(LoginFlash(..flash, score:))
     }
   }
@@ -183,7 +183,7 @@ fn new_password_confirm(conn: Conn, flash: LoginFlash, input: String) -> Conn {
     Ok(False) -> {
       use score <- penalize(conn, flash, amount: 4)
       conn
-      |> conn.render(login_view.password_mismatch_err())
+      |> conn.render(render.password_mismatch_err())
       |> flash_put(
         LoginFlash(..flash, score:, stage: controller.LoginNewPassword),
       )
@@ -208,7 +208,7 @@ fn password(conn: Conn, flash: LoginFlash, input: String) -> Conn {
     Ok(False) -> {
       use score <- penalize(conn, flash, amount: 5)
       conn
-      |> conn.render(login_view.password_err())
+      |> conn.render(render.password_err())
       |> flash_put(LoginFlash(..flash, score:, stage: controller.LoginPassword))
     }
 

@@ -15,8 +15,7 @@ import gleam/time/duration
 import gleam/time/timestamp
 import lore/character/flag
 import lore/character/view
-import lore/character/view/look_view
-import lore/character/view/move_view
+import lore/character/view/render
 import lore/server/my_list
 import lore/world.{
   type ErrorRoomRequest, type Id, type Mobile, type Room, type StringId, Closed,
@@ -459,8 +458,8 @@ fn move_arrive(
     True -> {
       fn() {
         [
-          move_view.exit(from_exit_keyword),
-          look_view.room_with_mini_map_impure(
+          render.exit(from_exit_keyword),
+          render.room_with_mini_map_impure(
             room,
             event.acting_character,
             model.lookup,
@@ -498,7 +497,7 @@ fn look_room(
 ) -> #(Model, RoomEffect(CharacterMessage)) {
   let effect =
     effect.render_lazy(event.from, fn() {
-      look_view.room_with_mini_map_impure(
+      render.room_with_mini_map_impure(
         model.room,
         event.acting_character,
         model.lookup,
