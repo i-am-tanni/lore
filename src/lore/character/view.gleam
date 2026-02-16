@@ -6,7 +6,6 @@ import gleam/string
 import gleam/string_tree.{type StringTree}
 import hyphenation
 import hyphenation/language
-import lore/character/pronoun
 import lore/world
 
 pub type PerspectiveSimple {
@@ -133,7 +132,7 @@ fn report_simple_loop(
   subject: world.Mobile,
   acc: BytesTree,
 ) -> Result(String, Nil) {
-  let pronouns = pronoun.lookup(subject.pronouns)
+  let pronouns = world.pronouns(subject.pronouns)
   case report_basic {
     <<>> ->
       acc
@@ -212,8 +211,8 @@ fn report_advanced_loop(
   victim: world.Mobile,
   acc: BytesTree,
 ) -> Result(String, Nil) {
-  let subject_pronouns = pronoun.lookup(subject.pronouns)
-  let victim_pronouns = pronoun.lookup(subject.pronouns)
+  let subject_pronouns = world.pronouns(subject.pronouns)
+  let victim_pronouns = world.pronouns(subject.pronouns)
 
   case report_advanced {
     <<>> ->

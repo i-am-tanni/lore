@@ -6,7 +6,6 @@ import lore/character/conn.{type Conn}
 import lore/character/controller.{
   type LoginFlash, CharacterFlash, LoginFlash, UserSentCommand,
 }
-import lore/character/pronoun
 import lore/character/users
 import lore/character/view
 import lore/character/view/render
@@ -231,7 +230,7 @@ fn login(conn: Conn, flash: LoginFlash) -> Conn {
       template_id: world.Player(Id(0)),
       role: world.Admin,
       keywords: [string.lowercase(name)],
-      pronouns: pronoun.Feminine,
+      pronouns: world.Feminine,
       short: name <> " is standing here.",
       inventory: [],
       equipment:,

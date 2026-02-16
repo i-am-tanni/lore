@@ -4,7 +4,6 @@ import gleam/int
 import gleam/list
 import gleam/option.{type Option}
 import lore/character/flag
-import lore/character/pronoun
 
 pub type RoomTemplate
 
@@ -103,7 +102,7 @@ pub type Mobile {
     template_id: TemplateId,
     name: String,
     keywords: List(String),
-    pronouns: pronoun.PronounChoice,
+    pronouns: PronounKind,
     short: String,
     fighting: Fighting,
     affects: flag.Affects,
@@ -136,7 +135,7 @@ pub type MobileInternal {
     keywords: List(String),
     inventory: List(ItemInstance),
     equipment: Dict(WearSlot, Wearing),
-    pronouns: pronoun.PronounChoice,
+    pronouns: PronounKind,
     short: String,
     fighting: Fighting,
     affects: Affects,
@@ -334,7 +333,7 @@ pub fn mobile_identity() -> Mobile {
     template_id: Npc(Id(0)),
     name: "",
     keywords: [],
-    pronouns: pronoun.Neutral,
+    pronouns: PronounNeutral,
     short: "",
     fighting: NoTarget,
     affects: flag.Affects(0),
@@ -360,3 +359,34 @@ pub fn item_id(instance: ItemInstance) -> Id(Item) {
 pub fn affects_init() -> Affects {
   Affects(flags: flag.Affects(0))
 }
+
+pub type Pronoun {
+  /// Note: These are only masculine because he/him/his/himself is clearer
+  /// than she/her/her/herself
+  Pronoun(he: String, him: String, his: String, himself: String)
+}
+
+pub type PronounKind {
+  Feminine
+  Masculine
+  PronounNeutral
+}
+
+pub fn pronouns(choice: PronounKind) -> Pronoun {
+  case choice {
+    Feminine -> feminine
+    Masculine -> masculine
+    PronounNeutral -> neutral
+  }
+}
+
+const feminine = Pronoun(he: "she", him: "her", his: "her", himself: "herself")
+
+const masculine = Pronoun(he: "he", him: "him", his: "his", himself: "himself")
+
+const neutral = Pronoun(
+  he: "they",
+  him: "them",
+  his: "their",
+  himself: "themself",
+)

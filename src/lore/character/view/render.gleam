@@ -10,7 +10,6 @@ import gleam/option.{type Option, None, Some}
 import gleam/result.{try}
 import gleam/string_tree
 import lore/character/flag
-import lore/character/pronoun
 import lore/character/users
 import lore/character/view.{type View}
 import lore/world.{type Direction, type Mobile, type Room, type StringId}
@@ -874,7 +873,7 @@ fn last_character(binary: BitArray, last_char: BitArray) -> BitArray {
 }
 
 fn pronoun_self(acting_character: world.Mobile) -> String {
-  let pronoun.Pronoun(himself:, ..) = pronoun.lookup(acting_character.pronouns)
+  let world.Pronoun(himself:, ..) = world.pronouns(acting_character.pronouns)
   himself
 }
 

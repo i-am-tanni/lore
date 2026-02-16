@@ -10,7 +10,6 @@ import gleam/pair
 import gleam/result.{try}
 import gleam/set
 import lore/character/character_registry
-import lore/character/pronoun
 import lore/character/users
 import lore/world.{
   type Id, type Mobile, type Npc, type Room, type SpawnGroup, type StringId, Id,
@@ -210,7 +209,7 @@ fn to_mobile(
     name: row.name,
     role: world.User,
     keywords: row.keywords,
-    pronouns: pronoun.Masculine,
+    pronouns: world.Masculine,
     short: row.short,
     inventory: [],
     equipment: dict.new(),

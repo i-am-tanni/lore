@@ -20,7 +20,6 @@ import lore/character/controller.{type Controller}
 import lore/character/controller/character_controller
 import lore/character/controller/login_controller
 import lore/character/controller/spawn_controller
-import lore/character/pronoun
 import lore/character/view
 import lore/character/view/render
 import lore/server/output
@@ -103,7 +102,7 @@ fn init_reception(
       role: world.User,
       keywords: [],
       short: "",
-      pronouns: pronoun.Feminine,
+      pronouns: world.Feminine,
       inventory: [],
       equipment: dict.new(),
       fighting: world.NoTarget,
