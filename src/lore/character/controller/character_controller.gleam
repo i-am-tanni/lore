@@ -3,7 +3,7 @@ import lore/character/command
 import lore/character/conn.{type Conn}
 import lore/character/controller.{type CharacterFlash}
 import lore/character/events
-import lore/character/view/communication_view
+import lore/character/view/render
 import lore/world
 import lore/world/system_tables
 
@@ -26,7 +26,7 @@ pub fn recv(
 
     controller.Chat(data) if is_player ->
       conn
-      |> conn.renderln(communication_view.chat(data))
+      |> conn.renderln(render.chat(data))
       |> conn.prompt()
 
     controller.Chat(_) -> conn

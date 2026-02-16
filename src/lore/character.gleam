@@ -22,7 +22,7 @@ import lore/character/controller/login_controller
 import lore/character/controller/spawn_controller
 import lore/character/pronoun
 import lore/character/view
-import lore/character/view/prompt_view
+import lore/character/view/render
 import lore/server/output
 import lore/world.{Id, Player}
 import lore/world/communication
@@ -192,7 +192,7 @@ fn recv(
             Some(endpoint) -> {
               // Append prompt and push text to socket
               let prompt =
-                prompt_view.prompt(state.character)
+                render.prompt(state.character)
                 |> view.to_string_tree
                 |> output.Text(text: _, newline: False)
 

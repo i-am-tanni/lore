@@ -415,16 +415,16 @@ pub fn look_at(character: world.MobileInternal) -> View {
 // Error views
 //
 
-pub fn parse_error() -> View {
+pub fn error_parse() -> View {
   "huh?"
   |> view.Leaf
 }
 
-pub fn render_error(error: String) -> View {
+pub fn error(error: String) -> View {
   view.Leaf(error)
 }
 
-pub fn room_request_error(error: world.ErrorRoomRequest) -> View {
+pub fn error_room_request(error: world.ErrorRoomRequest) -> View {
   case error {
     world.UnknownExit(direction:) ->
       ["There is no exit ", direction_to_string(direction), "."]
@@ -442,9 +442,9 @@ pub fn room_request_error(error: world.ErrorRoomRequest) -> View {
       "So strange. It's as if that destination doesn't want to be found."
       |> view.Leaf
 
-    world.MoveErr(move_err) -> move_error(move_err)
+    world.MoveErr(move_err) -> error_move(move_err)
 
-    world.DoorErr(door_err) -> door_error(door_err)
+    world.DoorErr(door_err) -> error_door(door_err)
 
     world.NotFound(keyword) ->
       ["Unable to find '", keyword, "'."] |> view.Leaves
@@ -455,7 +455,7 @@ pub fn room_request_error(error: world.ErrorRoomRequest) -> View {
   }
 }
 
-pub fn item_error(err: world.ErrorItem) -> View {
+pub fn error_item(err: world.ErrorItem) -> View {
   case err {
     world.UnknownItem(search_term:, verb:) -> [
       "You are not ",
@@ -487,17 +487,17 @@ pub fn item_error(err: world.ErrorItem) -> View {
   |> view.Leaves
 }
 
-pub fn not_carrying_error() -> View {
+pub fn error_not_carrying() -> View {
   "You aren't carrying that." |> view.Leaf
 }
 
-fn move_error(error: world.ErrorMove) -> View {
+fn error_move(error: world.ErrorMove) -> View {
   case error {
     world.Unauthorized -> "You lack the permissions to enter." |> view.Leaf
   }
 }
 
-fn door_error(error: world.ErrorDoor) -> View {
+fn error_door(error: world.ErrorDoor) -> View {
   case error {
     world.DoorLocked -> "The door is closed and locked." |> view.Leaf
     world.NoChangeNeeded(state) ->
@@ -508,15 +508,15 @@ fn door_error(error: world.ErrorDoor) -> View {
   }
 }
 
-pub fn cannot_target_self() {
+pub fn error_cannot_target_self() {
   "That would be unwise." |> view.Leaf
 }
 
-pub fn already_fighting() {
+pub fn error_already_fighting() {
   "You are fighting for your life!" |> view.Leaf
 }
 
-pub fn user_not_found(name: String) -> View {
+pub fn error_user_not_found(name: String) -> View {
   ["User ", name, " not found."]
   |> view.Leaves
 }

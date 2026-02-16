@@ -23,7 +23,7 @@ pub fn route_player(
   case event.data {
     event.ActFailed(reason) ->
       conn
-      |> conn.renderln(render.room_request_error(reason))
+      |> conn.renderln(render.error_room_request(reason))
       |> conn.prompt()
     // move events
     //

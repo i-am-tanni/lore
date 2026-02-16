@@ -172,8 +172,7 @@ fn command(
 ) -> Conn {
   case args_result {
     Ok(data) -> command_fun(conn, data)
-    Error(error) ->
-      conn.renderln(conn, render.render_error(error)) |> conn.prompt
+    Error(error) -> conn.renderln(conn, render.error(error)) |> conn.prompt
   }
 }
 
@@ -186,8 +185,7 @@ fn admin_command(
   use <- bool.lazy_guard(role != world.Admin, fn() { unknown_command(conn) })
   case args_fun() {
     Ok(data) -> command_fun(conn, data)
-    Error(error) ->
-      conn.renderln(conn, render.render_error(error)) |> conn.prompt
+    Error(error) -> conn.renderln(conn, render.error(error)) |> conn.prompt
   }
 }
 
@@ -454,7 +452,7 @@ fn move_command(conn: Conn, direction: world.Direction) -> Conn {
     world.NoTarget -> conn.action(conn, act.move(direction))
     world.Fighting(..) ->
       conn
-      |> conn.renderln(render.already_fighting())
+      |> conn.renderln(render.error_already_fighting())
       |> conn.prompt()
   }
 }
@@ -551,7 +549,7 @@ fn drop_command(conn: Conn, command: Command(String)) -> Conn {
     Ok(item_instance) -> conn.action(conn, act.item_drop(item_instance))
     Error(Nil) ->
       conn
-      |> conn.renderln(render.not_carrying_error())
+      |> conn.renderln(render.error_not_carrying())
       |> conn.prompt()
   }
 }
@@ -570,12 +568,12 @@ fn kill_command(conn: Conn, command: Command(String)) -> Conn {
 
     True ->
       conn
-      |> conn.renderln(render.already_fighting())
+      |> conn.renderln(render.error_already_fighting())
       |> conn.prompt()
 
     False ->
       conn
-      |> conn.renderln(render.cannot_target_self())
+      |> conn.renderln(render.error_cannot_target_self())
       |> conn.prompt()
   }
 }
@@ -648,7 +646,7 @@ fn wear_command(conn: Conn, command: Command(String)) -> Conn {
     }
 
     Error(error) ->
-      conn |> conn.renderln(render.item_error(error)) |> conn.prompt
+      conn |> conn.renderln(render.error_item(error)) |> conn.prompt
   }
 }
 
@@ -686,7 +684,7 @@ fn remove_command(conn: Conn, command: Command(String)) -> Conn {
     }
 
     Error(error) -> {
-      conn |> conn.renderln(render.item_error(error)) |> conn.prompt
+      conn |> conn.renderln(render.error_item(error)) |> conn.prompt
     }
   }
 }
@@ -756,7 +754,7 @@ fn kick_command(conn: Conn, command: Command(Victim)) -> Conn {
 
         Error(_) ->
           conn
-          |> conn.renderln(render.user_not_found(victim))
+          |> conn.renderln(render.error_user_not_found(victim))
           |> conn.prompt
       }
     }
