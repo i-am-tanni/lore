@@ -19,10 +19,15 @@ pub fn room_with_mini_map_impure(
 ) -> View {
   let loaded = items.load_instances(lookup.items, room.items)
   let room = world.Room(..room, items: loaded)
+  let mini_map =
+    mapper.render_mini_map(lookup.mapper, room.id)
+    |> string_tree.join("\n")
+    |> string_tree.append("\n")
+    |> view.Tree
 
   [
     view.blank(),
-    mini_map(mapper.render_mini_map(lookup.mapper, room.id)),
+    mini_map,
     room_view(room, observer),
   ]
   |> view.join("\n")
@@ -84,12 +89,5 @@ pub fn room_view(room: Room, observer: world.Mobile) -> View {
   [preamble, exits, items, mobiles]
   |> list.filter(fn(tree) { !string_tree.is_empty(tree) })
   |> string_tree.concat
-  |> view.Tree
-}
-
-pub fn mini_map(lines: List(StringTree)) -> View {
-  lines
-  |> string_tree.join("\n")
-  |> string_tree.append("\n")
   |> view.Tree
 }
