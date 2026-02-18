@@ -491,12 +491,12 @@ fn is_busy(cooldown: GlobalCooldown, action: event.Action) -> Bool {
   case cooldown {
     Idle -> False
     Busy(priority:, timer:, ..) ->
-      case event.is_priority_gt(priority, action.priority) {
-        True -> True
-        False -> {
+      case event.is_priority_gt(action.priority, priority) {
+        True -> {
           process.cancel_timer(timer)
           False
         }
+        False -> True
       }
   }
 }
