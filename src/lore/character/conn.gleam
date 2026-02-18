@@ -438,60 +438,65 @@ pub fn to_response(conn: Conn) -> Response {
   )
 }
 
+type ErrorAction {
+  ErrBusy
+  ActFailed(String)
+}
+
 // Convert actions to events if they can be performed. Stash the remainder.
 fn process_actions(conn: Conn, actions: List(event.Action)) -> Conn {
   case actions {
-    [next, ..rest] ->
-      case can_act(conn.cooldown, next) {
-        True ->
-          case perform(conn, next) {
-            Ok(conn) -> process_actions(conn, rest)
-            // In the case of being free to act BUT failing the conditions,
-            // clear the action queue as the rest of the chain is likely
-            // dependent.
-            Error(_reason) -> Conn(..conn, actions: [], cooldown: Idle)
-          }
+    [] -> Conn(..conn, actions: [])
+    [first, ..rest] -> {
+      let result = {
+        use <- bool.guard(is_busy(conn.cooldown, first), Error(ErrBusy))
+        use _ <- result.try(
+          first.condition(conn.character)
+          |> result.map_error(ActFailed),
+        )
+        // Put on cooldown if the action has a delay.
+        let conn = case first.delay {
+          delay if delay <= 0 -> Conn(..conn, cooldown: Idle)
+          // if delay is > 0, schedule a cooldown expiration notification to self
+          delay -> {
+            let event.Action(id:, priority:, ..) = first
+            let timer =
+              process.send_after(conn.self, delay, event.CooldownExpired(id:))
 
-        // ..else if the character cannot act, append the action queue
-        False -> Conn(..conn, actions: actions)
+            Conn(..conn, cooldown: Busy(id:, priority:, timer:))
+          }
+        }
+        Ok(event(conn, first.event))
       }
 
-    [] -> Conn(..conn, actions: [])
-  }
-}
-
-fn perform(conn: Conn, action: event.Action) -> Result(Conn, String) {
-  use _ <- result.try(action.condition(conn.character))
-  let conn = event(conn, action.event)
-  // If the action succeeds, schedule the next global cooldown timer
-
-  case action.delay {
-    delay if delay <= 0 -> Conn(..conn, cooldown: Idle)
-    // if delay is > 0, schedule a cooldown expiration notification to self
-    delay -> {
-      let event.Action(id:, priority:, ..) = action
-      let timer =
-        process.send_after(conn.self, delay, event.CooldownExpired(id:))
-
-      Conn(..conn, cooldown: Busy(id:, priority:, timer:))
+      case result {
+        // If busy, must wait til cooldown completes or cancel the cooldown with
+        // a higher priority action to perform next action.
+        Error(ErrBusy) -> Conn(..conn, actions:)
+        // If the act fails, assume all other queued actions depend on its
+        // success and cancel.
+        Error(ActFailed(_reason)) -> Conn(..conn, actions: [], cooldown: Idle)
+        // ..else the action was successfully converted into an event and we
+        // can try to process another.
+        Ok(update) -> process_actions(update, rest)
+      }
     }
   }
-  |> Ok
 }
 
 // Character can act if either:
 // - Idle
 // - the requested action's priority exceeds cooldown's priority level
-fn can_act(cooldown: GlobalCooldown, action: event.Action) -> Bool {
+fn is_busy(cooldown: GlobalCooldown, action: event.Action) -> Bool {
   case cooldown {
-    Idle -> True
+    Idle -> False
     Busy(priority:, timer:, ..) ->
       case event.is_priority_gt(action.priority, priority) {
         True -> {
           process.cancel_timer(timer)
-          True
+          False
         }
-        False -> False
+        False -> True
       }
   }
 }
