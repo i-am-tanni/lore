@@ -307,7 +307,7 @@ pub fn container_contents(
   |> list.map(fn(item) { view.Leaves(["  ", item.name]) })
 }
 
-pub fn get(
+pub fn item_get(
   self: world.MobileInternal,
   acting_character: world.Mobile,
   item: world.Item,
@@ -323,7 +323,7 @@ pub fn get(
   |> view.Leaves
 }
 
-pub fn drop(
+pub fn item_drop(
   self: world.MobileInternal,
   acting_character: world.Mobile,
   item: world.Item,
@@ -339,7 +339,7 @@ pub fn drop(
   |> view.Leaves
 }
 
-pub fn inspect(item: world.Item) -> View {
+pub fn item_inspect(item: world.Item) -> View {
   [item.name, "\n  ", item.long] |> view.Leaves
 }
 

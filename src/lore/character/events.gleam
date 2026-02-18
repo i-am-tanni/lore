@@ -147,12 +147,12 @@ fn item_get(
 
         conn
         |> conn.character_put(world.MobileInternal(..self, inventory: update))
-        |> conn.renderln(render.get(self, event.acting_character, item))
+        |> conn.renderln(render.item_get(self, event.acting_character, item))
         |> Ok
       }
 
       False ->
-        conn.renderln(conn, render.get(self, event.acting_character, item))
+        conn.renderln(conn, render.item_get(self, event.acting_character, item))
         |> Ok
     }
   }
@@ -178,12 +178,15 @@ fn item_drop(
 
         conn
         |> conn.character_put(world.MobileInternal(..self, inventory: update))
-        |> conn.renderln(render.drop(self, event.acting_character, item))
+        |> conn.renderln(render.item_drop(self, event.acting_character, item))
         |> Ok
       }
 
       False ->
-        conn.renderln(conn, render.drop(self, event.acting_character, item))
+        conn.renderln(
+          conn,
+          render.item_drop(self, event.acting_character, item),
+        )
         |> Ok
     }
   }
@@ -198,14 +201,14 @@ pub fn item_look_at(conn: Conn, item_instance: world.ItemInstance) -> Conn {
   case item_load(conn, item_instance), item_instance.contains {
     Ok(item), world.NotContainer ->
       conn
-      |> conn.renderln(render.inspect(item))
+      |> conn.renderln(render.item_inspect(item))
       |> conn.prompt
 
     Ok(item), world.Contains(contents) -> {
       let named_actors.Lookup(items:, ..) = conn.named_actors(conn)
 
       conn
-      |> conn.renderln(render.inspect(item))
+      |> conn.renderln(render.item_inspect(item))
       |> conn.renderln(render.item_contains(items, contents))
       |> conn.prompt
     }
