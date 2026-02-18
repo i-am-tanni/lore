@@ -116,7 +116,7 @@ fn init_reception(
     endpoint: Some(endpoint),
     character: dummy_character,
     controller: login_controller,
-    cooldown: conn.FreeToAct,
+    cooldown: conn.Idle,
     actions: [],
     system_tables: system_tables,
     subscribed: set.new(),
@@ -162,7 +162,7 @@ fn init_character(
     endpoint:,
     character:,
     controller: spawn_controller,
-    cooldown: conn.FreeToAct,
+    cooldown: conn.Idle,
     actions: [],
     system_tables: system_tables,
     subscribed: set.new(),
@@ -218,12 +218,12 @@ fn recv(
     // if cooldown expired, try to process any lazy actions queued
     event.CooldownExpired(id: expected) ->
       case state.cooldown {
-        conn.GlobalCooldown(id:, ..) if expected == id ->
+        conn.Busy(id:, ..) if expected == id ->
           case state.actions {
-            [] -> State(..state, cooldown: conn.FreeToAct)
+            [] -> State(..state, cooldown: conn.Idle)
 
             actions ->
-              State(..state, cooldown: conn.FreeToAct)
+              State(..state, cooldown: conn.Idle)
               |> new_conn()
               |> conn.actions(actions)
               |> conn.to_response
@@ -232,7 +232,7 @@ fn recv(
 
         // ..else if an unexpected cooldown expiration notification received,
         // free the character to act and cancel any queued actions to be safe.
-        conn.GlobalCooldown(id:, ..) -> {
+        conn.Busy(id:, ..) -> {
           let error =
             "Off cooldown but "
             <> string.inspect(id)
@@ -240,11 +240,11 @@ fn recv(
             <> string.inspect(expected)
 
           logging.log(logging.Error, error)
-          State(..state, cooldown: conn.FreeToAct, actions: [])
+          State(..state, cooldown: conn.Idle, actions: [])
         }
 
         // Character is already free to act. In that case, discard notification.
-        conn.FreeToAct -> state
+        conn.Idle -> state
       }
 
     event.Chat(data) -> on_controller_message(state, controller.Chat(data))
@@ -459,9 +459,8 @@ fn recv_controller(
 
 fn is_cooldown_match(a: conn.GlobalCooldown, b: conn.GlobalCooldown) -> Bool {
   case a, b {
-    conn.FreeToAct, conn.FreeToAct -> True
-    conn.GlobalCooldown(id: id1, ..), conn.GlobalCooldown(id: id2, ..) ->
-      id1 == id2
+    conn.Idle, conn.Idle -> True
+    conn.Busy(id: id1, ..), conn.Busy(id: id2, ..) -> id1 == id2
     _, _ -> False
   }
 }

@@ -83,12 +83,8 @@ pub type EventToSend {
 /// of the requested higher priority action.
 ///
 pub type GlobalCooldown {
-  GlobalCooldown(
-    id: StringId(event.Action),
-    priority: event.Priority,
-    timer: Timer,
-  )
-  FreeToAct
+  Busy(id: StringId(event.Action), priority: event.Priority, timer: Timer)
+  Idle
 }
 
 /// A conn is transformed into a completed response upon return.
@@ -453,7 +449,7 @@ fn process_actions(conn: Conn, actions: List(event.Action)) -> Conn {
             // In the case of being free to act BUT failing the conditions,
             // clear the action queue as the rest of the chain is likely
             // dependent.
-            Error(_reason) -> Conn(..conn, actions: [], cooldown: FreeToAct)
+            Error(_reason) -> Conn(..conn, actions: [], cooldown: Idle)
           }
 
         // ..else if the character cannot act, append the action queue
@@ -465,41 +461,37 @@ fn process_actions(conn: Conn, actions: List(event.Action)) -> Conn {
 }
 
 fn perform(conn: Conn, action: event.Action) -> Result(Conn, String) {
-  // First, cancel any existing cooldown timer if one exists.
-  case conn.cooldown {
-    GlobalCooldown(timer:, ..) -> {
-      process.cancel_timer(timer)
-      Nil
-    }
-    FreeToAct -> Nil
-  }
-
-  // Then try to run the action
   use _ <- result.try(action.condition(conn.character))
   let conn = event(conn, action.event)
   // If the action succeeds, schedule the next global cooldown timer
 
   case action.delay {
-    delay if delay <= 0 -> Conn(..conn, cooldown: FreeToAct)
+    delay if delay <= 0 -> Conn(..conn, cooldown: Idle)
     // if delay is > 0, schedule a cooldown expiration notification to self
     delay -> {
       let event.Action(id:, priority:, ..) = action
       let timer =
         process.send_after(conn.self, delay, event.CooldownExpired(id:))
 
-      Conn(..conn, cooldown: GlobalCooldown(id:, priority:, timer:))
+      Conn(..conn, cooldown: Busy(id:, priority:, timer:))
     }
   }
   |> Ok
 }
 
 // Character can act if either:
-// - FreeToAct
+// - Idle
 // - the requested action's priority exceeds cooldown's priority level
 fn can_act(cooldown: GlobalCooldown, action: event.Action) -> Bool {
   case cooldown {
-    FreeToAct -> True
-    GlobalCooldown(priority:, ..) ->
-      event.is_priority_gt(action.priority, priority)
+    Idle -> True
+    Busy(priority:, timer:, ..) ->
+      case event.is_priority_gt(action.priority, priority) {
+        True -> {
+          process.cancel_timer(timer)
+          True
+        }
+        False -> False
+      }
   }
 }
