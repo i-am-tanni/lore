@@ -16,7 +16,7 @@ import lore/world.{type Direction, type Mobile, type Room, type StringId}
 import lore/world/event
 import lore/world/items
 import lore/world/mapper
-import lore/world/system_tables
+import lore/world/named_actors
 
 const color_room_title = "&189"
 
@@ -89,7 +89,7 @@ pub fn exit(room_exit: Option(Direction)) -> View {
 pub fn room_with_mini_map_impure(
   room: Room,
   observer: world.Mobile,
-  lookup: system_tables.Lookup,
+  lookup: named_actors.Lookup,
 ) -> View {
   let loaded = items.load_instances(lookup.items, room.items)
   let room = world.Room(..room, items: loaded)

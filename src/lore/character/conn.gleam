@@ -21,7 +21,7 @@ import lore/world/communication
 import lore/world/event.{
   type CharacterMessage, type CharacterToRoomEvent, type Event,
 }
-import lore/world/system_tables
+import lore/world/named_actors
 
 /// A type that wraps the character state and aggregates a response
 /// to be returned to the calling controller.
@@ -35,7 +35,7 @@ pub opaque type Conn {
     character: world.MobileInternal,
     flash: Controller,
     cooldown: GlobalCooldown,
-    system_tables: system_tables.Lookup,
+    named_actors: named_actors.Lookup,
     events: List(EventToSend),
     output: List(Text),
     out_of_band: List(output.OutOfBand),
@@ -122,7 +122,7 @@ pub fn new(
   cooldown cooldown: GlobalCooldown,
   self self: process.Subject(CharacterMessage),
   subscribed subscribed: Set(world.ChatChannel),
-  system_tables system_tables: system_tables.Lookup,
+  named_actors named_actors: named_actors.Lookup,
 ) -> Conn {
   let is_player = case character.template_id {
     world.Player(_) -> True
@@ -135,7 +135,7 @@ pub fn new(
     flash:,
     cooldown:,
     subscribed:,
-    system_tables:,
+    named_actors:,
     events: [],
     output: [],
     out_of_band: [],
@@ -160,8 +160,8 @@ pub fn is_player(conn: Conn) -> Bool {
   conn.is_player
 }
 
-pub fn system_tables(conn: Conn) -> system_tables.Lookup {
-  conn.system_tables
+pub fn named_actors(conn: Conn) -> named_actors.Lookup {
+  conn.named_actors
 }
 
 pub fn prompt(conn: Conn) -> Conn {
@@ -347,7 +347,7 @@ pub fn spawn(conn: Conn, to to_room_id: Id(Room)) -> Conn {
 pub fn subscribe(conn: Conn, channel: world.ChatChannel) -> Conn {
   let result = {
     use <- bool.guard(set.contains(conn.subscribed, channel), Error(NotFound))
-    let comms = conn.system_tables.communication
+    let comms = conn.named_actors.communication
     use <- bool.guard(
       !communication.subscribe_chat(comms, channel, conn.self),
       Error(ChannelOperationFailed),
@@ -368,7 +368,7 @@ pub fn subscribe(conn: Conn, channel: world.ChatChannel) -> Conn {
 pub fn unsubscribed(conn: Conn, channel: world.ChatChannel) -> Conn {
   let result = {
     use <- bool.guard(!set.contains(conn.subscribed, channel), Error(NotFound))
-    let comms = conn.system_tables.communication
+    let comms = conn.named_actors.communication
     use <- bool.guard(
       !communication.unsubscribe_chat(comms, channel, conn.self),
       Error(ChannelOperationFailed),

@@ -20,8 +20,8 @@ import lore/character/view/render
 import lore/world.{type Id, type Item, type Room, Id, StringId}
 import lore/world/event
 import lore/world/items
+import lore/world/named_actors
 import lore/world/room/presence
-import lore/world/system_tables
 import lore/world/zone/spawner
 import splitter.{type Splitter}
 
@@ -281,7 +281,7 @@ fn social_args(
   rest: String,
   word: Splitter,
 ) -> Result(Command(SocialData), String) {
-  let lookups = conn.system_tables(conn)
+  let lookups = conn.named_actors(conn)
   use social <- result.try(
     socials.lookup(lookups.socials, verb)
     |> result.replace_error("Huh?"),
@@ -589,7 +589,7 @@ fn is_auto(conn: Conn, search_term: String) -> Bool {
 }
 
 fn inventory_command(conn: Conn, _verb: Verb) -> Conn {
-  let system_tables.Lookup(items:, ..) = conn.system_tables(conn)
+  let named_actors.Lookup(items:, ..) = conn.named_actors(conn)
   let character = conn.character_get(conn)
 
   conn.renderln(conn, render.inventory(items, character))
@@ -606,7 +606,7 @@ fn wear_command(conn: Conn, command: Command(String)) -> Conn {
         world.UnknownItem(search_term:, verb: "carrying")
       }),
     )
-    let lookup = conn.system_tables(conn)
+    let lookup = conn.named_actors(conn)
     use item <- result.try(items.load_from_instance(lookup.items, item_instance))
     let wear_slot = item.wear_slot
     use <- bool.lazy_guard(wear_slot == world.CannotWear, fn() {
@@ -672,7 +672,7 @@ fn remove_command(conn: Conn, command: Command(String)) -> Conn {
 
   case result {
     Ok(#(wear_slot, item_instance)) -> {
-      let system_tables.Lookup(items:, ..) = conn.system_tables(conn)
+      let named_actors.Lookup(items:, ..) = conn.named_actors(conn)
       world.MobileInternal(
         ..self,
         equipment: dict.insert(equipment, wear_slot, world.EmptySlot),
@@ -691,12 +691,12 @@ fn remove_command(conn: Conn, command: Command(String)) -> Conn {
 
 fn equipment_command(conn: Conn, _verb: Verb) -> Conn {
   let self = conn.character_get(conn)
-  let system_tables.Lookup(items:, ..) = conn.system_tables(conn)
+  let named_actors.Lookup(items:, ..) = conn.named_actors(conn)
   conn |> conn.renderln(render.equipment(items, self)) |> conn.prompt
 }
 
 fn who_command(conn: Conn) -> Conn {
-  let system_tables.Lookup(user:, ..) = conn.system_tables(conn)
+  let named_actors.Lookup(user:, ..) = conn.named_actors(conn)
   conn.render(conn, render.who_list(users.players_logged_in(user)))
 }
 
@@ -729,7 +729,7 @@ fn social_command(conn: Conn, command: Command(SocialData)) -> Conn {
 }
 
 fn kick_command(conn: Conn, command: Command(Victim)) -> Conn {
-  let system_tables.Lookup(user:, character:, ..) = conn.system_tables(conn)
+  let named_actors.Lookup(user:, character:, ..) = conn.named_actors(conn)
   case command.data {
     Self ->
       conn
@@ -767,7 +767,7 @@ fn tele_command(conn: Conn, command: Command(Id(Room))) -> Conn {
 }
 
 fn tele_to_command(conn: Conn, command: Command(Victim)) -> Conn {
-  let system_tables.Lookup(user:, presence:, ..) = conn.system_tables(conn)
+  let named_actors.Lookup(user:, presence:, ..) = conn.named_actors(conn)
   case command.data {
     Self ->
       conn |> conn.renderln(view.Leaf("You're already there!")) |> conn.prompt
@@ -798,7 +798,7 @@ fn tele_to_command(conn: Conn, command: Command(Victim)) -> Conn {
 
 fn tele_other_command(conn: Conn, command: Command(TeleOtherArgs)) -> Conn {
   let TeleOther(room_id:, victim:) = command.data
-  let system_tables.Lookup(user:, character:, ..) = conn.system_tables(conn)
+  let named_actors.Lookup(user:, character:, ..) = conn.named_actors(conn)
   case victim {
     Self -> tele_command(conn, Command(Teleport, room_id))
     Victim(victim) -> {
@@ -830,7 +830,7 @@ fn smite_command(conn: Conn, command: Command(Victim)) -> Conn {
   case command.data {
     Victim(victim) -> {
       let result = {
-        let system_tables.Lookup(presence:, ..) = conn.system_tables(conn)
+        let named_actors.Lookup(presence:, ..) = conn.named_actors(conn)
         let victim_id = StringId(string.uppercase(victim))
         use room_id <- try(presence.lookup(presence, victim_id))
         conn.event_to_room(conn, room_id, event.Slay(event.SearchId(victim_id)))
@@ -856,7 +856,7 @@ fn smite_command(conn: Conn, command: Command(Victim)) -> Conn {
 fn item_spawn_command(conn: Conn, command: Command(Id(Item))) -> Conn {
   let result = {
     let item_id = command.data
-    let system_tables.Lookup(items:, ..) = conn.system_tables(conn)
+    let named_actors.Lookup(items:, ..) = conn.named_actors(conn)
     use item_instance <- try(items.instance(items, item_id))
     use loaded <- try(items.load(items, item_id))
     let character = conn.character_get(conn)
@@ -877,7 +877,7 @@ fn item_spawn_command(conn: Conn, command: Command(Id(Item))) -> Conn {
 }
 
 fn mobile_spawn_command(conn: Conn, command: Command(Id(world.Npc))) -> Conn {
-  let lookup = conn.system_tables(conn)
+  let lookup = conn.named_actors(conn)
   let mobile_id = command.data
   let self = conn.character_get(conn)
   case spawner.spawn_mobile_ad_hoc(lookup, mobile_id, self.room_id) {

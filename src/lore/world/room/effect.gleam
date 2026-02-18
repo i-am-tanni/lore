@@ -12,7 +12,7 @@ import lore/world/event.{
   type CharacterEvent, type CharacterMessage, type RoomMessage, type ZoneEvent,
   Event,
 }
-import lore/world/system_tables
+import lore/world/named_actors
 import lore/world/zone/zone_registry
 
 /// A side-effect that a room can perform, represented as data.
@@ -153,7 +153,7 @@ pub fn realize(
   from self: process.Subject(RoomMessage),
   by acting_character: world.Mobile,
   in room: world.Room,
-  with_context lookup: system_tables.Lookup,
+  with_context lookup: named_actors.Lookup,
 ) -> Nil {
   case effect {
     Send(to:, message:) -> process.send(to, message)

@@ -16,43 +16,43 @@ import gleam/string
 import lore/world.{Id}
 import lore/world/items
 import lore/world/mapper
+import lore/world/named_actors
 import lore/world/room
 import lore/world/sql
-import lore/world/system_tables
 import lore/world/zone
 import pog
 
 pub fn supervisor(
-  system_tables: system_tables.Lookup,
+  named_actors: named_actors.Lookup,
 ) -> Result(actor.Started(static_supervisor.Supervisor), actor.StartError) {
   use zones <- result.try(
-    load_zones(system_tables.db)
+    load_zones(named_actors.db)
     |> result.map_error(fn(error) { actor.InitFailed(string.inspect(error)) }),
   )
 
   static_supervisor.new(static_supervisor.OneForOne)
   |> static_supervisor.add(
-    worker(fn() { items.start(system_tables.items, system_tables.db) }),
+    worker(fn() { items.start(named_actors.items, named_actors.db) }),
   )
   // Each zone gets a supervisor
   |> list.fold(zones, _, fn(acc, zone) {
-    static_supervisor.add(acc, zone_supervised(zone, system_tables))
+    static_supervisor.add(acc, zone_supervised(zone, named_actors))
   })
   |> static_supervisor.add(
-    worker(fn() { mapper.start(system_tables.mapper, system_tables.db) }),
+    worker(fn() { mapper.start(named_actors.mapper, named_actors.db) }),
   )
   |> static_supervisor.start
 }
 
 fn zone_supervised(
   zone: world.Zone,
-  system_tables: system_tables.Lookup,
+  named_actors: named_actors.Lookup,
 ) -> supervision.ChildSpecification(static_supervisor.Supervisor) {
   static_supervisor.new(static_supervisor.OneForOne)
   |> list.fold(zone.rooms, _, fn(acc, room) {
-    static_supervisor.add(acc, worker(fn() { room.start(room, system_tables) }))
+    static_supervisor.add(acc, worker(fn() { room.start(room, named_actors) }))
   })
-  |> static_supervisor.add(worker(fn() { zone.start(zone, system_tables) }))
+  |> static_supervisor.add(worker(fn() { zone.start(zone, named_actors) }))
   |> static_supervisor.supervised
 }
 

@@ -12,7 +12,7 @@ import logging
 import lore/character
 import lore/server/telnet/protocol
 import lore/world/kickoff
-import lore/world/system_tables
+import lore/world/named_actors
 import pog
 
 pub type ServerStartError {
@@ -28,8 +28,8 @@ pub fn main() {
 
     logging.configure()
 
-    let system_tables =
-      system_tables.Lookup(
+    let named_actors =
+      named_actors.Lookup(
         db: process.new_name("db"),
         zone: process.new_name("zone_registry"),
         room: process.new_name("room_registry"),
@@ -46,20 +46,20 @@ pub fn main() {
 
     static_supervisor.new(static_supervisor.OneForOne)
     |> static_supervisor.add(start_database_connection(
-      system_tables.db,
+      named_actors.db,
       server_ip,
       database_name,
     ))
-    |> static_supervisor.add(system_tables.supervised(system_tables))
-    |> static_supervisor.add(mob_factory_supervised(system_tables))
+    |> static_supervisor.add(named_actors.supervised(named_actors))
+    |> static_supervisor.add(mob_factory_supervised(named_actors))
     // kickoff is a lazy function b/c its dependent on the db being available
     |> static_supervisor.add(
-      supervision.supervisor(fn() { kickoff.supervisor(system_tables) }),
+      supervision.supervisor(fn() { kickoff.supervisor(named_actors) }),
     )
     |> static_supervisor.add(telnet_supervised(
       server_ip,
       string_to_int(port),
-      system_tables,
+      named_actors,
     ))
     |> static_supervisor.start()
     |> result.map_error(StartError)
@@ -81,12 +81,12 @@ pub fn main() {
 fn telnet_supervised(
   server_ip: String,
   port: Int,
-  system_tables: system_tables.Lookup,
+  named_actors: named_actors.Lookup,
 ) -> supervision.ChildSpecification(static_supervisor.Supervisor) {
   // define init function to be ran on each new telnet connection
   let init_connection = fn(conn) {
     // the protocol module handles all telent I/O
-    protocol.init(conn, system_tables)
+    protocol.init(conn, named_actors)
   }
 
   glisten.new(init_connection, protocol.recv)
@@ -116,9 +116,9 @@ fn env_var(name: String) -> Result(String, ServerStartError) {
   |> result.replace_error(MissingEnvVar(name))
 }
 
-pub fn mob_factory_supervised(system_tables: system_tables.Lookup) {
-  factory_supervisor.worker_child(character.start_character(_, system_tables))
-  |> factory_supervisor.named(system_tables.mob_factory)
+pub fn mob_factory_supervised(named_actors: named_actors.Lookup) {
+  factory_supervisor.worker_child(character.start_character(_, named_actors))
+  |> factory_supervisor.named(named_actors.mob_factory)
   |> factory_supervisor.supervised
 }
 

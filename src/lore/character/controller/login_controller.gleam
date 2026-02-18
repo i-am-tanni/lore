@@ -10,8 +10,8 @@ import lore/character/users
 import lore/character/view
 import lore/character/view/render
 import lore/world.{Id}
+import lore/world/named_actors
 import lore/world/sql
-import lore/world/system_tables
 import pog
 import splitter
 
@@ -57,7 +57,7 @@ fn account_name(conn: Conn, flash: LoginFlash, input: String) -> Conn {
   let result = {
     use name <- try(parse(flash.splitter, input))
     let name = name |> string.lowercase |> string.capitalise
-    let system_tables.Lookup(db:, ..) = conn.system_tables(conn)
+    let named_actors.Lookup(db:, ..) = conn.named_actors(conn)
     let db = pog.named_connection(db)
     use account <- try(query1(sql.account_get(db, name), name))
 
@@ -171,7 +171,7 @@ fn new_password_confirm(conn: Conn, flash: LoginFlash, input: String) -> Conn {
 
   case result {
     Ok(True) -> {
-      let lookup = conn.system_tables(conn)
+      let lookup = conn.named_actors(conn)
       let db = pog.named_connection(lookup.db)
       case sql.account_put(db, flash.name, flash.password_hash) {
         Ok(_) -> login(conn, flash)
@@ -240,7 +240,7 @@ fn login(conn: Conn, flash: LoginFlash) -> Conn {
       hp_max: 20,
     )
 
-  let system_tables.Lookup(user:, ..) = conn.system_tables(conn)
+  let named_actors.Lookup(user:, ..) = conn.named_actors(conn)
   users.insert(user, flash.endpoint, name:, id:)
 
   let next_flash = CharacterFlash(name)

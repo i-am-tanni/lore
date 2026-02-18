@@ -23,7 +23,7 @@ import lore/character
 import lore/server/output
 import lore/server/telnet.{Do, Dont, Will, Wont}
 import lore/world/event.{type CharacterMessage, type Outgoing}
-import lore/world/system_tables
+import lore/world/named_actors
 
 const max_input_buffer_size = 1024
 
@@ -128,7 +128,7 @@ pub type TelnetOption {
 ///
 pub fn init(
   conn: glisten.Connection(Outgoing),
-  system_tables: system_tables.Lookup,
+  named_actors: named_actors.Lookup,
 ) -> #(State, Option(Selector(Outgoing))) {
   let assert Ok(glisten.ConnectionInfo(ip_address:, ..)) =
     glisten.get_client_info(conn)
@@ -141,7 +141,7 @@ pub fn init(
   let self = process.new_subject()
 
   let assert Ok(actor.Started(data: reception, ..)) =
-    character.start_reception(self, system_tables)
+    character.start_reception(self, named_actors)
 
   let state =
     State(

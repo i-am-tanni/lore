@@ -24,11 +24,11 @@ import lore/world.{
 import lore/world/event.{
   type CharacterMessage, type CharacterToRoomEvent, type Event, type RoomMessage,
 }
+import lore/world/named_actors
 import lore/world/room/effect.{type RoomEffect}
 import lore/world/room/janitor
 import lore/world/room/presence
 import lore/world/room/room_registry
-import lore/world/system_tables
 
 const combat_round_len_in_ms = 3000
 
@@ -46,7 +46,7 @@ type Found {
 type State {
   State(
     room: world.Room,
-    system_tables: system_tables.Lookup,
+    named_actors: named_actors.Lookup,
     self: process.Subject(RoomMessage),
     combat_queue: List(event.CombatPollData),
     combat_timer: Timer,
@@ -57,7 +57,7 @@ type State {
 pub type Model {
   Model(
     room: world.Room,
-    lookup: system_tables.Lookup,
+    lookup: named_actors.Lookup,
     is_in_combat: Bool,
     combat_queue: List(event.CombatPollData),
   )
@@ -67,9 +67,9 @@ pub type Model {
 ///
 pub fn start(
   room: Room,
-  system_tables: system_tables.Lookup,
+  named_actors: named_actors.Lookup,
 ) -> Result(actor.Started(process.Subject(RoomMessage)), actor.StartError) {
-  actor.new_with_initialiser(100, fn(self) { init(self, room, system_tables) })
+  actor.new_with_initialiser(100, fn(self) { init(self, room, named_actors) })
   |> actor.on_message(recv)
   |> actor.start
 }
@@ -77,10 +77,10 @@ pub fn start(
 fn init(
   self: process.Subject(RoomMessage),
   room: Room,
-  system_tables: system_tables.Lookup,
+  named_actors: named_actors.Lookup,
 ) -> Result(actor.Initialised(State, RoomMessage, Subject(RoomMessage)), String) {
   // register room on init
-  room_registry.register(system_tables.room, room.id, self)
+  room_registry.register(named_actors.room, room.id, self)
 
   let update =
     list.map(room.items, fn(instance) {
@@ -90,7 +90,7 @@ fn init(
 
   State(
     room:,
-    system_tables:,
+    named_actors:,
     self:,
     combat_queue: [],
     combat_timer: Cancelled,
@@ -151,7 +151,7 @@ fn recv(state: State, msg: RoomMessage) -> actor.Next(State, RoomMessage) {
         from: state.self,
         by: world.mobile_identity(),
         in: state.room,
-        with_context: state.system_tables,
+        with_context: state.named_actors,
       )
 
       update(state, model)
@@ -189,7 +189,7 @@ fn route_from_character(
     from: state.self,
     by: event.acting_character,
     in: state.room,
-    with_context: state.system_tables,
+    with_context: state.named_actors,
   )
 
   update(state, model)
@@ -214,7 +214,7 @@ fn route_from_zone(
     from: state.self,
     by: event.acting_character,
     in: state.room,
-    with_context: state.system_tables,
+    with_context: state.named_actors,
   )
 
   update(state, model)
@@ -235,7 +235,7 @@ fn poll_room(
     from: state.self,
     by: event.acting_character,
     in: state.room,
-    with_context: state.system_tables,
+    with_context: state.named_actors,
   )
 
   update(state, model)
@@ -244,7 +244,7 @@ fn poll_room(
 fn to_model(state: State) -> Model {
   Model(
     room: state.room,
-    lookup: state.system_tables,
+    lookup: state.named_actors,
     combat_queue: state.combat_queue,
     is_in_combat: state.is_in_combat,
   )
@@ -267,7 +267,7 @@ fn update(state: State, model: Model) -> State {
   State(
     ..state,
     room: model.room,
-    system_tables: model.lookup,
+    named_actors: model.lookup,
     combat_queue: model.combat_queue,
     is_in_combat: model.is_in_combat,
     combat_timer:,

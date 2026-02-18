@@ -26,8 +26,8 @@ import lore/server/output
 import lore/world.{Id, Player}
 import lore/world/communication
 import lore/world/event.{type CharacterMessage, type Outgoing}
+import lore/world/named_actors
 import lore/world/room/room_registry
-import lore/world/system_tables
 import splitter
 
 const dummy_id = 0
@@ -41,7 +41,7 @@ type State {
     self: Subject(CharacterMessage),
     cooldown: conn.GlobalCooldown,
     actions: List(event.Action),
-    system_tables: system_tables.Lookup,
+    named_actors: named_actors.Lookup,
     subscribed: Set(world.ChatChannel),
     continue: Bool,
   )
@@ -57,11 +57,11 @@ type ActionSummary {
 ///
 pub fn start_reception(
   endpoint: Subject(Outgoing),
-  system_tables: system_tables.Lookup,
+  named_actors: named_actors.Lookup,
 ) -> Result(actor.Started(Subject(CharacterMessage)), actor.StartError) {
   logging.log(logging.Info, "Player process started")
 
-  let init = init_reception(_, endpoint, system_tables)
+  let init = init_reception(_, endpoint, named_actors)
 
   actor.new_with_initialiser(1000, init)
   |> actor.on_message(recv)
@@ -71,7 +71,7 @@ pub fn start_reception(
 fn init_reception(
   self: process.Subject(CharacterMessage),
   endpoint: Subject(Outgoing),
-  system_tables: system_tables.Lookup,
+  named_actors: named_actors.Lookup,
 ) -> Result(
   actor.Initialised(State, CharacterMessage, Subject(CharacterMessage)),
   String,
@@ -118,7 +118,7 @@ fn init_reception(
     controller: login_controller,
     cooldown: conn.Idle,
     actions: [],
-    system_tables: system_tables,
+    named_actors: named_actors,
     subscribed: set.new(),
     continue: True,
   )
@@ -133,9 +133,9 @@ fn init_reception(
 ///
 pub fn start_character(
   data: event.SpawnMobile,
-  system_tables system_tables: system_tables.Lookup,
+  named_actors named_actors: named_actors.Lookup,
 ) -> Result(actor.Started(Subject(CharacterMessage)), actor.StartError) {
-  let init = init_character(_, data.endpoint, data.mobile, system_tables)
+  let init = init_character(_, data.endpoint, data.mobile, named_actors)
 
   actor.new_with_initialiser(100, init)
   |> actor.on_message(recv)
@@ -146,16 +146,16 @@ fn init_character(
   self: process.Subject(CharacterMessage),
   endpoint: Option(Subject(Outgoing)),
   character: world.MobileInternal,
-  system_tables: system_tables.Lookup,
+  named_actors: named_actors.Lookup,
 ) -> Result(
   actor.Initialised(State, CharacterMessage, Subject(CharacterMessage)),
   String,
 ) {
   let spawn_controller =
-    controller.SpawnFlash(character.room_id, system_tables.presence)
+    controller.SpawnFlash(character.room_id, named_actors.presence)
     |> controller.Spawn()
 
-  character_registry.register(system_tables.character, character.id, self)
+  character_registry.register(named_actors.character, character.id, self)
 
   State(
     self:,
@@ -164,7 +164,7 @@ fn init_character(
     controller: spawn_controller,
     cooldown: conn.Idle,
     actions: [],
-    system_tables: system_tables,
+    named_actors: named_actors,
     subscribed: set.new(),
     continue: True,
   )
@@ -281,7 +281,7 @@ fn handle_response(response: conn.Response, state: State) -> State {
       let assert Ok(actor.Started(data: new_subject, ..)) =
         start_character(
           event.SpawnMobile(state.endpoint, character),
-          state.system_tables,
+          state.named_actors,
         )
       Some(new_subject)
     }
@@ -303,7 +303,7 @@ fn handle_response(response: conn.Response, state: State) -> State {
     _, _ -> Nil
   }
 
-  let system_tables = state.system_tables
+  let named_actors = state.named_actors
 
   // update character
   let character = case response.updated_character {
@@ -312,14 +312,14 @@ fn handle_response(response: conn.Response, state: State) -> State {
   }
 
   // Dispatch chat messages to publish
-  let comms = system_tables.communication
+  let comms = named_actors.communication
   list.each(response.publish, fn(chat_data) {
     let conn.ChatData(channel:, text:) = chat_data
     communication.publish_chat(comms, channel, character.name, text)
   })
 
   // Dispatch events
-  let _ = push_events(response.events, character.room_id, system_tables.room)
+  let _ = push_events(response.events, character.room_id, named_actors.room)
 
   // Get cooldown status and updated action queue information
   let ActionSummary(cooldown:, actions:) = update_actions(response, state)
@@ -338,7 +338,7 @@ fn handle_response(response: conn.Response, state: State) -> State {
       character:,
       cooldown:,
       actions:,
-      system_tables:,
+      named_actors:,
       subscribed: response.subscribed,
       continue: state.continue && !halt,
     )
@@ -472,9 +472,9 @@ fn new_conn(state: State) -> Conn {
     self:,
     cooldown:,
     subscribed:,
-    system_tables:,
+    named_actors:,
     ..,
   ) = state
 
-  conn.new(character:, flash:, self:, cooldown:, subscribed:, system_tables:)
+  conn.new(character:, flash:, self:, cooldown:, subscribed:, named_actors:)
 }

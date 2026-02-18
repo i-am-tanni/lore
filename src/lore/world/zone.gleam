@@ -9,8 +9,8 @@ import lore/world/event.{
   type Done, type Event, type RoomMessage, type ZoneEvent, type ZoneMessage,
   Done, MoveKickoffData, ResetSpawnGroup, RoomToZone,
 }
+import lore/world/named_actors
 import lore/world/room/room_registry
-import lore/world/system_tables
 import lore/world/zone/spawner
 import lore/world/zone/zone_registry
 
@@ -18,16 +18,16 @@ pub type State {
   State(
     self: process.Subject(ZoneMessage),
     zone: Zone,
-    system_tables: system_tables.Lookup,
+    named_actors: named_actors.Lookup,
     spawn_groups: Dict(Id(SpawnGroup), SpawnGroup),
   )
 }
 
 pub fn start(
   zone: Zone,
-  system_tables: system_tables.Lookup,
+  named_actors: named_actors.Lookup,
 ) -> Result(actor.Started(Subject(ZoneMessage)), actor.StartError) {
-  actor.new_with_initialiser(100, fn(self) { init(self, zone, system_tables) })
+  actor.new_with_initialiser(100, fn(self) { init(self, zone, named_actors) })
   |> actor.on_message(recv)
   |> actor.start
 }
@@ -35,21 +35,21 @@ pub fn start(
 fn init(
   self: process.Subject(ZoneMessage),
   zone: Zone,
-  system_tables: system_tables.Lookup,
+  named_actors: named_actors.Lookup,
 ) -> Result(actor.Initialised(State, ZoneMessage, Subject(ZoneMessage)), String) {
   // register zone on init
 
-  zone_registry.register(system_tables.zone, zone.id, self)
+  zone_registry.register(named_actors.zone, zone.id, self)
 
   let spawn_groups =
     list.map(zone.spawn_groups, fn(group) {
-      let group = spawner.reset_group(group, system_tables)
+      let group = spawner.reset_group(group, named_actors)
       let _ = schedule_next_reset(self, group)
       #(group.id, group)
     })
     |> dict.from_list
 
-  State(self:, zone:, system_tables:, spawn_groups:)
+  State(self:, zone:, named_actors:, spawn_groups:)
   |> actor.initialised()
   |> actor.returning(self)
   |> Ok
@@ -60,11 +60,11 @@ fn recv(state: State, msg: ZoneMessage) -> actor.Next(State, ZoneMessage) {
     RoomToZone(event) ->
       case event.data {
         event.MoveKickoff(data) -> {
-          move_request(state.system_tables, event, data)
+          move_request(state.named_actors, event, data)
           state
         }
         event.DoorSync(data) -> {
-          door_update(state.system_tables, event, data)
+          door_update(state.named_actors, event, data)
           state
         }
       }
@@ -79,7 +79,7 @@ fn reset_spawn_group(state: State, group_id: Id(SpawnGroup)) -> State {
   let spawn_groups = state.spawn_groups
   let result = {
     use group <- try(dict.get(spawn_groups, group_id))
-    let group = spawner.reset_group(group, state.system_tables)
+    let group = spawner.reset_group(group, state.named_actors)
     let _ = schedule_next_reset(state.self, group)
 
     Ok(dict.insert(spawn_groups, group_id, group))
@@ -115,7 +115,7 @@ type Approved {
 /// approved, syncs the commit to both rooms.
 ///
 pub fn move_request(
-  system_tables: system_tables.Lookup,
+  named_actors: named_actors.Lookup,
   event: Event(ZoneEvent, RoomMessage),
   data: event.MoveKickoffData,
 ) -> Nil {
@@ -123,7 +123,7 @@ pub fn move_request(
     let MoveKickoffData(to_room_id:, from: subject, ..) = data
     // Ask arrival if move is OK to proceed and block until answer is received
     let lookup =
-      room_registry.whereis(system_tables.room, to_room_id)
+      room_registry.whereis(named_actors.room, to_room_id)
       |> result.replace_error(world.RoomLookupFailed(to_room_id))
 
     use to_room_subject <- result.try(lookup)
@@ -224,7 +224,7 @@ fn move_arrive(
 }
 
 pub fn door_update(
-  system_tables: system_tables.Lookup,
+  named_actors: named_actors.Lookup,
   event: Event(ZoneEvent, RoomMessage),
   data: event.DoorSyncData,
 ) -> Nil {
@@ -233,7 +233,7 @@ pub fn door_update(
 
   let result = {
     let lookup =
-      room_registry.whereis(system_tables.room, to_room_id)
+      room_registry.whereis(named_actors.room, to_room_id)
       |> result.replace_error(world.RoomLookupFailed(to_room_id))
 
     use to_room_subject <- result.try(lookup)

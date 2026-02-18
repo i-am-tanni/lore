@@ -18,10 +18,10 @@ import lore/world.{
 import lore/world/event
 import lore/world/items
 import lore/world/mob_factory
+import lore/world/named_actors
 import lore/world/room/presence
 import lore/world/room/room_registry
 import lore/world/sql
-import lore/world/system_tables
 import pog
 
 pub type SpawnError(a) {
@@ -34,30 +34,30 @@ pub type SpawnError(a) {
 ///
 pub fn reset_group(
   group: SpawnGroup,
-  system_tables: system_tables.Lookup,
+  named_actors: named_actors.Lookup,
 ) -> SpawnGroup {
   use <- bool.guard(!group.is_enabled, group)
   case group.is_despawn_on_reset {
     True ->
       group
-      |> reset_mobs_with_despawn(system_tables)
-      |> reset_items(system_tables)
+      |> reset_mobs_with_despawn(named_actors)
+      |> reset_items(named_actors)
 
     False ->
       group
-      |> reset_mobs(system_tables)
-      |> reset_items(system_tables)
+      |> reset_mobs(named_actors)
+      |> reset_items(named_actors)
   }
 }
 
 pub fn spawn_mobile_ad_hoc(
-  system_tables: system_tables.Lookup,
+  named_actors: named_actors.Lookup,
   mobile_id: Id(Npc),
   room_id: Id(Room),
 ) -> Result(String, SpawnError(Mobile)) {
-  let db = pog.named_connection(system_tables.db)
-  let mob_factory = system_tables.mob_factory
-  let instance_id = generate_mob_instance_id(system_tables.character)
+  let db = pog.named_connection(named_actors.db)
+  let mob_factory = named_actors.mob_factory
+  let instance_id = generate_mob_instance_id(named_actors.character)
   use mobile <- try(generate_mobile(db, mobile_id, instance_id, in: room_id))
   use _ <- try(
     mob_factory.start_child(mob_factory, mobile)
@@ -68,13 +68,13 @@ pub fn spawn_mobile_ad_hoc(
 
 fn reset_items(
   group: SpawnGroup,
-  system_tables: system_tables.Lookup,
+  named_actors: named_actors.Lookup,
 ) -> SpawnGroup {
   let item_instances =
     list.filter_map(group.item_members, fn(member) {
-      use item <- try(items.instance(system_tables.items, member.item_id))
+      use item <- try(items.instance(named_actors.items, member.item_id))
       use room_subject <- try(room_registry.whereis(
-        system_tables.room,
+        named_actors.room,
         member.room_id,
       ))
       actor.send(room_subject, event.SpawnItem(item))
@@ -87,9 +87,9 @@ fn reset_items(
 
 fn reset_mobs(
   group: SpawnGroup,
-  system_tables: system_tables.Lookup,
+  named_actors: named_actors.Lookup,
 ) -> SpawnGroup {
-  let registry = system_tables.character
+  let registry = named_actors.character
   let SpawnGroup(mob_instances:, mob_members:, ..) = group
 
   let active_instances =
@@ -104,7 +104,7 @@ fn reset_mobs(
   let mob_instances =
     mob_members
     |> reject_spawn_ids(active_spawn_ids)
-    |> spawn_mobs(system_tables)
+    |> spawn_mobs(named_actors)
     |> list.append(active_instances)
 
   SpawnGroup(..group, mob_instances:)
@@ -112,15 +112,15 @@ fn reset_mobs(
 
 fn reset_mobs_with_despawn(
   group: SpawnGroup,
-  system_tables: system_tables.Lookup,
+  named_actors: named_actors.Lookup,
 ) -> SpawnGroup {
-  let character_registry = system_tables.character
-  let presence = system_tables.presence
+  let character_registry = named_actors.character
+  let presence = named_actors.presence
   let SpawnGroup(mob_instances:, mob_members:, ..) = group
 
   // Instance must be in a room depopulated of players to despawn
   let rooms_occupied_by_player = {
-    users.players_logged_in(system_tables.user)
+    users.players_logged_in(named_actors.user)
     |> list.filter_map(fn(user) {
       use room_id <- try(presence.lookup(presence, user.id))
       Ok(room_id)
@@ -152,7 +152,7 @@ fn reset_mobs_with_despawn(
   let mob_instances =
     mob_members
     |> reject_spawn_ids(cannot_despawn_ids)
-    |> spawn_mobs(system_tables)
+    |> spawn_mobs(named_actors)
     |> list.append(cannot_despawn)
 
   SpawnGroup(..group, mob_instances:)
@@ -160,14 +160,14 @@ fn reset_mobs_with_despawn(
 
 fn spawn_mobs(
   to_spawn: List(world.MobSpawn),
-  system_tables: system_tables.Lookup,
+  named_actors: named_actors.Lookup,
 ) -> List(#(Id(world.MobSpawn), StringId(Mobile))) {
-  let db = pog.named_connection(system_tables.db)
-  let mob_factory = system_tables.mob_factory
+  let db = pog.named_connection(named_actors.db)
+  let mob_factory = named_actors.mob_factory
 
   list.filter_map(to_spawn, fn(spawn) {
     let MobSpawn(spawn_id:, mobile_id:, room_id:) = spawn
-    let instance_id = generate_mob_instance_id(system_tables.character)
+    let instance_id = generate_mob_instance_id(named_actors.character)
     use mobile <- try(generate_mobile(db, mobile_id, instance_id, in: room_id))
     use _ <- try(
       mob_factory.start_child(mob_factory, mobile)

@@ -14,7 +14,7 @@ import lore/character/view/render
 import lore/world.{type Id, type Room}
 import lore/world/event.{type CharacterEvent, type Event, type RoomMessage}
 import lore/world/items
-import lore/world/system_tables
+import lore/world/named_actors
 
 pub fn route_player(
   conn: Conn,
@@ -202,7 +202,7 @@ pub fn item_look_at(conn: Conn, item_instance: world.ItemInstance) -> Conn {
       |> conn.prompt
 
     Ok(item), world.Contains(contents) -> {
-      let system_tables.Lookup(items:, ..) = conn.system_tables(conn)
+      let named_actors.Lookup(items:, ..) = conn.named_actors(conn)
 
       conn
       |> conn.renderln(render.inspect(item))
@@ -218,7 +218,7 @@ fn item_load(
   conn: Conn,
   item_instance: world.ItemInstance,
 ) -> Result(world.Item, Nil) {
-  let system_tables.Lookup(items:, ..) = conn.system_tables(conn)
+  let named_actors.Lookup(items:, ..) = conn.named_actors(conn)
   case item_instance.item {
     world.Loading(id) -> items.load(items, id)
     world.Loaded(item) -> Ok(item)
