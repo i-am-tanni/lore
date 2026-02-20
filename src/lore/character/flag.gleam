@@ -46,7 +46,7 @@ fn toggle(flags: Int, flag: Int) -> Int {
 }
 
 fn has(flags: Int, flag: Int) -> Bool {
-  int.bitwise_and(flags, flag) > 0
+  int.bitwise_and(flags, flag) == flag
 }
 
 fn affect_to_int(flag: AffectFlag) -> Int {
