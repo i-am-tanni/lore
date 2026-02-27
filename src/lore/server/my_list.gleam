@@ -233,7 +233,8 @@ fn reverse_and_prepend(list prefix: List(a), to suffix: List(a)) -> List(a) {
   }
 }
 
-/// Similar to list.map but only performs the map if an Ok(update) is returned.
+/// Similar to list.map() but only performs the map if the callback returns
+/// Ok(update). On Error(_), does NOT update.
 ///
 pub fn update(list: List(a), update_fun: fn(a) -> Result(a, b)) -> List(a) {
   update_loop(list, update_fun, [])

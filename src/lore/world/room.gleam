@@ -837,11 +837,7 @@ fn combat_request(
 
     Ok(round_data) if is_round_based -> {
       let update =
-        Model(
-          ..model,
-          combat_queue: [round_data, ..model.combat_queue],
-          is_in_combat: True,
-        )
+        Model(..model, combat_queue: [round_data, ..model.combat_queue])
 
       #(update, effect.EffectNone)
     }
@@ -901,6 +897,7 @@ fn combat_process(
       let characters = case attacker_update {
         Some(attacker) ->
           my_list.update(characters, fn(character) {
+            // if attacker, no need to check if victim
             use <- result.lazy_or(update_character(
               character,
               attacker.id,
