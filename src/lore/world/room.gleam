@@ -104,9 +104,9 @@ fn init(
 
 fn recv(state: State, msg: RoomMessage) -> actor.Next(State, RoomMessage) {
   let state = case msg {
-    event.CharacterToRoom(event) -> route_from_character(state, event)
+    event.CharacterToRoom(event) -> dispatch_from_character(state, event)
     event.PollRoom(event) -> poll_room(state, event)
-    event.InterRoom(event) -> route_from_zone(state, event)
+    event.InterRoom(event) -> dispatch_from_zone(state, event)
     event.MobileCleanup(mobile_id) -> {
       // clean up dead or crashed mobile
       let world.Room(characters:, ..) as room = state.room
@@ -161,7 +161,7 @@ fn recv(state: State, msg: RoomMessage) -> actor.Next(State, RoomMessage) {
   actor.continue(state)
 }
 
-fn route_from_character(
+fn dispatch_from_character(
   state: State,
   event: Event(event.CharacterToRoomEvent, event.CharacterMessage),
 ) -> State {
@@ -195,7 +195,7 @@ fn route_from_character(
   update(state, model)
 }
 
-fn route_from_zone(
+fn dispatch_from_zone(
   state: State,
   event: Event(event.InterRoomEvent, event.Done),
 ) -> State {

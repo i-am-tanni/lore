@@ -16,7 +16,7 @@ import lore/world/event.{type CharacterEvent, type Event, type RoomMessage}
 import lore/world/items
 import lore/world/named_actors
 
-pub fn route_player(
+pub fn dispatch_player(
   conn: Conn,
   event: Event(CharacterEvent, RoomMessage),
 ) -> Conn {
