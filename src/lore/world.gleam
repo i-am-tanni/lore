@@ -260,7 +260,7 @@ pub type ErrorRoomRequest {
   DoorErr(ErrorDoor)
   NotFound(keyword: String)
   PvpForbidden
-  GodMode
+  VictimHasGodMode
 }
 
 pub type ErrorMove {

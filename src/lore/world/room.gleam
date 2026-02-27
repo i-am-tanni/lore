@@ -811,7 +811,7 @@ fn combat_request(
     use victim <- try(find_local_character(model.room.characters, data.victim))
     use <- bool.guard(
       flag.affect_has(victim.affects, flag.GodMode),
-      Error(world.GodMode),
+      Error(world.VictimHasGodMode),
     )
     use <- bool.guard(is_pvp(attacker, victim), Error(world.PvpForbidden))
     event.CombatPollData(
@@ -1051,7 +1051,7 @@ fn combat_slay(
     use victim <- try(find_local_character(characters, victim))
     use <- bool.guard(
       flag.affect_has(victim.affects, flag.GodMode),
-      Error(world.GodMode),
+      Error(world.VictimHasGodMode),
     )
     let damage = victim.hp_max * 6
     let victim = world.Mobile(..victim, hp: victim.hp - damage)

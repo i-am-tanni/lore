@@ -450,7 +450,8 @@ pub fn error_room_request(error: world.ErrorRoomRequest) -> View {
 
     world.PvpForbidden -> "You cannot attack other players." |> view.Leaf
 
-    world.GodMode -> "You are forbidden to attack an immortal" |> view.Leaf
+    world.VictimHasGodMode ->
+      "You are forbidden to attack an immortal" |> view.Leaf
   }
 }
 
