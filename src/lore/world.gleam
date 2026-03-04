@@ -153,8 +153,8 @@ pub type TemplateId {
   Player(template_id: Id(Player))
 }
 
-pub type Container(a) {
-  Contains(List(a))
+pub type Container {
+  Contains(List(ItemInstance))
   NotContainer
 }
 
@@ -192,7 +192,7 @@ pub type ItemInstance {
     id: StringId(ItemInstance),
     keywords: List(String),
     item: Load,
-    contains: Container(ItemInstance),
+    contains: Container,
     was_touched: Bool,
   )
 }
