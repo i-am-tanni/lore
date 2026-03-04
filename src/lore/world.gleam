@@ -176,7 +176,7 @@ pub type Item {
     short: String,
     long: String,
     wear_slot: WearSlot,
-    contains: Container(Id(Item)),
+    is_container: Bool,
   )
 }
 
@@ -358,6 +358,11 @@ pub fn item_id(instance: ItemInstance) -> Id(Item) {
 
 pub fn affects_init() -> Affects {
   Affects(flags: flag.Affects(0))
+}
+
+pub fn unwrap_id(id: Id(a)) -> Int {
+  let Id(a) = id
+  a
 }
 
 pub type Pronoun {

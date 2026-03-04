@@ -2,21 +2,34 @@
 //// in this table via an id.
 ////
 
-import gleam/dict
+import gleam/dict.{type Dict}
 import gleam/erlang/process
 import gleam/list
-import gleam/option.{None, Some}
 import gleam/otp/actor
 import gleam/result
-import glets/cache
 import glets/table
 import lore/server/my_list
-import lore/world.{type Id, type Item}
+import lore/world.{type Id, type Item, Id}
 import lore/world/sql
 import pog
 
-pub type Message =
-  cache.Message(Id(Item), Item)
+pub type Message {
+  InsertMany(key_vals: List(#(Id(Item), Item)))
+  Insert(item_id: Id(Item), item: Item)
+  Delete(item_id: Id(Item))
+  ItemInstance(
+    caller: process.Subject(Result(world.ItemInstance, Nil)),
+    item_id: Id(Item),
+  )
+}
+
+type State {
+  State(
+    table_name: process.Name(Message),
+    table: table.Set(Id(Item), Item),
+    containers: Dict(Int, List(Int)),
+  )
+}
 
 pub fn start(
   table_name: process.Name(Message),
@@ -32,14 +45,7 @@ fn init(
   self: process.Subject(Message),
   table_name: process.Name(Message),
   db: process.Name(pog.Message),
-) -> Result(
-  actor.Initialised(
-    table.Set(Id(Item), Item),
-    Message,
-    process.Subject(Message),
-  ),
-  String,
-) {
+) -> Result(actor.Initialised(State, Message, process.Subject(Message)), String) {
   use table <- result.try(
     table_name
     |> table.new
@@ -51,54 +57,40 @@ fn init(
     sql.items(db)
     |> result.replace_error("Could not get items from the database!"),
   )
-  use pog.Returned(rows: containers, ..) <- result.try(
+  use pog.Returned(rows: container_kits, ..) <- result.try(
     sql.containers(db)
-    |> result.replace_error("Could not get items from the database!"),
+    |> result.replace_error("Could not get container kits from the database!"),
   )
 
   // populate table
-  let containers =
-    my_list.group_by(containers, fn(container) {
+  let container_kits =
+    my_list.group_by(container_kits, fn(container) {
       #(container.container_id, container.item_id)
     })
 
   list.map(item_rows, fn(row) {
-    let item = to_item(row, containers)
+    let item = to_item(row)
     #(item.id, item)
   })
   |> table.insert_many(table, _)
 
-  table
+  State(table_name:, table:, containers: container_kits)
   |> actor.initialised
   |> actor.returning(self)
   |> Ok
 }
 
-fn to_item(
-  row: sql.ItemsRow,
-  containers: dict.Dict(Int, List(Int)),
-) -> world.Item {
-  let sql.ItemsRow(item_id:, name:, short:, long:, keywords:, container_id:) =
-    row
-
-  let contains = case container_id {
-    Some(container_id) ->
-      dict.get(containers, container_id)
-      |> result.unwrap([])
-      |> list.map(world.Id)
-      |> world.Contains
-
-    None -> world.NotContainer
-  }
+fn to_item(row: sql.ItemsRow) -> world.Item {
+  let sql.ItemsRow(item_id:, name:, short:, long:, keywords:, ..) = row
 
   world.Item(
-    id: world.Id(item_id),
+    id: Id(item_id),
     name:,
     short:,
     long:,
     keywords:,
     wear_slot: world.Arms,
-    contains:,
+    is_container: False,
   )
 }
 
@@ -107,13 +99,13 @@ pub fn insert_many(table_name: process.Name(Message), items: List(Item)) -> Nil 
 
   table_name
   |> process.named_subject
-  |> process.send(cache.InsertMany(items))
+  |> process.send(InsertMany(items))
 }
 
 pub fn insert(table_name: process.Name(Message), item: Item) -> Nil {
   table_name
   |> process.named_subject
-  |> process.send(cache.Insert(item.id, item))
+  |> process.send(Insert(item.id, item))
 }
 
 /// Load item data
@@ -122,7 +114,7 @@ pub fn load(
   table_name: process.Name(Message),
   item_id: Id(Item),
 ) -> Result(Item, Nil) {
-  cache.lookup(table_name, item_id)
+  table.lookup(table_name, item_id)
 }
 
 pub fn load_from_instance(
@@ -164,45 +156,78 @@ pub fn load_instances(
   })
 }
 
-/// Generate an item instance given an item id
-///
+// Instances are generated as a call to keep table lookups from leaking
+// container information.
 pub fn instance(
   table_name: process.Name(Message),
   item_id: Id(Item),
 ) -> Result(world.ItemInstance, Nil) {
-  use world.Item(id:, keywords:, contains:, ..) <- result.try(cache.lookup(
-    table_name,
-    item_id,
-  ))
-
-  let contains = case contains {
-    world.Contains(container_contents) ->
-      // generate instances if a container
-      list.filter_map(container_contents, instance(table_name, _))
-      |> world.Contains
-
-    world.NotContainer -> world.NotContainer
-  }
-
-  Ok(world.ItemInstance(
-    id: world.generate_id(),
-    item: world.Loading(id),
-    keywords:,
-    contains:,
-    was_touched: False,
-  ))
+  table_name
+  |> process.named_subject
+  |> process.call(1000, ItemInstance(caller: _, item_id:))
 }
 
 /// A basic API for inserting and deleting from the key-val store.
 ///
-fn recv(
-  table: table.Set(Id(Item), Item),
-  msg: Message,
-) -> actor.Next(table.Set(Id(Item), Item), Message) {
+fn recv(state: State, msg: Message) -> actor.Next(State, Message) {
   case msg {
-    cache.InsertMany(objects:) -> table.insert_many(table, objects)
-    cache.Insert(key:, val:) -> table.insert(table, key, val)
-    cache.Delete(key:) -> table.delete(table, key)
+    InsertMany(key_vals:) -> table.insert_many(state.table, key_vals)
+    Insert(item_id:, item:) -> table.insert(state.table, item_id, item)
+    Delete(item_id:) -> table.delete(state.table, item_id)
+    ItemInstance(caller:, item_id:) -> {
+      item_instance(
+        state.table_name,
+        world.unwrap_id(item_id),
+        state.containers,
+      )
+      |> echo as "RESULT"
+      |> actor.send(caller, _)
+      True
+    }
   }
-  actor.continue(table)
+  actor.continue(state)
+}
+
+fn item_instance(
+  table_name: process.Name(Message),
+  raw_item_id: Int,
+  container_kits: Dict(Int, List(Int)),
+) -> Result(world.ItemInstance, Nil) {
+  use item: Item <- result.try(table.lookup(table_name, Id(raw_item_id)))
+  case dict.get(container_kits, raw_item_id) {
+    Ok(contents) -> {
+      let contains =
+        list.filter_map(contents, fn(id) {
+          item_instance(table_name, id, container_kits)
+        })
+        |> world.Contains
+
+      world.ItemInstance(
+        id: world.generate_id(),
+        item: world.Loading(Id(raw_item_id)),
+        keywords: item.keywords,
+        contains:,
+        was_touched: False,
+      )
+    }
+
+    Error(Nil) if item.is_container ->
+      world.ItemInstance(
+        id: world.generate_id(),
+        item: world.Loading(Id(raw_item_id)),
+        keywords: item.keywords,
+        contains: world.Contains([]),
+        was_touched: False,
+      )
+
+    Error(Nil) ->
+      world.ItemInstance(
+        id: world.generate_id(),
+        item: world.Loading(Id(raw_item_id)),
+        keywords: item.keywords,
+        contains: world.NotContainer,
+        was_touched: False,
+      )
+  }
+  |> Ok
 }
