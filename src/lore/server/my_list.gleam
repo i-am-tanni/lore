@@ -3,6 +3,7 @@
 
 import gleam/bool
 import gleam/dict.{type Dict}
+import gleam/int
 import gleam/list.{Continue, Stop}
 import gleam/pair
 import gleam/result
@@ -253,4 +254,9 @@ fn update_loop(
         Error(_) -> update_loop(rest, update_fun, [first, ..acc])
       }
   }
+}
+
+pub fn map_range(start: Int, stop: Int, map_fun: fn(Int) -> a) -> List(a) {
+  int.range(start, stop, [], fn(acc, i) { [map_fun(i), ..acc] })
+  |> list.reverse
 }

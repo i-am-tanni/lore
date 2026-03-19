@@ -235,8 +235,7 @@ pub type ItemSpawn {
 /// ```
 ///
 pub fn generate_id() -> StringId(a) {
-  list.range(1, 4)
-  |> list.map(fn(_) { <<int.random(256)>> })
+  list.map([1, 2, 3, 4], fn(_) { <<int.random(256)>> })
   |> bit_array.concat
   |> bit_array.base16_encode
   |> StringId

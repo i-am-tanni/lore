@@ -50,8 +50,8 @@ const xmax = 4
 // ysize - 1
 const ymax = 4
 
-// xmax * ysize + ymax
-const index_max = 24
+// xmax * ysize + ymax + 1
+const len_mini_map = 25
 
 const center_x = 2
 
@@ -190,7 +190,7 @@ fn mini_map(state: State, room_id: Id(Room)) -> List(StringTree) {
     //   15 16 17 18 19
     //   20 21 22 23 24
     |> fn(render_data: Dict(Int, MapNode)) {
-      list.map(list.range(0, index_max), fn(i) {
+      my_list.map_range(0, len_mini_map, fn(i) {
         case dict.get(render_data, i) {
           Ok(vertex) -> vertex.symbol
           Error(Nil) -> default_symbol
