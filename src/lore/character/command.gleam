@@ -20,6 +20,7 @@ import lore/character/view/render
 import lore/world.{type Id, type Item, type Room, Id, StringId}
 import lore/world/event
 import lore/world/items
+import lore/world/keyword
 import lore/world/named_actors
 import lore/world/room/presence
 import lore/world/zone/spawner
@@ -470,7 +471,7 @@ fn look_at_command(conn: Conn, command: Command(String)) -> Conn {
         || list.any(self.keywords, fn(keyword) { search_term == keyword }),
       Ok(LookSelf),
     )
-    list.find(self.inventory, item_matches(_, search_term))
+    find_item(conn, self.inventory, search_term)
     |> result.map(LookItem)
   }
 
@@ -539,13 +540,7 @@ fn get_command(conn: Conn, command: Command(String)) -> Conn {
 fn drop_command(conn: Conn, command: Command(String)) -> Conn {
   let keyword = command.data
   let world.MobileInternal(inventory:, ..) = conn.character_get(conn)
-  let result = {
-    use item <- list.find(inventory)
-    use item_keyword <- list.any(item.keywords)
-    keyword == item_keyword
-  }
-
-  case result {
+  case find_item(conn, inventory, keyword) {
     Ok(item_instance) -> conn.action(conn, act.item_drop(item_instance))
     Error(Nil) ->
       conn
@@ -601,7 +596,7 @@ fn wear_command(conn: Conn, command: Command(String)) -> Conn {
   let search_term = command.data
   let result = {
     use item_instance <- result.try(
-      list.find(self.inventory, item_matches(_, search_term))
+      find_item(conn, self.inventory, search_term)
       |> result.map_error(fn(_) {
         world.UnknownItem(search_term:, verb: "carrying")
       }),
@@ -652,15 +647,22 @@ fn wear_command(conn: Conn, command: Command(String)) -> Conn {
 
 fn remove_command(conn: Conn, command: Command(String)) -> Conn {
   let self = conn.character_get(conn)
-  let search_term = command.data
   let equipment = self.equipment
+  let search_term = command.data
 
-  let result =
+  let result = {
+    let keyword_actor = conn.named_actors(conn).keyword
+    use keyword_id <- result.try(
+      keyword.try_to_id(keyword_actor, search_term)
+      |> result.map_error(fn(_) {
+        world.UnknownItem(search_term:, verb: "wearing")
+      }),
+    )
     dict_find_map_nth(equipment, 1, fn(wear_slot, wearing) {
       case wearing {
         world.EmptySlot -> Error(Nil)
         world.Wearing(item) ->
-          case item_matches(item, search_term) {
+          case item_matches(item, keyword_id) {
             True -> Ok(#(wear_slot, item))
             False -> Error(Nil)
           }
@@ -669,6 +671,7 @@ fn remove_command(conn: Conn, command: Command(String)) -> Conn {
     |> result.map_error(fn(_) {
       world.UnknownItem(search_term:, verb: "wearing")
     })
+  }
 
   case result {
     Ok(#(wear_slot, item_instance)) -> {
@@ -963,14 +966,18 @@ fn role(conn: Conn) -> world.Role {
   conn.character_get(conn).role
 }
 
-fn item_matches(item_instance: world.ItemInstance, search_term: String) -> Bool {
-  list.any(item_instance.keywords, fn(keyword) { search_term == keyword })
-  || search_term == string_id_unwrap(item_instance.id)
+fn find_item(
+  conn: Conn,
+  inventory: List(world.ItemInstance),
+  keyword: String,
+) -> Result(world.ItemInstance, Nil) {
+  let keyword_actor = conn.named_actors(conn).keyword
+  use keyword_id <- result.try(keyword.try_to_id(keyword_actor, keyword))
+  list.find(inventory, item_matches(_, keyword_id))
 }
 
-fn string_id_unwrap(id: world.StringId(a)) -> String {
-  let StringId(raw_id) = id
-  raw_id
+fn item_matches(item_instance: world.ItemInstance, search_term: Int) -> Bool {
+  list.any(item_instance.keywords, fn(keyword) { search_term == keyword })
 }
 
 fn verb_missing_arg_err(verb: Verb) -> String {

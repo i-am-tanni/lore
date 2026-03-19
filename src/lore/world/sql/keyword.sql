@@ -1,0 +1,1 @@
+SELECT keyword_id, keyword FROM keyword;

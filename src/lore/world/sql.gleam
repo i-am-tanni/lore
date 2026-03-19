@@ -257,8 +257,8 @@ pub type ItemsRow {
     name: String,
     short: String,
     long: String,
-    keywords: List(String),
     container_id: Option(Int),
+    keywords: List(Int),
   )
 }
 
@@ -276,15 +276,15 @@ pub fn items(
     use name <- decode.field(1, decode.string)
     use short <- decode.field(2, decode.string)
     use long <- decode.field(3, decode.string)
-    use keywords <- decode.field(4, decode.list(decode.string))
-    use container_id <- decode.field(5, decode.optional(decode.int))
+    use container_id <- decode.field(4, decode.optional(decode.int))
+    use keywords <- decode.field(5, decode.list(decode.int))
     decode.success(ItemsRow(
       item_id:,
       name:,
       short:,
       long:,
-      keywords:,
       container_id:,
+      keywords:,
     ))
   }
 
@@ -293,12 +293,48 @@ pub fn items(
   i.name,
   i.short,
   i.long,
-  i.keywords,
-  c.container_id
+  c.container_id,
+  k_agg.keywords as keywords
 FROM item as i
-LEFT JOIN container_kit as c
-  ON c.item_id = i.item_id;
-"
+LEFT JOIN container_kit as c 
+  ON c.item_id = i.item_id
+LEFT JOIN (
+  SELECT item_id, ARRAY_AGG(keyword_id) as keywords
+  FROM item_keyword
+  GROUP BY item_id
+) as k_agg 
+  ON k_agg.item_id = i.item_id;"
+  |> pog.query
+  |> pog.returning(decoder)
+  |> pog.execute(db)
+}
+
+/// A row you get from running the `keyword` query
+/// defined in `./src/lore/world/sql/keyword.sql`.
+///
+/// > 🐿️ This type definition was generated automatically using v4.6.0 of the
+/// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub type KeywordRow {
+  KeywordRow(keyword_id: Int, keyword: String)
+}
+
+/// Runs the `keyword` query
+/// defined in `./src/lore/world/sql/keyword.sql`.
+///
+/// > 🐿️ This function was generated automatically using v4.6.0 of
+/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub fn keyword(
+  db: pog.Connection,
+) -> Result(pog.Returned(KeywordRow), pog.QueryError) {
+  let decoder = {
+    use keyword_id <- decode.field(0, decode.int)
+    use keyword <- decode.field(1, decode.string)
+    decode.success(KeywordRow(keyword_id:, keyword:))
+  }
+
+  "SELECT keyword_id, keyword FROM keyword;"
   |> pog.query
   |> pog.returning(decoder)
   |> pog.execute(db)

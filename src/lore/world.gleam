@@ -171,7 +171,7 @@ pub type Wearing {
 pub type Item {
   Item(
     id: Id(Item),
-    keywords: List(String),
+    keywords: List(Int),
     name: String,
     short: String,
     long: String,
@@ -190,7 +190,7 @@ pub type Load {
 pub type ItemInstance {
   ItemInstance(
     id: StringId(ItemInstance),
-    keywords: List(String),
+    keywords: List(Int),
     item: Load,
     contains: Container,
     was_touched: Bool,

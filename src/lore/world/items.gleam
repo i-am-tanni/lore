@@ -53,10 +53,11 @@ fn init(
     |> result.replace_error("Failed to start ets table: 'items'"),
   )
   let db = pog.named_connection(db)
-  use pog.Returned(rows: item_rows, ..) <- result.try(
+  use returned <- result.try(
     sql.items(db)
     |> result.replace_error("Could not get items from the database!"),
   )
+  let pog.Returned(rows: item_rows, ..) = returned
   use pog.Returned(rows: container_kits, ..) <- result.try(
     sql.containers(db)
     |> result.replace_error("Could not get container kits from the database!"),
@@ -180,7 +181,6 @@ fn recv(state: State, msg: Message) -> actor.Next(State, Message) {
         world.unwrap_id(item_id),
         state.containers,
       )
-      |> echo as "RESULT"
       |> actor.send(caller, _)
       True
     }

@@ -42,6 +42,7 @@ pub fn main() {
         socials: process.new_name("socials"),
         janitor: process.new_name("janitor"),
         mob_factory: process.new_name("mob_factory"),
+        keyword: process.new_name("keyword"),
       )
 
     static_supervisor.new(static_supervisor.OneForOne)

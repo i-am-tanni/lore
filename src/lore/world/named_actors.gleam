@@ -9,6 +9,7 @@ import lore/character/socials
 import lore/character/users
 import lore/world/communication
 import lore/world/items
+import lore/world/keyword
 import lore/world/mapper
 import lore/world/mob_factory
 import lore/world/room/janitor
@@ -34,6 +35,7 @@ pub type Lookup {
   /// - Socials: A table for canned emotes
   /// - Janitor: Actor that cleans up abandoned items in rooms
   /// - Mob Factory: The supervisor for spawning mobiles
+  /// - Keyword: A keyword lookup by hash table
   ///
   Lookup(
     db: process.Name(pog.Message),
@@ -48,6 +50,7 @@ pub type Lookup {
     socials: process.Name(socials.Message),
     janitor: process.Name(janitor.Message),
     mob_factory: process.Name(mob_factory.Message),
+    keyword: process.Name(keyword.Message),
   )
 }
 
@@ -65,5 +68,6 @@ pub fn supervised(
   |> add(worker(fn() { users.start(name.user, name.communication) }))
   |> add(worker(fn() { socials.start(name.socials, name.db) }))
   |> add(worker(fn() { janitor.start(name.janitor, name.room) }))
+  |> add(worker(fn() { keyword.start(name.keyword, name.db) }))
   |> static_supervisor.supervised
 }

@@ -24,6 +24,7 @@ import lore/world.{
 import lore/world/event.{
   type CharacterMessage, type CharacterToRoomEvent, type Event, type RoomMessage,
 }
+import lore/world/keyword
 import lore/world/named_actors
 import lore/world/room/effect.{type RoomEffect}
 import lore/world/room/janitor
@@ -515,8 +516,12 @@ fn look_at(
   let room = model.room
 
   let result = {
+    use keyword_id <- result.try(keyword.try_to_id(
+      model.lookup.keyword,
+      search_term,
+    ))
     use <- result.lazy_or(
-      find_local_item(room.items, search_term)
+      find_local_item(room.items, keyword_id)
       |> result.map(Item),
     )
     use <- result.lazy_or(
@@ -640,9 +645,14 @@ fn item_get(
   search_term: String,
 ) -> #(Model, RoomEffect(CharacterMessage)) {
   let result = {
-    use world.ItemInstance(id:, ..) as item_instance <- try(
-      list.find(model.room.items, item_keyword_matches(_, search_term)),
-    )
+    use keyword_id <- result.try(keyword.try_to_id(
+      model.lookup.keyword,
+      search_term,
+    ))
+    use world.ItemInstance(id:, ..) as item_instance <- try(find_local_item(
+      model.room.items,
+      keyword_id,
+    ))
 
     let update = {
       let room = model.room
@@ -1090,8 +1100,8 @@ fn find_local_exit(
   |> result.replace_error(world.UnknownExit(direction))
 }
 
-fn item_keyword_matches(item: world.ItemInstance, search_term: String) {
-  list.any(item.keywords, fn(keyword) { keyword == search_term })
+fn item_keyword_matches(item: world.ItemInstance, keyword_id: Int) {
+  list.any(item.keywords, fn(keyword) { keyword == keyword_id })
 }
 
 // Confirm exit is accessible
@@ -1138,11 +1148,9 @@ fn find_local_character(
 
 fn find_local_item(
   items: List(world.ItemInstance),
-  term: String,
+  keyword_id: Int,
 ) -> Result(world.ItemInstance, Nil) {
-  list.find(items, fn(item) {
-    list.any(item.keywords, fn(keyword) { term == keyword })
-  })
+  list.find(items, item_keyword_matches(_, keyword_id))
 }
 
 fn find_local_xdesc(
