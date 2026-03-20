@@ -13,6 +13,7 @@ import gleam/otp/actor
 import gleam/result.{try}
 import gleam/time/duration
 import gleam/time/timestamp.{type Timestamp}
+import logging
 import lore/server/my_list
 import lore/world.{type Id, type ItemInstance, type Room, type StringId}
 import lore/world/event
@@ -78,6 +79,8 @@ pub fn start(
   name: process.Name(Message),
   room_registry: process.Name(room_registry.Message),
 ) -> Result(actor.Started(process.Subject(Message)), actor.StartError) {
+  logging.log(logging.Info, "Starting Janitor actor")
+
   actor.new_with_initialiser(500, init(_, room_registry))
   |> actor.named(name)
   |> actor.on_message(recv)

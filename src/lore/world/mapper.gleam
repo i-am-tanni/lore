@@ -85,6 +85,7 @@ pub fn start(
   name: process.Name(Message),
   db: process.Name(pog.Message),
 ) -> Result(actor.Started(process.Subject(Message)), actor.StartError) {
+  logging.log(logging.Info, "Starting Mini Map actor")
   actor.new_with_initialiser(100, fn(self) { init(self, db) })
   |> actor.named(name)
   |> actor.on_message(recv)

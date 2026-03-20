@@ -10,6 +10,7 @@ import gleam/pair
 import gleam/result
 import gleam/string
 import glets/table
+import logging
 import lore/world.{type Mobile, type StringId}
 import lore/world/communication
 import lore/world/event
@@ -50,6 +51,7 @@ pub fn start(
   table_name: process.Name(Message),
   comms: process.Name(communication.Message),
 ) -> Result(actor.Started(Subject(Message)), actor.StartError) {
+  logging.log(logging.Info, "Starting User Tracking")
   actor.new_with_initialiser(1000, init(_, table_name, comms))
   |> actor.named(table_name)
   |> actor.on_message(recv)

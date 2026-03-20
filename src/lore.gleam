@@ -67,6 +67,8 @@ pub fn main() {
     |> result.replace(#(server_ip, port))
   }
 
+  // If a supervisor tries to start an actor and it fails, it will crash
+  // without returning the error!
   case start_result {
     Ok(#(server_ip, port)) -> {
       let start_msg = "Server started! " <> server_ip <> ":" <> port
@@ -100,6 +102,8 @@ pub fn start_database_connection(
   server_ip: String,
   database_name: String,
 ) {
+  logging.log(logging.Info, "Starting Database Connection")
+
   let pool_child =
     pog.default_config(pool_name)
     |> pog.host(server_ip)

@@ -4,6 +4,7 @@ import gleam/otp/actor
 import gleam/result
 import glets/cache
 import glets/table
+import logging
 import lore/world/sql
 import pog
 
@@ -27,6 +28,7 @@ pub fn start(
   table_name: process.Name(Message),
   db: process.Name(pog.Message),
 ) -> Result(actor.Started(process.Subject(Message)), actor.StartError) {
+  logging.log(logging.Info, "Starting Socials table")
   actor.new_with_initialiser(500, fn(self) { init(self, table_name, db) })
   |> actor.named(table_name)
   |> actor.on_message(recv)

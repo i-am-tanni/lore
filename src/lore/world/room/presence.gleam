@@ -13,6 +13,7 @@ import gleam/otp/actor
 import gleam/result
 import gleam/string
 import glets/table
+import logging
 import lore/world.{type Id, type Mobile, type Room, type StringId}
 import lore/world/event
 import lore/world/room/room_registry
@@ -60,6 +61,8 @@ pub fn start(
   table_name: process.Name(Message),
   room_registry: process.Name(room_registry.Message),
 ) -> Result(actor.Started(process.Subject(Message)), actor.StartError) {
+  logging.log(logging.Info, "Starting Presence table")
+
   actor.new_with_initialiser(100, fn(self) {
     init(self, table_name, room_registry)
   })

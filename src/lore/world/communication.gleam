@@ -13,6 +13,7 @@ import gleam/result
 import gleam/set.{type Set}
 import gleam/string
 import glets/table
+import logging
 import lore/world.{type Id, type Mobile, type Room}
 import lore/world/event
 
@@ -69,6 +70,8 @@ pub type Subscriber {
 pub fn start(
   table_name: process.Name(Message),
 ) -> Result(actor.Started(Subject(Message)), actor.StartError) {
+  logging.log(logging.Info, "Starting Communication actor")
+
   actor.new_with_initialiser(1000, init(_, table_name))
   |> actor.named(table_name)
   |> actor.on_message(recv)

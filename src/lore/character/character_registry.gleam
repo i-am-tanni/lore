@@ -8,6 +8,7 @@ import gleam/otp/actor
 import gleam/result
 import gleam/string
 import glets/table
+import logging
 import lore/world.{type Mobile, type StringId}
 import lore/world/event.{type CharacterMessage}
 
@@ -36,6 +37,8 @@ type State {
 pub fn start(
   table_name: process.Name(Message),
 ) -> Result(actor.Started(Subject(Message)), actor.StartError) {
+  logging.log(logging.Info, "Starting Character Registry")
+
   actor.new_with_initialiser(1000, init(_, table_name))
   |> actor.named(table_name)
   |> actor.on_message(recv)

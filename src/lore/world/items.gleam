@@ -8,6 +8,7 @@ import gleam/list
 import gleam/otp/actor
 import gleam/result
 import glets/table
+import logging
 import lore/server/my_list
 import lore/world.{type Id, type Item, Id}
 import lore/world/sql
@@ -35,6 +36,8 @@ pub fn start(
   table_name: process.Name(Message),
   db: process.Name(pog.Message),
 ) -> Result(actor.Started(process.Subject(Message)), actor.StartError) {
+  logging.log(logging.Info, "Starting Items table")
+
   actor.new_with_initialiser(500, fn(self) { init(self, table_name, db) })
   |> actor.named(table_name)
   |> actor.on_message(recv)
@@ -46,39 +49,53 @@ fn init(
   table_name: process.Name(Message),
   db: process.Name(pog.Message),
 ) -> Result(actor.Initialised(State, Message, process.Subject(Message)), String) {
-  use table <- result.try(
-    table_name
-    |> table.new
-    |> table.set
-    |> result.replace_error("Failed to start ets table: 'items'"),
-  )
-  let db = pog.named_connection(db)
-  use returned <- result.try(
-    sql.items(db)
-    |> result.replace_error("Could not get items from the database!"),
-  )
-  let pog.Returned(rows: item_rows, ..) = returned
-  use pog.Returned(rows: container_kits, ..) <- result.try(
-    sql.containers(db)
-    |> result.replace_error("Could not get container kits from the database!"),
-  )
+  let result = {
+    use table <- result.try(
+      table_name
+      |> table.new
+      |> table.set
+      |> result.replace_error("Failed to start ets table: 'items'"),
+    )
+    let db = pog.named_connection(db)
+    use returned <- result.try(
+      sql.items(db)
+      |> result.replace_error("Could not get items from the database!"),
+    )
+    let pog.Returned(rows: item_rows, ..) = returned
+    use pog.Returned(rows: container_kits, ..) <- result.try(
+      sql.containers(db)
+      |> result.replace_error("Could not get container kits from the database!"),
+    )
 
-  // populate table
-  let container_kits =
-    my_list.group_by(container_kits, fn(container) {
-      #(container.container_id, container.item_id)
+    // populate table
+    let container_kits =
+      my_list.group_by(container_kits, fn(container) {
+        #(container.container_id, container.item_id)
+      })
+
+    list.map(item_rows, fn(row) {
+      let item = to_item(row)
+      #(item.id, item)
     })
+    |> table.insert_many(table, _)
+    State(table_name:, table:, containers: container_kits)
+    |> Ok
+  }
 
-  list.map(item_rows, fn(row) {
-    let item = to_item(row)
-    #(item.id, item)
-  })
-  |> table.insert_many(table, _)
+  // We must intercept the error message if the initializer fails and log it
+  // otherwise the supervisor will crash with an ugly error message
+  // and the error specifics will be lost.
+  case result {
+    Ok(state) ->
+      actor.initialised(state)
+      |> actor.returning(self)
+      |> Ok
 
-  State(table_name:, table:, containers: container_kits)
-  |> actor.initialised
-  |> actor.returning(self)
-  |> Ok
+    Error(msg) -> {
+      logging.log(logging.Critical, msg)
+      Error(msg)
+    }
+  }
 }
 
 fn to_item(row: sql.ItemsRow) -> world.Item {

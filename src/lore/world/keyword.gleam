@@ -38,6 +38,7 @@ import gleam/erlang/process
 import gleam/list
 import gleam/otp/actor
 import gleam/result
+import logging
 import lore/world/sql
 import pog
 
@@ -62,6 +63,8 @@ pub fn start(
   actor_name: process.Name(Message),
   db: process.Name(pog.Message),
 ) -> Result(actor.Started(process.Subject(Message)), actor.StartError) {
+  logging.log(logging.Info, "Starting Keyword actor")
+
   actor.new_with_initialiser(500, fn(self) { init(self, actor_name, db) })
   |> actor.named(actor_name)
   |> actor.on_message(recv)

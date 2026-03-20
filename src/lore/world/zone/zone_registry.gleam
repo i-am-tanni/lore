@@ -1,6 +1,7 @@
 import gleam/erlang/process.{type Subject}
 import gleam/otp/actor
 import glets/cache
+import logging
 import lore/world.{type Id, type Zone}
 import lore/world/event.{type ZoneMessage}
 
@@ -15,6 +16,7 @@ pub type Message =
 pub fn start(
   table_name: process.Name(Message),
 ) -> Result(actor.Started(process.Subject(Message)), actor.StartError) {
+  logging.log(logging.Info, "Starting Zone Registry")
   cache.start(table_name)
 }
 
