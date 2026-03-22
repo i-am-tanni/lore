@@ -1029,12 +1029,7 @@ fn verb_missing_arg_err(verb: Verb) -> String {
     Remove ->
       "What would you like to remove? Provide either a wear location or item keyword."
     // verbs without args that will never have this error
-    Inventory -> ""
-    Equipment -> ""
-    Social -> ""
-    SuperInvisible -> ""
-    GodMode -> ""
-    AutoRevive -> ""
+    Inventory | Equipment | Social | SuperInvisible | GodMode | AutoRevive -> ""
   }
 }
 
