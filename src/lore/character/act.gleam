@@ -1,5 +1,6 @@
 import lore/world
 import lore/world/event.{type Action, Action}
+import lore/world/keyword.{type Keyword}
 
 const min_delay = 500
 
@@ -33,7 +34,7 @@ pub fn communicate(data: event.RoomCommunicationData) -> Action {
   )
 }
 
-pub fn item_get(keyword: String) -> Action {
+pub fn item_get(keyword: Keyword) -> Action {
   Action(
     event: event.ItemGet(keyword),
     id: world.generate_id(),

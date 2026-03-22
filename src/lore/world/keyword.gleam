@@ -42,17 +42,17 @@ import logging
 import lore/world/sql
 import pog
 
+pub type Keyword {
+  Keyword(id: Int, term: String)
+}
+
 pub type Message {
   Lookup(caller: process.Subject(Result(Int, Nil)), keyword: String)
 }
 
-type KeywordData {
-  KeywordData(keyword_id: Int, keyword: String, hash: Int)
-}
-
 type HashData {
-  Perfect(KeywordData)
-  Collisions(List(KeywordData))
+  Perfect(Keyword)
+  Collisions(List(Keyword))
 }
 
 type State {
@@ -63,7 +63,7 @@ pub fn start(
   actor_name: process.Name(Message),
   db: process.Name(pog.Message),
 ) -> Result(actor.Started(process.Subject(Message)), actor.StartError) {
-  logging.log(logging.Info, "Starting Keyword actor")
+  logging.log(logging.Info, "Starting Keyword cache")
 
   actor.new_with_initialiser(500, fn(self) { init(self, actor_name, db) })
   |> actor.named(actor_name)
@@ -82,23 +82,29 @@ fn init(
     |> result.replace_error("Could not get keywords from the database!"),
   )
 
-  let data =
-    list.map(keyword_rows, fn(row) {
+  let lookup =
+    list.fold(keyword_rows, dict.new(), fn(acc, row) {
       let sql.KeywordRow(keyword_id:, keyword:) = row
-      KeywordData(keyword_id:, keyword:, hash: hash(keyword))
+      insert(acc, hash(keyword), Keyword(id: keyword_id, term: keyword))
     })
 
-  let hash_table = list.fold(data, dict.new(), insert)
-
-  State(lookup: hash_table)
+  State(lookup:)
   |> actor.initialised
   |> actor.returning(self)
   |> Ok
 }
 
+pub fn from_term(
+  actor_name: process.Name(Message),
+  term: String,
+) -> Result(Keyword, Nil) {
+  to_id(actor_name, term)
+  |> result.map(Keyword(_, term:))
+}
+
 /// a synchronous call to the keyword cache to attempt a keyword_id conversion
 ///
-pub fn try_to_id(
+pub fn to_id(
   actor_name: process.Name(Message),
   keyword: String,
 ) -> Result(Int, Nil) {
@@ -115,8 +121,8 @@ fn recv(state: State, msg: Message) -> actor.Next(State, Message) {
   actor.continue(state)
 }
 
-fn lookup(lookup: Dict(Int, HashData), term: String) -> Result(Int, Nil) {
-  use match <- result.try(dict.get(lookup, hash(term)))
+fn lookup(lookup: Dict(Int, HashData), input: String) -> Result(Int, Nil) {
+  use match <- result.try(dict.get(lookup, hash(input)))
   case match {
     // If a single match is found, assume correct because garbage input that
     // matches a perfect hash in the table is unlikely to succeed when
@@ -124,13 +130,12 @@ fn lookup(lookup: Dict(Int, HashData), term: String) -> Result(Int, Nil) {
     //
     // If there is a problematic collision, we can simply add the exception case 
     // to the table.
-    Perfect(KeywordData(keyword_id:, ..)) -> Ok(keyword_id)
+    Perfect(Keyword(id:, ..)) -> Ok(id)
     // .. else if there are collisions, we must resolve via string comparison
     Collisions(collisions) ->
       list.find_map(collisions, fn(keyword_data) {
         case keyword_data {
-          KeywordData(keyword_id:, keyword:, ..) if keyword == term ->
-            Ok(keyword_id)
+          Keyword(id:, term:) if term == input -> Ok(id)
           _ -> Error(Nil)
         }
       })
@@ -139,9 +144,9 @@ fn lookup(lookup: Dict(Int, HashData), term: String) -> Result(Int, Nil) {
 
 fn insert(
   lookup: Dict(Int, HashData),
-  keyword_data: KeywordData,
+  hash: Int,
+  keyword_data: Keyword,
 ) -> Dict(Int, HashData) {
-  let hash = keyword_data.hash
   let value = case dict.get(lookup, hash) {
     Error(Nil) -> Perfect(keyword_data)
     Ok(Perfect(first_match)) -> Collisions([keyword_data, first_match])

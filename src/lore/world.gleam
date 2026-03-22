@@ -66,7 +66,7 @@ pub type Direction {
 
 /// An extra description that can be revealed via keyword search
 pub type ExtraDesc {
-  ExtraDesc(short: String, keywords: List(String), text: String)
+  ExtraDesc(id: Id(ExtraDesc), keywords: List(Int), short: String, long: String)
 }
 
 pub type RoomExit {
@@ -101,7 +101,7 @@ pub type Mobile {
     room_id: Id(Room),
     template_id: TemplateId,
     name: String,
-    keywords: List(String),
+    keywords: List(Int),
     pronouns: PronounKind,
     short: String,
     fighting: Fighting,
@@ -132,7 +132,7 @@ pub type MobileInternal {
     template_id: TemplateId,
     role: Role,
     name: String,
-    keywords: List(String),
+    keywords: List(Int),
     inventory: List(ItemInstance),
     equipment: Dict(WearSlot, Wearing),
     pronouns: PronounKind,

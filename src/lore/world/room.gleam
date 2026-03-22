@@ -24,7 +24,7 @@ import lore/world.{
 import lore/world/event.{
   type CharacterMessage, type CharacterToRoomEvent, type Event, type RoomMessage,
 }
-import lore/world/keyword
+import lore/world/keyword.{type Keyword}
 import lore/world/named_actors
 import lore/world/room/effect.{type RoomEffect}
 import lore/world/room/janitor
@@ -511,25 +511,21 @@ fn look_room(
 fn look_at(
   model: Model,
   event: Event(event.CharacterToRoomEvent, CharacterMessage),
-  search_term: String,
+  keyword: Keyword,
 ) -> #(Model, RoomEffect(CharacterMessage)) {
   let room = model.room
 
   let result = {
-    use keyword_id <- result.try(keyword.try_to_id(
-      model.lookup.keyword,
-      search_term,
-    ))
     use <- result.lazy_or(
-      find_local_item(room.items, keyword_id)
+      find_local_item(room.items, keyword.id)
       |> result.map(Item),
     )
     use <- result.lazy_or(
-      find_local_character(room.characters, event.Keyword(search_term))
+      find_local_character(room.characters, event.SearchWord(keyword))
       |> result.map(Mobile)
       |> result.replace_error(Nil),
     )
-    find_local_xdesc(room.xdescs, search_term)
+    find_local_xdesc(room.xdescs, keyword.id)
     |> result.map(ExtraDesc)
   }
 
@@ -539,11 +535,11 @@ fn look_at(
     Ok(Mobile(world.Mobile(id:, ..))) ->
       effect.send_character_id(id, event.MobileInspectRequest(event.from))
     Ok(ExtraDesc(xdesc_match)) ->
-      effect.renderln(event.from, view.text(xdesc_match.text))
+      effect.renderln(event.from, view.text(xdesc_match.long))
     Error(_) ->
       effect.send_character(
         event.from,
-        event.ActFailed(world.NotFound(search_term)),
+        event.ActFailed(world.NotFound(keyword.term)),
       )
   }
 
@@ -606,12 +602,12 @@ fn broadcast(
     event.SayData(text:, adverb:) -> Ok(event.Say(text:, adverb:))
 
     event.SayAtData(at:, text:, adverb:) -> {
-      list.find(model.room.characters, character_keyword_matches(_, at))
+      list.find(model.room.characters, character_keyword_matches(_, at.id))
       |> result.map(fn(victim) { event.SayAt(text:, adverb:, at: victim) })
     }
 
     event.WhisperData(at:, text:, ..) -> {
-      list.find(model.room.characters, character_keyword_matches(_, at))
+      list.find(model.room.characters, character_keyword_matches(_, at.id))
       |> result.map(fn(victim) { event.Whisper(text:, at: victim) })
     }
 
@@ -620,7 +616,7 @@ fn broadcast(
     event.SocialData(report:) -> Ok(event.Social(report:))
 
     event.SocialAtData(report:, at:) -> {
-      list.find(model.room.characters, character_keyword_matches(_, at))
+      list.find(model.room.characters, character_keyword_matches(_, at.id))
       |> result.map(fn(victim) { event.SocialAt(report:, at: victim) })
     }
   }
@@ -642,16 +638,12 @@ fn broadcast(
 fn item_get(
   model: Model,
   event: Event(CharacterToRoomEvent, CharacterMessage),
-  search_term: String,
+  keyword: Keyword,
 ) -> #(Model, RoomEffect(CharacterMessage)) {
   let result = {
-    use keyword_id <- result.try(keyword.try_to_id(
-      model.lookup.keyword,
-      search_term,
-    ))
     use world.ItemInstance(id:, ..) as item_instance <- try(find_local_item(
       model.room.items,
-      keyword_id,
+      keyword.id,
     ))
 
     let update = {
@@ -688,7 +680,7 @@ fn item_get(
 
     Error(_) -> {
       let effect =
-        event.ActFailed(world.ItemLookupFailed(search_term))
+        event.ActFailed(world.ItemLookupFailed(keyword.term))
         |> effect.send_character(event.from, _)
 
       #(model, effect)
@@ -1088,8 +1080,8 @@ fn combat_slay(
   }
 }
 
-fn character_keyword_matches(character: world.Mobile, term: String) -> Bool {
-  list.any(character.keywords, fn(keyword) { term == keyword })
+fn character_keyword_matches(character: world.Mobile, keyword_id: Int) -> Bool {
+  list.any(character.keywords, fn(keyword) { keyword_id == keyword })
 }
 
 fn find_local_exit(
@@ -1136,10 +1128,12 @@ fn find_local_character(
   search_term: event.SearchTerm(Mobile),
 ) -> Result(Mobile, world.ErrorRoomRequest) {
   let matches = case search_term {
-    event.Keyword(term) -> fn(character: world.Mobile) {
-      list.any(character.keywords, fn(keyword) { term == keyword })
+    event.SearchWord(keyword) -> {
+      character_keyword_matches(_, keyword.id)
     }
-    event.SearchId(id) -> fn(character: world.Mobile) { id == character.id }
+    event.SearchId(mobile_id) -> fn(character: world.Mobile) {
+      mobile_id == character.id
+    }
   }
 
   list.find(characters, matches)
@@ -1155,10 +1149,10 @@ fn find_local_item(
 
 fn find_local_xdesc(
   xdescs: List(world.ExtraDesc),
-  term: String,
+  keyword_id: Int,
 ) -> Result(world.ExtraDesc, Nil) {
   list.find(xdescs, fn(xdesc) {
-    list.any([xdesc.short, ..xdesc.keywords], fn(keyword) { term == keyword })
+    list.any(xdesc.keywords, fn(keyword) { keyword_id == keyword })
   })
 }
 

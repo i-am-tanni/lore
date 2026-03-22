@@ -298,7 +298,7 @@ pub fn items(
 FROM item as i
 LEFT JOIN container_kit as c 
   ON c.item_id = i.item_id
-LEFT JOIN (
+INNER JOIN (
   SELECT item_id, ARRAY_AGG(keyword_id) as keywords
   FROM item_keyword
   GROUP BY item_id
@@ -319,8 +319,7 @@ pub type KeywordRow {
   KeywordRow(keyword_id: Int, keyword: String)
 }
 
-/// Runs the `keyword` query
-/// defined in `./src/lore/world/sql/keyword.sql`.
+/// query keywords + user names
 ///
 /// > 🐿️ This function was generated automatically using v4.6.0 of
 /// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
@@ -334,7 +333,22 @@ pub fn keyword(
     decode.success(KeywordRow(keyword_id:, keyword:))
   }
 
-  "SELECT keyword_id, keyword FROM keyword;"
+  "-- query keywords + user names
+
+WITH max_id AS (
+    -- Get the current maximum ID from the keyword table
+    SELECT COALESCE(MAX(keyword_id), 0) as start_val FROM keyword
+)
+SELECT keyword_id, keyword 
+FROM keyword
+
+UNION ALL
+-- union with user names
+SELECT 
+    -- generate a keyword_id on the fly for account names
+    (SELECT start_val FROM max_id) + ROW_NUMBER() OVER () AS keyword_id, 
+    LOWER(name)
+FROM account;"
   |> pog.query
   |> pog.returning(decoder)
   |> pog.execute(db)
@@ -461,7 +475,7 @@ pub type MobileByIdRow {
     room_id: Int,
     name: String,
     short: String,
-    keywords: List(String),
+    keywords: List(Int),
   )
 }
 
@@ -480,11 +494,25 @@ pub fn mobile_by_id(
     use room_id <- decode.field(1, decode.int)
     use name <- decode.field(2, decode.string)
     use short <- decode.field(3, decode.string)
-    use keywords <- decode.field(4, decode.list(decode.string))
+    use keywords <- decode.field(4, decode.list(decode.int))
     decode.success(MobileByIdRow(mobile_id:, room_id:, name:, short:, keywords:))
   }
 
-  "SELECT * from mobile where mobile_id = $1;
+  "SELECT
+  m.mobile_id,
+  m.room_id,
+  m.name,
+  m.short,
+  k_agg.keywords as keywords
+FROM mobile as m
+INNER JOIN (
+  SELECT mobile_id, ARRAY_AGG(keyword_id) as keywords
+  FROM mob_keyword
+  GROUP BY mobile_id
+) as k_agg
+  ON k_agg.mobile_id = m.mobile_id
+WHERE m.mobile_id = $1
+;
 "
   |> pog.query
   |> pog.parameter(pog.int(arg_1))

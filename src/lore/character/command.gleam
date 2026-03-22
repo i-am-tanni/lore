@@ -20,7 +20,7 @@ import lore/character/view/render
 import lore/world.{type Id, type Item, type Room, Id, StringId}
 import lore/world/event
 import lore/world/items
-import lore/world/keyword
+import lore/world/keyword.{type Keyword, Keyword}
 import lore/world/named_actors
 import lore/world/room/presence
 import lore/world/zone/spawner
@@ -60,22 +60,30 @@ type Verb {
 
 type Victim {
   Self
-  Victim(String)
+  Victim(Keyword)
 }
 
 type LookAt {
   LookSelf
   LookItem(world.ItemInstance)
+  LookRoom(Keyword)
 }
 
 type SocialData {
   SocialAuto(social: socials.Social)
-  SocialAt(social: socials.Social, at: String)
+  SocialAt(social: socials.Social, at: Keyword)
   SocialNoArg(social: socials.Social)
 }
 
 type TeleOtherArgs {
   TeleOther(room_id: Id(Room), victim: Victim)
+}
+
+type ErrorPreposition {
+  // Not provided
+  Missing
+  // Provided but unknown
+  Unknown(String)
 }
 
 pub fn parse(conn: Conn, input: String) -> Conn {
@@ -91,8 +99,8 @@ pub fn parse(conn: Conn, input: String) -> Conn {
     "d" | "down" -> move_command(conn, world.Down)
     "l" | "look" if rest == "" -> command_nil(conn, Look, look_command)
     "l" | "look" -> command(conn, look_at_command, look_args(rest, word))
-    "say" -> command(conn, room_comms, say_args(rest, word))
-    "whisper" -> command(conn, room_comms, whisper_args(rest, word))
+    "say" -> command(conn, room_comms, say_args(conn, rest, word))
+    "whisper" -> command(conn, room_comms, whisper_args(conn, rest, word))
     "emote" -> command(conn, room_comms, emote_text(rest))
     "k" | "kill" -> command(conn, kill_command, keyword_arg(Get, rest, word))
     "op" | "open" ->
@@ -210,6 +218,7 @@ fn look_args(s: String, word: Splitter) -> Result(Command(String), String) {
 }
 
 fn say_args(
+  conn: Conn,
   s: String,
   word: Splitter,
 ) -> Result(Command(event.RoomCommunicationData), String) {
@@ -217,26 +226,29 @@ fn say_args(
     options(s, [#("at", at(_, word)), #("adverb", adverb(_, word))])
 
   let text = quote(s)
-  let at = list.key_find(options, "at")
+  let at = find_at(conn, options)
   let adverb = list.key_find(options, "adverb") |> option.from_result
   case at {
     Ok(at) -> Command(Say, event.SayAtData(text:, at:, adverb:)) |> Ok
-    Error(_) -> Command(Say, event.SayData(text:, adverb:)) |> Ok
+    Error(Missing) -> Command(Say, event.SayData(text:, adverb:)) |> Ok
+    Error(Unknown(keyword)) -> Error("Could not locate '" <> keyword <> "'.")
   }
 }
 
 fn whisper_args(
+  conn: Conn,
   s: String,
   word: Splitter,
 ) -> Result(Command(event.RoomCommunicationData), String) {
   let #(options, s) =
     options(s, [#("at", at(_, word)), #("adverb", adverb(_, word))])
   let text = quote(s)
-  let at = list.key_find(options, "at")
+  let at = find_at(conn, options)
   let adverb = list.key_find(options, "adverb") |> option.from_result
   case at {
     Ok(at) -> Command(Whisper, event.WhisperData(text:, at:, adverb:)) |> Ok
-    Error(_) -> Error("Who do you want to whisper to?")
+    Error(Missing) -> Error("Who do you want to whisper to?")
+    Error(Unknown(term)) -> Error("Could not locate '" <> term <> "'.")
   }
 }
 
@@ -288,10 +300,11 @@ fn social_args(
     |> result.replace_error("Huh?"),
   )
   let data = case victim(rest, word) {
-    Ok(#(victim, _)) ->
-      case is_auto(conn, victim) {
-        True -> SocialAuto(social)
-        False -> SocialAt(social, victim)
+    Ok(#(search_term, _)) ->
+      case to_victim(conn, search_term) {
+        Ok(Self) -> SocialAuto(social)
+        Ok(Victim(keyword)) -> SocialAt(social, keyword)
+        Error(Nil) -> SocialNoArg(social)
       }
     Error(_) -> SocialNoArg(social)
   }
@@ -311,14 +324,14 @@ fn tele_other_arg(
   s: String,
   word: Splitter,
 ) -> Result(Command(TeleOtherArgs), String) {
-  use #(victim, rest) <- result.try(
+  use #(search_term, rest) <- result.try(
     victim(s, word)
     |> result.replace_error(verb_missing_arg_err(Teleport)),
   )
-  let victim = case is_auto(conn, victim) {
-    True -> Self
-    False -> Victim(victim)
-  }
+  use victim <- result.try(
+    to_victim(conn, search_term)
+    |> result.replace_error("Could not locate '" <> search_term <> "' here."),
+  )
   use #(room_id, _) <- try(
     id(rest, word)
     |> result.replace_error("Where do you want to teleport this person to?"),
@@ -334,15 +347,13 @@ fn victim_arg(
   s: String,
   word: Splitter,
 ) -> Result(Command(Victim), String) {
-  use #(victim, _) <- result.try(
+  use #(search_term, _) <- result.try(
     victim(s, word)
     |> result.replace_error(verb_missing_arg_err(verb)),
   )
-  case is_auto(conn, victim) {
-    True -> Command(verb, Self)
-    False -> Command(verb, Victim(victim))
-  }
-  |> Ok
+  to_victim(conn, search_term)
+  |> result.map(Command(verb, _))
+  |> result.replace_error("Could not locate '" <> search_term <> "' here.")
 }
 
 fn quote(s: String) -> String {
@@ -466,13 +477,13 @@ fn look_at_command(conn: Conn, command: Command(String)) -> Conn {
   let search_term = command.data
   let self = conn.character_get(conn)
   let found_result = {
-    use <- bool.guard(
-      search_term == "self"
-        || list.any(self.keywords, fn(keyword) { search_term == keyword }),
-      Ok(LookSelf),
+    use <- bool.guard(is_auto(self, search_term), Ok(LookSelf))
+    use <- result.lazy_or(
+      find_item(conn, self.inventory, search_term)
+      |> result.map(LookItem),
     )
-    find_item(conn, self.inventory, search_term)
-    |> result.map(LookItem)
+    keyword_from_term(conn, search_term)
+    |> result.map(LookRoom)
   }
 
   case found_result {
@@ -483,7 +494,11 @@ fn look_at_command(conn: Conn, command: Command(String)) -> Conn {
 
     Ok(LookItem(item_instance)) -> events.item_look_at(conn, item_instance)
 
-    Error(Nil) -> conn.event(conn, event.LookAt(search_term))
+    Ok(LookRoom(keyword)) -> conn.event(conn, event.LookAt(keyword))
+
+    Error(Nil) ->
+      render.error_room_request(world.ItemLookupFailed(keyword: search_term))
+      |> conn.renderln(conn, _)
   }
 }
 
@@ -497,12 +512,12 @@ fn room_comms(conn: Conn, command: Command(event.RoomCommunicationData)) {
 
     event.SayAtData(text: "", at:, ..) ->
       conn
-      |> conn.renderln(render.empty("say to " <> at))
+      |> conn.renderln(render.empty("say to " <> at.term))
       |> conn.prompt()
 
     event.WhisperData(text: "", at:, ..) ->
       conn
-      |> conn.renderln(render.empty("whisper to " <> at))
+      |> conn.renderln(render.empty("whisper to " <> at.term))
       |> conn.prompt()
 
     event.EmoteData(text: "") ->
@@ -534,7 +549,15 @@ fn chat_command(
 }
 
 fn get_command(conn: Conn, command: Command(String)) -> Conn {
-  conn.action(conn, act.item_get(command.data))
+  let search_term = command.data
+  let result = keyword_from_term(conn, search_term)
+
+  case result {
+    Ok(keyword) -> conn.action(conn, act.item_get(keyword))
+    Error(Nil) ->
+      render.error_room_request(world.ItemLookupFailed(keyword: search_term))
+      |> conn.renderln(conn, _)
+  }
 }
 
 fn drop_command(conn: Conn, command: Command(String)) -> Conn {
@@ -551,35 +574,39 @@ fn drop_command(conn: Conn, command: Command(String)) -> Conn {
 
 fn kill_command(conn: Conn, command: Command(String)) -> Conn {
   let self = conn.character_get(conn)
-  case !is_auto(conn, command.data) {
-    True if self.fighting == world.NoTarget ->
+  case to_victim(conn, command.data) {
+    Ok(Victim(keyword)) if self.fighting == world.NoTarget ->
       event.CombatRequestData(
-        victim: event.Keyword(command.data),
+        victim: event.SearchWord(keyword),
         dam_roll: world.random(8),
         is_round_based: False,
       )
       |> act.kill
       |> conn.action(conn, _)
 
-    True ->
+    Ok(Victim(_)) ->
       conn
       |> conn.renderln(render.error_already_fighting())
       |> conn.prompt()
 
-    False ->
+    Ok(Self) ->
       conn
       |> conn.renderln(render.error_cannot_target_self())
+      |> conn.prompt()
+
+    Error(Nil) ->
+      conn
+      |> conn.renderln(view.Leaf("Cannot locate '" <> command.data <> "' here."))
       |> conn.prompt()
   }
 }
 
-fn is_auto(conn: Conn, search_term: String) -> Bool {
-  let self = conn.character_get(conn)
+fn is_auto(self: world.MobileInternal, search_term: String) -> Bool {
   case search_term {
     "self" -> True
     search_term ->
       self.id == StringId(string.uppercase(search_term))
-      || list.any(self.keywords, fn(keyword) { search_term == keyword })
+      || self.name == search_term
   }
 }
 
@@ -653,7 +680,7 @@ fn remove_command(conn: Conn, command: Command(String)) -> Conn {
   let result = {
     let keyword_actor = conn.named_actors(conn).keyword
     use keyword_id <- result.try(
-      keyword.try_to_id(keyword_actor, search_term)
+      keyword.to_id(keyword_actor, search_term)
       |> result.map_error(fn(_) {
         world.UnknownItem(search_term:, verb: "wearing")
       }),
@@ -739,12 +766,12 @@ fn kick_command(conn: Conn, command: Command(Victim)) -> Conn {
       |> conn.renderln("You cannot do that to yourself!" |> view.Leaf)
       |> conn.prompt
 
-    Victim(victim) -> {
+    Victim(Keyword(_, term)) -> {
       let result = {
-        use user <- try(users.lookup(user, victim))
+        use user <- try(users.lookup(user, term))
         use user_subject <- try(character_registry.whereis(character, user.id))
         let world.MobileInternal(name:, ..) = conn.character_get(conn)
-        let user_name = string.capitalise(victim)
+        let user_name = string.capitalise(term)
         conn
         |> conn.character_event(event.Kick(initiated_by: name), user_subject)
         |> conn.renderln(["Kicking ", user_name, "..."] |> view.Leaves)
@@ -757,7 +784,7 @@ fn kick_command(conn: Conn, command: Command(Victim)) -> Conn {
 
         Error(_) ->
           conn
-          |> conn.renderln(render.error_user_not_found(victim))
+          |> conn.renderln(render.error_user_not_found(term))
           |> conn.prompt
       }
     }
@@ -775,9 +802,9 @@ fn tele_to_command(conn: Conn, command: Command(Victim)) -> Conn {
     Self ->
       conn |> conn.renderln(view.Leaf("You're already there!")) |> conn.prompt
 
-    Victim(victim) -> {
+    Victim(Keyword(_, term)) -> {
       let result = {
-        use users.User(id:, ..) <- try(users.lookup(user, victim))
+        use users.User(id:, ..) <- try(users.lookup(user, term))
         use room_id <- try(presence.lookup(presence, id))
         conn.event(conn, event.TeleportRequest(room_id))
         |> Ok
@@ -785,7 +812,7 @@ fn tele_to_command(conn: Conn, command: Command(Victim)) -> Conn {
 
       let result = {
         use _ <- result.try_recover(result)
-        let victim_id = StringId(string.uppercase(victim))
+        let victim_id = StringId(string.uppercase(term))
         use room_id <- try(presence.lookup(presence, victim_id))
         conn.event(conn, event.TeleportRequest(room_id))
         |> Ok
@@ -804,9 +831,9 @@ fn tele_other_command(conn: Conn, command: Command(TeleOtherArgs)) -> Conn {
   let named_actors.Lookup(user:, character:, ..) = conn.named_actors(conn)
   case victim {
     Self -> tele_command(conn, Command(Teleport, room_id))
-    Victim(victim) -> {
+    Victim(Keyword(_, term)) -> {
       let result = {
-        use users.User(id:, ..) <- try(users.lookup(user, victim))
+        use users.User(id:, ..) <- try(users.lookup(user, term))
         character_registry.whereis(character, id)
       }
 
@@ -821,7 +848,7 @@ fn tele_other_command(conn: Conn, command: Command(TeleOtherArgs)) -> Conn {
 
 fn slay_command(conn: Conn, command: Command(Victim)) -> Conn {
   case command.data {
-    Victim(victim) -> conn.event(conn, event.Slay(event.Keyword(victim)))
+    Victim(keyword) -> conn.event(conn, event.Slay(event.SearchWord(keyword)))
     Self ->
       conn
       |> conn.renderln(view.Leaf("That would be unwise."))
@@ -831,13 +858,13 @@ fn slay_command(conn: Conn, command: Command(Victim)) -> Conn {
 
 fn smite_command(conn: Conn, command: Command(Victim)) -> Conn {
   case command.data {
-    Victim(victim) -> {
+    Victim(Keyword(_, term)) -> {
       let result = {
         let named_actors.Lookup(presence:, ..) = conn.named_actors(conn)
-        let victim_id = StringId(string.uppercase(victim))
+        let victim_id = StringId(string.uppercase(term))
         use room_id <- try(presence.lookup(presence, victim_id))
         conn.event_to_room(conn, room_id, event.Slay(event.SearchId(victim_id)))
-        |> conn.renderln(render.smite_1p(victim))
+        |> conn.renderln(render.smite_1p(term))
         |> conn.prompt
         |> Ok
       }
@@ -846,7 +873,7 @@ fn smite_command(conn: Conn, command: Command(Victim)) -> Conn {
         Ok(conn) -> conn
         Error(_) ->
           conn
-          |> conn.renderln(["Unable to find id '", victim, "'"] |> view.Leaves)
+          |> conn.renderln(["Unable to find id '", term, "'"] |> view.Leaves)
           |> conn.prompt
       }
     }
@@ -972,7 +999,7 @@ fn find_item(
   keyword: String,
 ) -> Result(world.ItemInstance, Nil) {
   let keyword_actor = conn.named_actors(conn).keyword
-  use keyword_id <- result.try(keyword.try_to_id(keyword_actor, keyword))
+  use keyword_id <- result.try(keyword.to_id(keyword_actor, keyword))
   list.find(inventory, item_matches(_, keyword_id))
 }
 
@@ -1035,4 +1062,31 @@ fn dict_find_map_nth(
     )
 
   result
+}
+
+fn find_at(
+  conn: Conn,
+  options: List(#(String, String)),
+) -> Result(keyword.Keyword, ErrorPreposition) {
+  use term <- result.try(
+    list.key_find(options, "at") |> result.replace_error(Missing),
+  )
+  keyword_from_term(conn, term)
+  |> result.replace_error(Unknown(term))
+}
+
+fn keyword_from_term(conn: Conn, term: String) -> Result(keyword.Keyword, Nil) {
+  let keyword_actor = conn.named_actors(conn).keyword
+  keyword.from_term(keyword_actor, term)
+}
+
+fn to_victim(conn: Conn, search_term: String) -> Result(Victim, Nil) {
+  let self = conn.character_get(conn)
+  case is_auto(self, search_term) {
+    True -> Ok(Self)
+    False -> {
+      keyword_from_term(conn, search_term)
+      |> result.map(Victim)
+    }
+  }
 }

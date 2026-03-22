@@ -17,6 +17,7 @@ import lore/server/output
 import lore/world.{
   type Direction, type Id, type Mobile, type Room, type StringId,
 }
+import lore/world/keyword.{type Keyword}
 
 /// This type is the primary means by which units of concurrency (Mobiles,
 /// Rooms, Zones, etc.) communicate. The event represents the incoming
@@ -183,11 +184,11 @@ pub type CharacterEvent {
 
 pub type CharacterToRoomEvent {
   Look
-  LookAt(keyword: String)
+  LookAt(keyword: Keyword)
   MoveRequest(exit_keyword: Direction)
   MoveArrive(MoveArriveData)
   TeleportRequest(to_room_id: Id(Room))
-  ItemGet(keyword: String)
+  ItemGet(keyword: Keyword)
   ItemDrop(item_instance: world.ItemInstance)
   RejoinRoom
   DoorToggle(DoorToggleData)
@@ -245,11 +246,11 @@ pub type DoorUpdateData {
 
 pub type RoomCommunicationData {
   SayData(text: String, adverb: Option(String))
-  SayAtData(text: String, at: String, adverb: Option(String))
-  WhisperData(text: String, at: String, adverb: Option(String))
+  SayAtData(text: String, at: Keyword, adverb: Option(String))
+  WhisperData(text: String, at: Keyword, adverb: Option(String))
   EmoteData(text: String)
   SocialData(report: view.Report)
-  SocialAtData(report: view.Report, at: String)
+  SocialAtData(report: view.Report, at: Keyword)
 }
 
 // Character Data
@@ -330,7 +331,7 @@ pub type DoorSyncData {
 }
 
 pub type SearchTerm(a) {
-  Keyword(String)
+  SearchWord(Keyword)
   SearchId(StringId(a))
 }
 
