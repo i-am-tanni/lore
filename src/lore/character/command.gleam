@@ -60,18 +60,18 @@ type Verb {
 
 type Victim {
   Self
-  Victim(Keyword)
+  Victim(keyword: Keyword)
 }
 
 type LookAt {
   LookSelf
   LookItem(world.ItemInstance)
-  LookRoom(Keyword)
+  LookRoom(keyword.Seek1)
 }
 
 type SocialData {
   SocialAuto(social: socials.Social)
-  SocialAt(social: socials.Social, at: Keyword)
+  SocialAt(social: socials.Social, at: keyword.Seek1)
   SocialNoArg(social: socials.Social)
 }
 
@@ -303,7 +303,8 @@ fn social_args(
     Ok(#(search_term, _)) ->
       case to_victim(conn, search_term) {
         Ok(Self) -> SocialAuto(social)
-        Ok(Victim(keyword)) -> SocialAt(social, keyword)
+        Ok(Victim(keyword)) ->
+          keyword.Seek1(keyword:, ordinal: 1) |> SocialAt(social, _)
         Error(Nil) -> SocialNoArg(social)
       }
     Error(_) -> SocialNoArg(social)
@@ -483,7 +484,10 @@ fn look_at_command(conn: Conn, command: Command(String)) -> Conn {
       |> result.map(LookItem),
     )
     keyword_from_term(conn, search_term)
-    |> result.map(LookRoom)
+    |> result.map(fn(keyword) {
+      keyword.Seek1(keyword:, ordinal: 1)
+      |> LookRoom
+    })
   }
 
   case found_result {
@@ -512,12 +516,12 @@ fn room_comms(conn: Conn, command: Command(event.RoomCommunicationData)) {
 
     event.SayAtData(text: "", at:, ..) ->
       conn
-      |> conn.renderln(render.empty("say to " <> at.term))
+      |> conn.renderln(render.empty("say to " <> at.keyword.term))
       |> conn.prompt()
 
     event.WhisperData(text: "", at:, ..) ->
       conn
-      |> conn.renderln(render.empty("whisper to " <> at.term))
+      |> conn.renderln(render.empty("whisper to " <> at.keyword.term))
       |> conn.prompt()
 
     event.EmoteData(text: "") ->
@@ -550,7 +554,9 @@ fn chat_command(
 
 fn get_command(conn: Conn, command: Command(String)) -> Conn {
   let search_term = command.data
-  let result = keyword_from_term(conn, search_term)
+  let result =
+    keyword_from_term(conn, search_term)
+    |> result.map(keyword.Seek1(_, 1))
 
   case result {
     Ok(keyword) -> conn.action(conn, act.item_get(keyword))
@@ -575,7 +581,8 @@ fn drop_command(conn: Conn, command: Command(String)) -> Conn {
 fn kill_command(conn: Conn, command: Command(String)) -> Conn {
   let self = conn.character_get(conn)
   case to_victim(conn, command.data) {
-    Ok(Victim(keyword)) if self.fighting == world.NoTarget ->
+    Ok(Victim(keyword)) if self.fighting == world.NoTarget -> {
+      let keyword = keyword.Seek1(keyword:, ordinal: 1)
       event.CombatRequestData(
         victim: event.SearchWord(keyword),
         dam_roll: world.random(8),
@@ -583,6 +590,7 @@ fn kill_command(conn: Conn, command: Command(String)) -> Conn {
       )
       |> act.kill
       |> conn.action(conn, _)
+    }
 
     Ok(Victim(_)) ->
       conn
@@ -831,7 +839,7 @@ fn tele_other_command(conn: Conn, command: Command(TeleOtherArgs)) -> Conn {
   let named_actors.Lookup(user:, character:, ..) = conn.named_actors(conn)
   case victim {
     Self -> tele_command(conn, Command(Teleport, room_id))
-    Victim(Keyword(_, term)) -> {
+    Victim(keyword: Keyword(_, term)) -> {
       let result = {
         use users.User(id:, ..) <- try(users.lookup(user, term))
         character_registry.whereis(character, id)
@@ -848,7 +856,10 @@ fn tele_other_command(conn: Conn, command: Command(TeleOtherArgs)) -> Conn {
 
 fn slay_command(conn: Conn, command: Command(Victim)) -> Conn {
   case command.data {
-    Victim(keyword) -> conn.event(conn, event.Slay(event.SearchWord(keyword)))
+    Victim(keyword) -> {
+      let keyword = keyword.Seek1(keyword:, ordinal: 1)
+      conn.event(conn, event.Slay(event.SearchWord(keyword)))
+    }
     Self ->
       conn
       |> conn.renderln(view.Leaf("That would be unwise."))
@@ -1062,11 +1073,12 @@ fn dict_find_map_nth(
 fn find_at(
   conn: Conn,
   options: List(#(String, String)),
-) -> Result(keyword.Keyword, ErrorPreposition) {
+) -> Result(keyword.Seek1, ErrorPreposition) {
   use term <- result.try(
     list.key_find(options, "at") |> result.replace_error(Missing),
   )
   keyword_from_term(conn, term)
+  |> result.map(fn(keyword) { keyword.Seek1(keyword:, ordinal: 1) })
   |> result.replace_error(Unknown(term))
 }
 

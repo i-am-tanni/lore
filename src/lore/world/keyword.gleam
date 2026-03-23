@@ -1,37 +1,37 @@
 //// This is basically an overengineered solution for keyword comparison where
-//// instead of keyword strings living on 'objects', we store keyword ids as 
+//// instead of keyword strings living on 'objects', we store keyword ids as
 //// ints.
-//// 
-//// Step 1: 
+////
+//// Step 1:
 //// When a keyword search is performed, the keyword is hashed and
 //// compared to known hashes from the database cached in this actor.
 //// If a match is found, return a keyword_id and continue.
-//// 
+////
 //// Step 2:
-//// A keyword_id is returned, which is then compared to keyword_ids on items, 
+//// A keyword_id is returned, which is then compared to keyword_ids on items,
 //// mobiles, etc.
-//// 
+////
 //// If a match is NOT found, the search automatically fails before
 //// moving to step 2
-//// 
+////
 //// This has two advantages:
 //// 1. Interactables can more efficiently store keywords as ids, making deep
 //// copies less expensive to pass around in messages.
 //// 2. We can short circuit the search if no known hash is found
-//// 
+////
 //// ## Mispellings
-//// 
+////
 //// Mispellings will never succeed. This trades speed and correctness for
 //// helpfulness. We could however offer some suggestions given context:
-//// 
-//// In the case of failure, we can collect a list of keyword_ids 
-//// and send to this actor to be mapped to keyword strings for jaro distance 
+////
+//// In the case of failure, we can collect a list of keyword_ids
+//// and send to this actor to be mapped to keyword strings for jaro distance
 //// comparison. We could do this in two short circuiting steps: once for
 //// private state comparison and another for room state comparison.
-//// 
-//// However, this would not help for keywords the builder 
+////
+//// However, this would not help for keywords the builder
 //// failed to consider!
-//// 
+////
 
 import gleam/dict.{type Dict}
 import gleam/erlang/process
@@ -44,6 +44,19 @@ import pog
 
 pub type Keyword {
   Keyword(id: Int, term: String)
+}
+
+/// Information for a keyword search returning one match
+///
+pub type Seek1 {
+  Seek1(keyword: Keyword, ordinal: Int)
+}
+
+/// Information for a keyword search returning a list of matches
+/// not exceeding quantity
+///
+pub type SeekMany {
+  SeekMany(keyword: Keyword, quantity: Int)
 }
 
 pub type Message {
@@ -128,7 +141,7 @@ fn lookup(lookup: Dict(Int, HashData), input: String) -> Result(Int, Nil) {
     // matches a perfect hash in the table is unlikely to succeed when
     // compared against the keyword ids on the thing.
     //
-    // If there is a problematic collision, we can simply add the exception case 
+    // If there is a problematic collision, we can simply add the exception case
     // to the table.
     Perfect(Keyword(id:, ..)) -> Ok(id)
     // .. else if there are collisions, we must resolve via string comparison
