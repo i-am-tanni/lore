@@ -64,9 +64,24 @@ pub fn filter_take(
   up_to num_elements: Int,
   one_that is_desired: fn(a) -> Bool,
 ) -> List(a) {
-  list
-  |> list.filter(is_desired)
-  |> list.take(num_elements)
+  filter_take_loop(list, num_elements, is_desired, [])
+}
+
+pub fn filter_take_loop(
+  list: List(a),
+  count: Int,
+  predicate: fn(a) -> Bool,
+  acc: List(a),
+) -> List(a) {
+  case list {
+    [] -> list.reverse(acc)
+    _ if count < 1 -> list.reverse(acc)
+    [first, ..rest] ->
+      case predicate(first) {
+        True -> filter_take_loop(rest, count - 1, predicate, [first, ..acc])
+        False -> filter_take_loop(rest, count, predicate, acc)
+      }
+  }
 }
 
 /// Returns the result of a find that matches the most keywords.
@@ -256,6 +271,8 @@ fn update_loop(
   }
 }
 
+/// Like list.map, but maps over a range instead
+///
 pub fn map_range(start: Int, stop: Int, map_fun: fn(Int) -> a) -> List(a) {
   int.range(start, stop, [], fn(acc, i) { [map_fun(i), ..acc] })
   |> list.reverse
