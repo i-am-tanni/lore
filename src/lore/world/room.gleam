@@ -601,15 +601,13 @@ fn broadcast(
   let result = case data {
     event.SayData(text:, adverb:) -> Ok(event.Say(text:, adverb:))
 
-    event.SayAtData(at:, text:, adverb:) -> {
+    event.SayAtData(at:, text:, adverb:) ->
       list.find(model.room.characters, character_keyword_matches(_, at.id))
       |> result.map(fn(victim) { event.SayAt(text:, adverb:, at: victim) })
-    }
 
-    event.WhisperData(at:, text:, ..) -> {
+    event.WhisperData(at:, text:, ..) ->
       list.find(model.room.characters, character_keyword_matches(_, at.id))
       |> result.map(fn(victim) { event.Whisper(text:, at: victim) })
-    }
 
     event.EmoteData(text:) -> Ok(event.Emote(text:))
 
