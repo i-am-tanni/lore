@@ -1180,17 +1180,13 @@ fn find_local_xdesc(
 }
 
 fn item_keyword_matches(item: world.ItemInstance, keyword_id: Int) {
-  list.any(item.keywords, equals(_, keyword_id))
+  list.contains(item.keywords, keyword_id)
 }
 
 fn character_keyword_matches(character: world.Mobile, keyword_id: Int) -> Bool {
-  list.any(character.keywords, equals(_, keyword_id))
+  list.contains(character.keywords, keyword_id)
 }
 
 fn xdesc_keyword_matches(xdesc: world.ExtraDesc, keyword_id: Int) -> Bool {
-  list.any(xdesc.keywords, equals(_, keyword_id))
-}
-
-fn equals(a: a, b: a) -> Bool {
-  a == b
+  list.contains(xdesc.keywords, keyword_id)
 }
