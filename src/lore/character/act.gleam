@@ -34,7 +34,7 @@ pub fn communicate(data: event.RoomCommunicationData) -> Action {
   )
 }
 
-pub fn item_get(keyword: keyword.Seek1) -> Action {
+pub fn item_get(keyword: keyword.OrdinalSearch) -> Action {
   Action(
     event: event.ItemGet(keyword),
     id: world.generate_id(),

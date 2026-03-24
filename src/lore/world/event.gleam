@@ -184,11 +184,11 @@ pub type CharacterEvent {
 
 pub type CharacterToRoomEvent {
   Look
-  LookAt(keyword: keyword.Seek1)
+  LookAt(keyword: keyword.OrdinalSearch)
   MoveRequest(exit_keyword: Direction)
   MoveArrive(MoveArriveData)
   TeleportRequest(to_room_id: Id(Room))
-  ItemGet(keyword: keyword.Seek1)
+  ItemGet(keyword: keyword.OrdinalSearch)
   ItemDrop(item_instance: world.ItemInstance)
   RejoinRoom
   DoorToggle(DoorToggleData)
@@ -246,11 +246,11 @@ pub type DoorUpdateData {
 
 pub type RoomCommunicationData {
   SayData(text: String, adverb: Option(String))
-  SayAtData(text: String, at: keyword.Seek1, adverb: Option(String))
-  WhisperData(text: String, at: keyword.Seek1, adverb: Option(String))
+  SayAtData(text: String, at: keyword.OrdinalSearch, adverb: Option(String))
+  WhisperData(text: String, at: keyword.OrdinalSearch, adverb: Option(String))
   EmoteData(text: String)
   SocialData(report: view.Report)
-  SocialAtData(report: view.Report, at: keyword.Seek1)
+  SocialAtData(report: view.Report, at: keyword.OrdinalSearch)
 }
 
 // Character Data
@@ -331,7 +331,7 @@ pub type DoorSyncData {
 }
 
 pub type SearchTerm(a) {
-  SearchWord(keyword.Seek1)
+  SearchWord(keyword.OrdinalSearch)
   SearchId(StringId(a))
 }
 

@@ -66,12 +66,12 @@ type Victim {
 type LookAt {
   LookSelf
   LookItem(world.ItemInstance)
-  LookRoom(keyword.Seek1)
+  LookRoom(keyword.OrdinalSearch)
 }
 
 type SocialData {
   SocialAuto(social: socials.Social)
-  SocialAt(social: socials.Social, at: keyword.Seek1)
+  SocialAt(social: socials.Social, at: keyword.OrdinalSearch)
   SocialNoArg(social: socials.Social)
 }
 
@@ -304,7 +304,7 @@ fn social_args(
       case to_victim(conn, search_term) {
         Ok(Self) -> SocialAuto(social)
         Ok(Victim(keyword)) ->
-          keyword.Seek1(keyword:, ordinal: 1) |> SocialAt(social, _)
+          keyword.OrdinalSearch(keyword:, ordinal: 1) |> SocialAt(social, _)
         Error(Nil) -> SocialNoArg(social)
       }
     Error(_) -> SocialNoArg(social)
@@ -485,7 +485,7 @@ fn look_at_command(conn: Conn, command: Command(String)) -> Conn {
     )
     keyword_from_term(conn, search_term)
     |> result.map(fn(keyword) {
-      keyword.Seek1(keyword:, ordinal: 1)
+      keyword.OrdinalSearch(keyword:, ordinal: 1)
       |> LookRoom
     })
   }
@@ -556,7 +556,7 @@ fn get_command(conn: Conn, command: Command(String)) -> Conn {
   let search_term = command.data
   let result =
     keyword_from_term(conn, search_term)
-    |> result.map(keyword.Seek1(_, 1))
+    |> result.map(keyword.OrdinalSearch(_, 1))
 
   case result {
     Ok(keyword) -> conn.action(conn, act.item_get(keyword))
@@ -582,7 +582,7 @@ fn kill_command(conn: Conn, command: Command(String)) -> Conn {
   let self = conn.character_get(conn)
   case to_victim(conn, command.data) {
     Ok(Victim(keyword)) if self.fighting == world.NoTarget -> {
-      let keyword = keyword.Seek1(keyword:, ordinal: 1)
+      let keyword = keyword.OrdinalSearch(keyword:, ordinal: 1)
       event.CombatRequestData(
         victim: event.SearchWord(keyword),
         dam_roll: world.random(8),
@@ -857,7 +857,7 @@ fn tele_other_command(conn: Conn, command: Command(TeleOtherArgs)) -> Conn {
 fn slay_command(conn: Conn, command: Command(Victim)) -> Conn {
   case command.data {
     Victim(keyword) -> {
-      let keyword = keyword.Seek1(keyword:, ordinal: 1)
+      let keyword = keyword.OrdinalSearch(keyword:, ordinal: 1)
       conn.event(conn, event.Slay(event.SearchWord(keyword)))
     }
     Self ->
@@ -1073,12 +1073,12 @@ fn dict_find_map_nth(
 fn find_at(
   conn: Conn,
   options: List(#(String, String)),
-) -> Result(keyword.Seek1, ErrorPreposition) {
+) -> Result(keyword.OrdinalSearch, ErrorPreposition) {
   use term <- result.try(
     list.key_find(options, "at") |> result.replace_error(Missing),
   )
   keyword_from_term(conn, term)
-  |> result.map(fn(keyword) { keyword.Seek1(keyword:, ordinal: 1) })
+  |> result.map(fn(keyword) { keyword.OrdinalSearch(keyword:, ordinal: 1) })
   |> result.replace_error(Unknown(term))
 }
 

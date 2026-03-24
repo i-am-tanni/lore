@@ -49,15 +49,15 @@ pub type Keyword {
 
 /// Information for a keyword search returning one match considering order
 ///
-pub type Seek1 {
-  Seek1(keyword: Keyword, ordinal: Int)
+pub type OrdinalSearch {
+  OrdinalSearch(keyword: Keyword, ordinal: Int)
 }
 
 /// Information for a keyword search returning a list of matches
 /// not exceeding quantity
 ///
-pub type SeekMany {
-  SeekMany(keyword: Keyword, quantity: Int)
+pub type QuantitySearch {
+  QuantitySearch(keyword: Keyword, quantity: Int)
 }
 
 pub type Message {
@@ -126,17 +126,17 @@ pub fn to_id(
   |> actor.call(1000, Lookup(caller: _, keyword:))
 }
 
-pub fn find1(
+pub fn find(
   list: List(a),
-  seek: Seek1,
+  seek: OrdinalSearch,
   predicate: fn(a, Int) -> Bool,
 ) -> Result(a, Nil) {
   my_list.find_nth(list, seek.ordinal, predicate(_, seek.keyword.id))
 }
 
-pub fn find_many(
+pub fn filter_take(
   list: List(a),
-  seek: SeekMany,
+  seek: QuantitySearch,
   predicate: fn(a, Int) -> Bool,
 ) -> List(a) {
   my_list.filter_take(list, seek.quantity, predicate(_, seek.keyword.id))

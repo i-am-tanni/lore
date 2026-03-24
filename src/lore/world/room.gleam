@@ -508,10 +508,10 @@ fn look_room(
 fn look_at(
   model: Model,
   event: Event(event.CharacterToRoomEvent, CharacterMessage),
-  seeking: keyword.Seek1,
+  seeking: keyword.OrdinalSearch,
 ) -> #(Model, RoomEffect(CharacterMessage)) {
   let room = model.room
-  let keyword.Seek1(keyword:, ..) = seeking
+  let keyword.OrdinalSearch(keyword:, ..) = seeking
 
   let result = {
     use <- result.lazy_or(
@@ -643,9 +643,9 @@ fn broadcast(
 fn item_get(
   model: Model,
   event: Event(CharacterToRoomEvent, CharacterMessage),
-  seeking: keyword.Seek1,
+  seeking: keyword.OrdinalSearch,
 ) -> #(Model, RoomEffect(CharacterMessage)) {
-  let keyword.Seek1(keyword:, ..) = seeking
+  let keyword.OrdinalSearch(keyword:, ..) = seeking
   let result = {
     use world.ItemInstance(id:, ..) as item_instance <- try(find_local_item(
       model.room.items,
@@ -1152,7 +1152,7 @@ fn find_local_character(
 ) -> Result(Mobile, world.ErrorRoomRequest) {
   case search_term {
     event.SearchWord(seeking) ->
-      keyword.find1(characters, seeking, character_keyword_matches)
+      keyword.find(characters, seeking, character_keyword_matches)
 
     event.SearchId(mobile_id) ->
       list.find(characters, fn(character: world.Mobile) {
@@ -1164,9 +1164,9 @@ fn find_local_character(
 
 fn find_local_item(
   items: List(world.ItemInstance),
-  seeking: keyword.Seek1,
+  seeking: keyword.OrdinalSearch,
 ) -> Result(world.ItemInstance, Nil) {
-  keyword.find1(items, seeking, item_keyword_matches)
+  keyword.find(items, seeking, item_keyword_matches)
 }
 
 fn find_local_xdesc(
