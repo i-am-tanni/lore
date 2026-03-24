@@ -508,18 +508,18 @@ fn look_room(
 fn look_at(
   model: Model,
   event: Event(event.CharacterToRoomEvent, CharacterMessage),
-  seeking: keyword.OrdinalSearch,
+  search_info: keyword.OrdinalSearch,
 ) -> #(Model, RoomEffect(CharacterMessage)) {
   let room = model.room
-  let keyword.OrdinalSearch(keyword:, ..) = seeking
+  let keyword.OrdinalSearch(keyword:, ..) = search_info
 
   let result = {
     use <- result.lazy_or(
-      find_local_item(room.items, seeking)
+      find_local_item(room.items, search_info)
       |> result.map(Item),
     )
     use <- result.lazy_or(
-      find_local_character(room.characters, event.SearchWord(seeking))
+      find_local_character(room.characters, event.SearchWord(search_info))
       |> result.map(Mobile)
       |> result.replace_error(Nil),
     )
@@ -537,7 +537,7 @@ fn look_at(
     Error(_) ->
       effect.send_character(
         event.from,
-        event.ActFailed(world.NotFound(seeking.keyword.term)),
+        event.ActFailed(world.NotFound(search_info.keyword.term)),
       )
   }
 
@@ -643,13 +643,13 @@ fn broadcast(
 fn item_get(
   model: Model,
   event: Event(CharacterToRoomEvent, CharacterMessage),
-  seeking: keyword.OrdinalSearch,
+  search_info: keyword.OrdinalSearch,
 ) -> #(Model, RoomEffect(CharacterMessage)) {
-  let keyword.OrdinalSearch(keyword:, ..) = seeking
+  let keyword.OrdinalSearch(keyword:, ..) = search_info
   let result = {
     use world.ItemInstance(id:, ..) as item_instance <- try(find_local_item(
       model.room.items,
-      seeking,
+      search_info,
     ))
 
     let update = {
@@ -1151,8 +1151,8 @@ fn find_local_character(
   search_term: event.SearchTerm(Mobile),
 ) -> Result(Mobile, world.ErrorRoomRequest) {
   case search_term {
-    event.SearchWord(seeking) ->
-      keyword.find(characters, seeking, character_keyword_matches)
+    event.SearchWord(search_info) ->
+      keyword.find(characters, search_info, character_keyword_matches)
 
     event.SearchId(mobile_id) ->
       list.find(characters, fn(character: world.Mobile) {
@@ -1164,9 +1164,9 @@ fn find_local_character(
 
 fn find_local_item(
   items: List(world.ItemInstance),
-  seeking: keyword.OrdinalSearch,
+  search_info: keyword.OrdinalSearch,
 ) -> Result(world.ItemInstance, Nil) {
-  keyword.find(items, seeking, item_keyword_matches)
+  keyword.find(items, search_info, item_keyword_matches)
 }
 
 fn find_local_xdesc(
