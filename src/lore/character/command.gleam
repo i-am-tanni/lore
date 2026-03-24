@@ -610,12 +610,9 @@ fn kill_command(conn: Conn, command: Command(String)) -> Conn {
 }
 
 fn is_auto(self: world.MobileInternal, search_term: String) -> Bool {
-  case search_term {
-    "self" -> True
-    search_term ->
-      self.id == StringId(string.uppercase(search_term))
-      || self.name == search_term
-  }
+  search_term == "self"
+  || self.name == search_term
+  || self.id == StringId(string.uppercase(search_term))
 }
 
 fn inventory_command(conn: Conn, _verb: Verb) -> Conn {
