@@ -277,10 +277,3 @@ pub fn map_range(start: Int, stop: Int, map_fun: fn(Int) -> a) -> List(a) {
   int.range(start, stop, [], fn(acc, i) { [map_fun(i), ..acc] })
   |> list.reverse
 }
-
-pub fn to_result(list: List(a)) -> Result(List(a), Nil) {
-  case list {
-    [] -> Error(Nil)
-    _ -> Ok(list)
-  }
-}
