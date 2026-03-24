@@ -1015,7 +1015,7 @@ fn find_item(
 }
 
 fn item_matches(item_instance: world.ItemInstance, search_term: Int) -> Bool {
-  list.any(item_instance.keywords, fn(keyword) { search_term == keyword })
+  list.contains(item_instance.keywords, search_term)
 }
 
 fn verb_missing_arg_err(verb: Verb) -> String {

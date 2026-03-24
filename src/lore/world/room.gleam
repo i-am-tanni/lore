@@ -132,10 +132,7 @@ fn recv(state: State, msg: RoomMessage) -> actor.Next(State, RoomMessage) {
     event.DespawnItems(item_ids) -> {
       let world.Room(items:, ..) as room = state.room
       let filtered =
-        list.filter(items, fn(item) {
-          let item_id = item.id
-          !list.any(item_ids, fn(id) { id == item_id })
-        })
+        list.filter(items, fn(item) { !list.contains(item_ids, item.id) })
 
       let room = world.Room(..room, items: filtered)
       State(..state, room:)
