@@ -143,11 +143,8 @@ pub fn filter_take(
 }
 
 fn recv(state: State, msg: Message) -> actor.Next(State, Message) {
-  case msg {
-    Lookup(caller:, keyword:) ->
-      actor.send(caller, lookup(state.lookup, keyword))
-  }
-
+  let Lookup(caller:, keyword:) = msg
+  actor.send(caller, lookup(state.lookup, keyword))
   actor.continue(state)
 }
 
