@@ -39,6 +39,7 @@ import gleam/list
 import gleam/otp/actor
 import gleam/result
 import logging
+import lore/server/my_list
 import lore/world/sql
 import pog
 
@@ -46,7 +47,7 @@ pub type Keyword {
   Keyword(id: Int, term: String)
 }
 
-/// Information for a keyword search returning one match
+/// Information for a keyword search returning one match considering order
 ///
 pub type Seek1 {
   Seek1(keyword: Keyword, ordinal: Int)
@@ -123,6 +124,22 @@ pub fn to_id(
 ) -> Result(Int, Nil) {
   process.named_subject(actor_name)
   |> actor.call(1000, Lookup(caller: _, keyword:))
+}
+
+pub fn find1(
+  list: List(a),
+  seek: Seek1,
+  predicate: fn(a, Int) -> Bool,
+) -> Result(a, Nil) {
+  my_list.find_nth(list, seek.ordinal, predicate(_, seek.keyword.id))
+}
+
+pub fn find_many(
+  list: List(a),
+  seek: SeekMany,
+  predicate: fn(a, Int) -> Bool,
+) -> List(a) {
+  my_list.filter_take(list, seek.quantity, predicate(_, seek.keyword.id))
 }
 
 fn recv(state: State, msg: Message) -> actor.Next(State, Message) {

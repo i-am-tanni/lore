@@ -514,11 +514,11 @@ fn look_at(
   seeking: keyword.Seek1,
 ) -> #(Model, RoomEffect(CharacterMessage)) {
   let room = model.room
-  let keyword.Seek1(keyword:, ordinal:) = seeking
+  let keyword.Seek1(keyword:, ..) = seeking
 
   let result = {
     use <- result.lazy_or(
-      find_local_item(room.items, ordinal, keyword.id)
+      find_local_item(room.items, seeking)
       |> result.map(Item),
     )
     use <- result.lazy_or(
@@ -648,12 +648,11 @@ fn item_get(
   event: Event(CharacterToRoomEvent, CharacterMessage),
   seeking: keyword.Seek1,
 ) -> #(Model, RoomEffect(CharacterMessage)) {
-  let keyword.Seek1(keyword:, ordinal:) = seeking
+  let keyword.Seek1(keyword:, ..) = seeking
   let result = {
     use world.ItemInstance(id:, ..) as item_instance <- try(find_local_item(
       model.room.items,
-      ordinal,
-      keyword.id,
+      seeking,
     ))
 
     let update = {
@@ -1090,22 +1089,6 @@ fn combat_slay(
   }
 }
 
-fn character_keyword_matches(character: world.Mobile, keyword_id: Int) -> Bool {
-  list.any(character.keywords, fn(keyword) { keyword_id == keyword })
-}
-
-fn find_local_exit(
-  exits: List(world.RoomExit),
-  direction: world.Direction,
-) -> Result(world.RoomExit, world.ErrorRoomRequest) {
-  list.find(exits, fn(exit) { exit.keyword == direction })
-  |> result.replace_error(world.UnknownExit(direction))
-}
-
-fn item_keyword_matches(item: world.ItemInstance, keyword_id: Int) {
-  list.any(item.keywords, fn(keyword) { keyword == keyword_id })
-}
-
 // Confirm exit is accessible
 fn can_access(exit: world.RoomExit) -> Result(Nil, world.ErrorRoomRequest) {
   case exit.door {
@@ -1133,40 +1116,14 @@ fn is_pvp(attacker: Mobile, victim: Mobile) -> Bool {
   }
 }
 
-fn find_local_character(
-  characters: List(Mobile),
-  search_term: event.SearchTerm(Mobile),
-) -> Result(Mobile, world.ErrorRoomRequest) {
-  case search_term {
-    event.SearchWord(keyword.Seek1(keyword:, ordinal:)) ->
-      my_list.find_nth(characters, ordinal, character_keyword_matches(
-        _,
-        keyword.id,
-      ))
-
-    event.SearchId(mobile_id) ->
-      list.find(characters, fn(character: world.Mobile) {
-        mobile_id == character.id
-      })
-  }
-  |> result.replace_error(world.CharacterLookupFailed)
-}
-
-fn find_local_item(
-  items: List(world.ItemInstance),
-  ordinal: Int,
-  keyword_id: Int,
-) -> Result(world.ItemInstance, Nil) {
-  my_list.find_nth(items, ordinal, item_keyword_matches(_, keyword_id))
-}
-
-fn find_local_xdesc(
-  xdescs: List(world.ExtraDesc),
-  keyword_id: Int,
-) -> Result(world.ExtraDesc, Nil) {
-  list.find(xdescs, fn(xdesc) {
-    list.any(xdesc.keywords, fn(keyword) { keyword_id == keyword })
-  })
+// Checks if there is already an instance of the item template
+//
+fn is_item_present(
+  instances: List(world.ItemInstance),
+  item_instance: world.ItemInstance,
+) -> Bool {
+  let item_id = world.item_id(item_instance)
+  list.any(instances, fn(instance) { world.item_id(instance) == item_id })
 }
 
 fn update_character(
@@ -1180,12 +1137,60 @@ fn update_character(
   }
 }
 
-// Checks if there is already an instance of the item template
 //
-fn is_item_present(
-  instances: List(world.ItemInstance),
-  item_instance: world.ItemInstance,
-) -> Bool {
-  let item_id = world.item_id(item_instance)
-  list.any(instances, fn(instance) { world.item_id(instance) == item_id })
+// Find functions
+//
+
+fn find_local_exit(
+  exits: List(world.RoomExit),
+  direction: world.Direction,
+) -> Result(world.RoomExit, world.ErrorRoomRequest) {
+  list.find(exits, fn(exit) { exit.keyword == direction })
+  |> result.replace_error(world.UnknownExit(direction))
+}
+
+fn find_local_character(
+  characters: List(Mobile),
+  search_term: event.SearchTerm(Mobile),
+) -> Result(Mobile, world.ErrorRoomRequest) {
+  case search_term {
+    event.SearchWord(seeking) ->
+      keyword.find1(characters, seeking, character_keyword_matches)
+
+    event.SearchId(mobile_id) ->
+      list.find(characters, fn(character: world.Mobile) {
+        mobile_id == character.id
+      })
+  }
+  |> result.replace_error(world.CharacterLookupFailed)
+}
+
+fn find_local_item(
+  items: List(world.ItemInstance),
+  seeking: keyword.Seek1,
+) -> Result(world.ItemInstance, Nil) {
+  keyword.find1(items, seeking, item_keyword_matches)
+}
+
+fn find_local_xdesc(
+  xdescs: List(world.ExtraDesc),
+  keyword_id: Int,
+) -> Result(world.ExtraDesc, Nil) {
+  list.find(xdescs, xdesc_keyword_matches(_, keyword_id))
+}
+
+fn item_keyword_matches(item: world.ItemInstance, keyword_id: Int) {
+  list.any(item.keywords, equals(_, keyword_id))
+}
+
+fn character_keyword_matches(character: world.Mobile, keyword_id: Int) -> Bool {
+  list.any(character.keywords, equals(_, keyword_id))
+}
+
+fn xdesc_keyword_matches(xdesc: world.ExtraDesc, keyword_id: Int) -> Bool {
+  list.any(xdesc.keywords, equals(_, keyword_id))
+}
+
+fn equals(a: a, b: a) -> Bool {
+  a == b
 }
