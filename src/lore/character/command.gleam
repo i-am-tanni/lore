@@ -98,7 +98,7 @@ pub fn parse(conn: Conn, input: String) -> Conn {
     "u" | "up" -> move_command(conn, world.Up)
     "d" | "down" -> move_command(conn, world.Down)
     "l" | "look" if rest == "" -> command_nil(conn, Look, look_command)
-    "l" | "look" -> command(conn, look_at_command, look_args(rest, splitters))
+    "l" | "look" -> command(conn, look_at_command, look_args(rest, word))
     "say" -> command(conn, room_comms, say_args(conn, rest, word))
     "whisper" -> command(conn, room_comms, whisper_args(conn, rest, word))
     "emote" -> command(conn, room_comms, emote_text(rest))
@@ -208,15 +208,14 @@ fn command_nil(
 
 fn look_args(
   s: String,
-  splitters: conn.Splitters,
+  word: splitter.Splitter,
 ) -> Result(Command(String), String) {
-  let conn.Splitters(word:, ..) = splitters
   use #(kw, rest) <- result.try(
     keyword(s, word)
     |> result.replace_error("What do you want to look at?"),
   )
   case kw {
-    "at" | "in" -> look_args(rest, splitters)
+    "at" | "in" -> look_args(rest, word)
     _ -> Ok(Command(Look, kw))
   }
 }
@@ -388,6 +387,39 @@ fn keyword(s: String, word: Splitter) -> Result(#(String, String), Nil) {
   }
 }
 
+fn ordinal_parse(conn: Conn, s: String) -> Result(keyword.OrdinalSearch, Nil) {
+  let conn.Splitters(ordinal:, ..) = conn.splitters(conn)
+  case splitter.split(ordinal, s) {
+    #(ordinal, ".", keyword) -> {
+      let ordinal = int.parse(ordinal) |> result.unwrap(1)
+      use keyword <- result.try(keyword_from_term(conn, keyword))
+      Ok(keyword.OrdinalSearch(keyword:, ordinal:))
+    }
+    _ -> {
+      use keyword <- result.try(keyword_from_term(conn, s))
+      Ok(keyword.OrdinalSearch(keyword:, ordinal: 1))
+    }
+  }
+}
+
+fn quantity_parse(
+  conn: Conn,
+  s: String,
+  quantity: Splitter,
+) -> Result(keyword.QuantitySearch, Nil) {
+  case splitter.split(quantity, s) {
+    #(quantity, "*", keyword) -> {
+      use quantity <- result.try(
+        int.parse(quantity) |> result.map(int.max(1, _)),
+      )
+      use keyword <- result.try(keyword_from_term(conn, keyword))
+      Ok(keyword.QuantitySearch(keyword:, quantity:))
+    }
+
+    _ -> Error(Nil)
+  }
+}
+
 // Parsers is a list of #(tag, option_parser_fun)
 // The output is a tuple containing a key_val list of options found
 // and the rest of the unconsumed string
@@ -470,7 +502,7 @@ fn move_command(conn: Conn, direction: world.Direction) -> Conn {
     world.Fighting(..) ->
       conn
       |> conn.renderln(render.error_already_fighting())
-      |> conn.prompt()
+      |> conn.prompt
   }
 }
 
@@ -479,34 +511,34 @@ fn look_command(conn: Conn, _: Verb) -> Conn {
 }
 
 fn look_at_command(conn: Conn, command: Command(String)) -> Conn {
-  let search_term = command.data
   let self = conn.character_get(conn)
+  let raw_input = command.data
   let found_result = {
-    use <- bool.guard(is_auto(self, search_term), Ok(LookSelf))
+    use search <- result.try(ordinal_parse(conn, raw_input))
+    use <- bool.guard(is_auto(self, search.keyword.term), Ok(LookSelf))
+    // Search inventory first
     use <- result.lazy_or(
-      find_item(conn, self.inventory, search_term)
+      keyword.find(self.inventory, search, item_matches)
       |> result.map(LookItem),
     )
-    keyword_from_term(conn, search_term)
-    |> result.map(fn(keyword) {
-      keyword.OrdinalSearch(keyword:, ordinal: 1)
-      |> LookRoom
-    })
+    // ..and if that fails, search the room
+    Ok(LookRoom(search))
   }
 
   case found_result {
     Ok(LookSelf) ->
       conn
       |> conn.renderln(render.look_at(self))
-      |> conn.prompt()
+      |> conn.prompt
 
     Ok(LookItem(item_instance)) -> events.item_look_at(conn, item_instance)
 
     Ok(LookRoom(keyword)) -> conn.event(conn, event.LookAt(keyword))
 
     Error(Nil) ->
-      render.error_room_request(world.ItemLookupFailed(keyword: search_term))
+      render.error_room_request(world.ItemLookupFailed(keyword: raw_input))
       |> conn.renderln(conn, _)
+      |> conn.prompt
   }
 }
 
@@ -516,22 +548,22 @@ fn room_comms(conn: Conn, command: Command(event.RoomCommunicationData)) {
     event.SayData(text: "", ..) ->
       conn
       |> conn.renderln(render.empty("say"))
-      |> conn.prompt()
+      |> conn.prompt
 
     event.SayAtData(text: "", at:, ..) ->
       conn
       |> conn.renderln(render.empty("say to " <> at.keyword.term))
-      |> conn.prompt()
+      |> conn.prompt
 
     event.WhisperData(text: "", at:, ..) ->
       conn
       |> conn.renderln(render.empty("whisper to " <> at.keyword.term))
-      |> conn.prompt()
+      |> conn.prompt
 
     event.EmoteData(text: "") ->
       conn
       |> conn.renderln(render.empty("emote"))
-      |> conn.prompt()
+      |> conn.prompt
 
     _ -> conn.action(conn, act.communicate(data))
   }
@@ -552,20 +584,16 @@ fn chat_command(
 
     False ->
       conn.renderln(conn, render.channel_not_subscribed(channel))
-      |> conn.prompt()
+      |> conn.prompt
   }
 }
 
 fn get_command(conn: Conn, command: Command(String)) -> Conn {
-  let search_term = command.data
-  let result =
-    keyword_from_term(conn, search_term)
-    |> result.map(keyword.OrdinalSearch(_, 1))
-
-  case result {
-    Ok(keyword) -> conn.action(conn, act.item_get(keyword))
+  let raw_input = command.data
+  case ordinal_parse(conn, raw_input) {
+    Ok(search) -> conn.action(conn, act.item_get(search))
     Error(Nil) ->
-      render.error_room_request(world.ItemLookupFailed(keyword: search_term))
+      render.error_room_request(world.ItemLookupFailed(keyword: raw_input))
       |> conn.renderln(conn, _)
   }
 }
@@ -578,7 +606,7 @@ fn drop_command(conn: Conn, command: Command(String)) -> Conn {
     Error(Nil) ->
       conn
       |> conn.renderln(render.error_not_carrying())
-      |> conn.prompt()
+      |> conn.prompt
   }
 }
 
@@ -599,17 +627,17 @@ fn kill_command(conn: Conn, command: Command(String)) -> Conn {
     Ok(Victim(_)) ->
       conn
       |> conn.renderln(render.error_already_fighting())
-      |> conn.prompt()
+      |> conn.prompt
 
     Ok(Self) ->
       conn
       |> conn.renderln(render.error_cannot_target_self())
-      |> conn.prompt()
+      |> conn.prompt
 
     Error(Nil) ->
       conn
       |> conn.renderln(view.Leaf("Cannot locate '" <> command.data <> "' here."))
-      |> conn.prompt()
+      |> conn.prompt
   }
 }
 
@@ -624,7 +652,7 @@ fn inventory_command(conn: Conn, _verb: Verb) -> Conn {
   let character = conn.character_get(conn)
 
   conn.renderln(conn, render.inventory(items, character))
-  |> conn.prompt()
+  |> conn.prompt
 }
 
 fn wear_command(conn: Conn, command: Command(String)) -> Conn {
@@ -925,7 +953,7 @@ fn mobile_spawn_command(conn: Conn, command: Command(Id(world.Npc))) -> Conn {
   case spawner.spawn_mobile_ad_hoc(lookup, mobile_id, self.room_id) {
     Ok(_) -> conn
     Error(_) ->
-      conn |> conn.renderln("Spawn failed." |> view.Leaf) |> conn.prompt()
+      conn |> conn.renderln("Spawn failed." |> view.Leaf) |> conn.prompt
   }
 }
 

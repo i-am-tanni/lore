@@ -452,7 +452,7 @@ fn move_arrive(
     Model(..model, room:)
   }
 
-  let optional_effect = case is_player(event.acting_character) {
+  let optional_effect = case world.is_player(event.acting_character) {
     True -> {
       fn() {
         [
@@ -1096,13 +1096,6 @@ fn can_access(exit: world.RoomExit) -> Result(Nil, world.ErrorRoomRequest) {
       }
 
     None -> Ok(Nil)
-  }
-}
-
-fn is_player(mobile: world.Mobile) -> Bool {
-  case mobile.template_id {
-    world.Player(_) -> True
-    world.Npc(_) -> False
   }
 }
 
