@@ -42,6 +42,7 @@ type State {
     cooldown: conn.GlobalCooldown,
     actions: List(event.Action),
     named_actors: named_actors.Lookup,
+    splitters: conn.Splitters,
     subscribed: Set(world.ChatChannel),
     continue: Bool,
   )
@@ -119,6 +120,7 @@ fn init_reception(
     cooldown: conn.Idle,
     actions: [],
     named_actors: named_actors,
+    splitters: splitters_new(),
     subscribed: set.new(),
     continue: True,
   )
@@ -166,6 +168,7 @@ fn init_character(
     actions: [],
     named_actors: named_actors,
     subscribed: set.new(),
+    splitters: splitters_new(),
     continue: True,
   )
   |> update_controller(spawn_controller)
@@ -339,6 +342,7 @@ fn handle_response(response: conn.Response, state: State) -> State {
       cooldown:,
       actions:,
       named_actors:,
+      splitters: state.splitters,
       subscribed: response.subscribed,
       continue: state.continue && !halt,
     )
@@ -473,8 +477,26 @@ fn new_conn(state: State) -> Conn {
     cooldown:,
     subscribed:,
     named_actors:,
+    splitters:,
     ..,
   ) = state
 
-  conn.new(character:, flash:, self:, cooldown:, subscribed:, named_actors:)
+  conn.new(
+    character:,
+    flash:,
+    self:,
+    cooldown:,
+    subscribed:,
+    named_actors:,
+    splitters:,
+  )
+}
+
+// Splitters for parsing
+fn splitters_new() -> conn.Splitters {
+  conn.Splitters(
+    word: splitter.new([" ", "\r\n", "\n"]),
+    ordinal: splitter.new(["."]),
+    quantity: splitter.new(["*"]),
+  )
 }

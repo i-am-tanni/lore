@@ -22,6 +22,7 @@ import lore/world/event.{
   type CharacterMessage, type CharacterToRoomEvent, type Event,
 }
 import lore/world/named_actors
+import splitter.{type Splitter}
 
 /// A type that wraps the character state and aggregates a response
 /// to be returned to the calling controller.
@@ -36,6 +37,7 @@ pub opaque type Conn {
     flash: Controller,
     cooldown: GlobalCooldown,
     named_actors: named_actors.Lookup,
+    splitters: Splitters,
     events: List(EventToSend),
     output: List(Text),
     out_of_band: List(output.OutOfBand),
@@ -113,6 +115,10 @@ type ChannelError {
   ChannelOperationFailed
 }
 
+pub type Splitters {
+  Splitters(word: Splitter, ordinal: Splitter, quantity: Splitter)
+}
+
 /// Generates a new conn. This is the handle generated when a request
 /// is received by the character process for the purpose of building a response.
 ///
@@ -123,6 +129,7 @@ pub fn new(
   self self: process.Subject(CharacterMessage),
   subscribed subscribed: Set(world.ChatChannel),
   named_actors named_actors: named_actors.Lookup,
+  splitters splitters: Splitters,
 ) -> Conn {
   let is_player = case character.template_id {
     world.Player(_) -> True
@@ -136,6 +143,7 @@ pub fn new(
     cooldown:,
     subscribed:,
     named_actors:,
+    splitters:,
     events: [],
     output: [],
     out_of_band: [],
@@ -162,6 +170,10 @@ pub fn is_player(conn: Conn) -> Bool {
 
 pub fn named_actors(conn: Conn) -> named_actors.Lookup {
   conn.named_actors
+}
+
+pub fn splitters(conn: Conn) -> Splitters {
+  conn.splitters
 }
 
 pub fn prompt(conn: Conn) -> Conn {

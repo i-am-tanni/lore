@@ -87,7 +87,7 @@ type ErrorPreposition {
 }
 
 pub fn parse(conn: Conn, input: String) -> Conn {
-  let word = splitter.new([" ", "\r\n", "\n"])
+  let conn.Splitters(word:, ..) as splitters = conn.splitters(conn)
   let #(verb, _, rest) = splitter.split(word, input)
   let rest = string.trim_start(rest)
   case string.lowercase(verb) {
@@ -98,7 +98,7 @@ pub fn parse(conn: Conn, input: String) -> Conn {
     "u" | "up" -> move_command(conn, world.Up)
     "d" | "down" -> move_command(conn, world.Down)
     "l" | "look" if rest == "" -> command_nil(conn, Look, look_command)
-    "l" | "look" -> command(conn, look_at_command, look_args(rest, word))
+    "l" | "look" -> command(conn, look_at_command, look_args(rest, splitters))
     "say" -> command(conn, room_comms, say_args(conn, rest, word))
     "whisper" -> command(conn, room_comms, whisper_args(conn, rest, word))
     "emote" -> command(conn, room_comms, emote_text(rest))
@@ -206,13 +206,17 @@ fn command_nil(
   command_fun(conn, verb)
 }
 
-fn look_args(s: String, word: Splitter) -> Result(Command(String), String) {
+fn look_args(
+  s: String,
+  splitters: conn.Splitters,
+) -> Result(Command(String), String) {
+  let conn.Splitters(word:, ..) = splitters
   use #(kw, rest) <- result.try(
     keyword(s, word)
     |> result.replace_error("What do you want to look at?"),
   )
   case kw {
-    "at" | "in" -> look_args(rest, word)
+    "at" | "in" -> look_args(rest, splitters)
     _ -> Ok(Command(Look, kw))
   }
 }
