@@ -60,6 +60,11 @@ pub type QuantitySearch {
   QuantitySearch(keyword: Keyword, quantity: Int)
 }
 
+pub type SpecifiedSearch {
+  Ordinal(OrdinalSearch)
+  Quantity(QuantitySearch)
+}
+
 pub type Message {
   Lookup(caller: process.Subject(Result(Int, Nil)), keyword: String)
 }
@@ -134,12 +139,39 @@ pub fn find(
   my_list.find_nth(list, seek.ordinal, predicate(_, seek.keyword.id))
 }
 
-pub fn filter_take(
+pub fn partition_take(
   list: List(a),
   seek: QuantitySearch,
   predicate: fn(a, Int) -> Bool,
-) -> List(a) {
-  my_list.filter_take(list, seek.quantity, predicate(_, seek.keyword.id))
+) -> #(List(a), List(a)) {
+  my_list.partition_take(list, seek.quantity, predicate(_, seek.keyword.id))
+}
+
+pub fn pop_nth_match(
+  list: List(a),
+  seek: OrdinalSearch,
+  predicate: fn(a, Int) -> Bool,
+) {
+  my_list.pop_nth_match(list, seek.ordinal, predicate(_, seek.keyword.id))
+}
+
+/// Splits a list in two via the search criteria and predicate. Returns the list
+/// of found items (limited by the criteria) and the remaining items in the list
+///
+pub fn partition(
+  list: List(a),
+  search_info: SpecifiedSearch,
+  predicate: fn(a, Int) -> Bool,
+) -> #(List(a), List(a)) {
+  case search_info {
+    Ordinal(search) ->
+      case pop_nth_match(list, search, predicate) {
+        Ok(#(popped, filtered)) -> #([popped], filtered)
+        Error(Nil) -> #([], list)
+      }
+
+    Quantity(search) -> partition_take(list, search, predicate)
+  }
 }
 
 fn recv(state: State, msg: Message) -> actor.Next(State, Message) {

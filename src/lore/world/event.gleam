@@ -188,7 +188,8 @@ pub type CharacterToRoomEvent {
   MoveRequest(exit_keyword: Direction)
   MoveArrive(MoveArriveData)
   TeleportRequest(to_room_id: Id(Room))
-  ItemGet(keyword: keyword.OrdinalSearch)
+  ItemGet(keyword: keyword.SpecifiedSearch)
+  ItemGetAll
   ItemDrop(item_instance: world.ItemInstance)
   RejoinRoom
   DoorToggle(DoorToggleData)

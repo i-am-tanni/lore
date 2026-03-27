@@ -277,3 +277,31 @@ pub fn map_range(start: Int, stop: Int, map_fun: fn(Int) -> a) -> List(a) {
   int.range(start, stop, [], fn(acc, i) { [map_fun(i), ..acc] })
   |> list.reverse
 }
+
+// A combination of list.partition and list.take where the partition short
+// circuits once the desired amount is categorized into the first list
+pub fn partition_take(
+  list: List(a),
+  up_to_n: Int,
+  categorize: fn(a) -> Bool,
+) -> #(List(a), List(a)) {
+  partition_take_loop(list, up_to_n, categorize, [])
+}
+
+pub fn partition_take_loop(
+  list: List(a),
+  up_to_n: Int,
+  categorize: fn(a) -> Bool,
+  acc: List(a),
+) -> #(List(a), List(a)) {
+  case list {
+    [] -> #(list.reverse(acc), [])
+    rest if up_to_n < 1 -> #(list.reverse(acc), rest)
+    [first, ..rest] ->
+      case categorize(first) {
+        True ->
+          partition_take_loop(rest, up_to_n - 1, categorize, [first, ..acc])
+        False -> partition_take_loop(rest, up_to_n, categorize, acc)
+      }
+  }
+}

@@ -20,7 +20,7 @@ import lore/character/view/render
 import lore/world.{type Id, type Item, type Room, Id, StringId}
 import lore/world/event
 import lore/world/items
-import lore/world/keyword.{type Keyword, Keyword}
+import lore/world/keyword
 import lore/world/named_actors
 import lore/world/room/presence
 import lore/world/zone/spawner
@@ -60,7 +60,7 @@ type Verb {
 
 type Victim {
   Self
-  Victim(keyword: Keyword)
+  Victim(search: keyword.OrdinalSearch)
 }
 
 type LookAt {
@@ -79,15 +79,20 @@ type TeleOtherArgs {
   TeleOther(room_id: Id(Room), victim: Victim)
 }
 
+type Token {
+  All
+  Keyword(String)
+}
+
 type ErrorPreposition {
-  // Not provided
+  // Preposition target expected and not provided
   Missing
-  // Provided but unknown
-  Unknown(String)
+  // Preposition target provided but unknown
+  Unknown
 }
 
 pub fn parse(conn: Conn, input: String) -> Conn {
-  let conn.Splitters(word:, ..) as splitters = conn.splitters(conn)
+  let conn.Splitters(word:, ..) = conn.splitters(conn)
   let #(verb, _, rest) = splitter.split(word, input)
   let rest = string.trim_start(rest)
   case string.lowercase(verb) {
@@ -108,7 +113,12 @@ pub fn parse(conn: Conn, input: String) -> Conn {
     "cl" | "close" ->
       command(conn, door_command, door_args(world.Closed, rest, word))
     "chat" -> command(conn, chat_command, chat_args(world.General, rest))
-    "g" | "get" -> command(conn, get_command, keyword_arg(Get, rest, word))
+    "g" | "get" ->
+      command(
+        conn,
+        get_command,
+        Ok(Command(Get, tokenize_item_args(rest, word))),
+      )
     "dr" | "drop" -> command(conn, drop_command, keyword_arg(Drop, rest, word))
     "who" -> who_command(conn)
     "quit" -> quit_command(conn)
@@ -211,7 +221,7 @@ fn look_args(
   word: splitter.Splitter,
 ) -> Result(Command(String), String) {
   use #(kw, rest) <- result.try(
-    keyword(s, word)
+    try_keyword(s, word)
     |> result.replace_error("What do you want to look at?"),
   )
   case kw {
@@ -234,7 +244,7 @@ fn say_args(
   case at {
     Ok(at) -> Command(Say, event.SayAtData(text:, at:, adverb:)) |> Ok
     Error(Missing) -> Command(Say, event.SayData(text:, adverb:)) |> Ok
-    Error(Unknown(keyword)) -> Error("Could not locate '" <> keyword <> "'.")
+    Error(Unknown) -> Error("Could not locate that person here.")
   }
 }
 
@@ -251,7 +261,7 @@ fn whisper_args(
   case at {
     Ok(at) -> Command(Whisper, event.WhisperData(text:, at:, adverb:)) |> Ok
     Error(Missing) -> Error("Who do you want to whisper to?")
-    Error(Unknown(term)) -> Error("Could not locate '" <> term <> "'.")
+    Error(Unknown) -> Error("Could not locate them here.")
   }
 }
 
@@ -277,6 +287,31 @@ fn door_args(
       |> Command(verb, _)
       |> Ok
     }
+  }
+}
+
+// Item commands like `get` and `put` have the potential for the some
+// complexity. So the strategy is to tokenize and pattern match to validate.
+//
+fn tokenize_item_args(s: String, word: Splitter) -> List(Token) {
+  tokenize_item_args_loop(s, word, [], 1)
+}
+
+fn tokenize_item_args_loop(
+  s: String,
+  word: Splitter,
+  acc: List(Token),
+  len: Int,
+) -> List(Token) {
+  let #(first, rest) = keyword(s, word)
+  case first {
+    "" -> list.reverse(acc)
+    _ if len > 2 -> list.reverse(acc)
+    // The 'all' keyword is only allowed if it leads the argument list
+    "all" if acc == [] -> tokenize_item_args_loop(rest, word, [All], len + 1)
+    // .. else ignore the following keywords
+    "all" | "in" | "from" -> tokenize_item_args_loop(rest, word, acc, len)
+    raw -> tokenize_item_args_loop(rest, word, [Keyword(raw), ..acc], len + 1)
   }
 }
 
@@ -306,8 +341,7 @@ fn social_args(
     Ok(#(search_term, _)) ->
       case to_victim(conn, search_term) {
         Ok(Self) -> SocialAuto(social)
-        Ok(Victim(keyword)) ->
-          keyword.OrdinalSearch(keyword:, ordinal: 1) |> SocialAt(social, _)
+        Ok(Victim(search)) -> SocialAt(social, search)
         Error(Nil) -> SocialNoArg(social)
       }
     Error(_) -> SocialNoArg(social)
@@ -370,21 +404,36 @@ fn keyword_arg(
   s: String,
   word: Splitter,
 ) -> Result(Command(String), String) {
-  case keyword(s, word) {
+  case try_keyword(s, word) {
     Ok(#(keyword, _)) -> Ok(Command(verb, keyword))
     Error(_) -> Error(verb_missing_arg_err(verb))
   }
 }
 
-fn keyword(s: String, word: Splitter) -> Result(#(String, String), Nil) {
+fn keyword(s: String, word: Splitter) -> #(String, String) {
   let #(slice, _, rest) = splitter.split(word, s)
   case slice {
     // an empty string is unexpected
-    "" -> Error(Nil)
+    "" -> #("", rest)
     // ignore articles
     "a" | "an" | "the" -> keyword(rest, word)
-    keyword -> Ok(#(string.lowercase(keyword), string.trim_start(rest)))
+    keyword -> #(string.lowercase(keyword), string.trim_start(rest))
   }
+}
+
+fn try_keyword(s: String, word: Splitter) -> Result(#(String, String), Nil) {
+  case keyword(s, word) {
+    #("", _) -> Error(Nil)
+    success -> Ok(success)
+  }
+}
+
+fn specified_search_parse(
+  conn: Conn,
+  s: String,
+) -> Result(keyword.SpecifiedSearch, Nil) {
+  use <- result.lazy_or(quantity_parse(conn, s) |> result.map(keyword.Quantity))
+  ordinal_parse(conn, s) |> result.map(keyword.Ordinal)
 }
 
 fn ordinal_parse(conn: Conn, s: String) -> Result(keyword.OrdinalSearch, Nil) {
@@ -402,18 +451,13 @@ fn ordinal_parse(conn: Conn, s: String) -> Result(keyword.OrdinalSearch, Nil) {
   }
 }
 
-fn quantity_parse(
-  conn: Conn,
-  s: String,
-  quantity: Splitter,
-) -> Result(keyword.QuantitySearch, Nil) {
+fn quantity_parse(conn: Conn, s: String) -> Result(keyword.QuantitySearch, Nil) {
+  let conn.Splitters(quantity:, ..) = conn.splitters(conn)
   case splitter.split(quantity, s) {
     #(quantity, "*", keyword) -> {
-      use quantity <- result.try(
-        int.parse(quantity) |> result.map(int.max(1, _)),
-      )
+      use quantity <- result.try(int.parse(quantity))
       use keyword <- result.try(keyword_from_term(conn, keyword))
-      Ok(keyword.QuantitySearch(keyword:, quantity:))
+      Ok(keyword.QuantitySearch(keyword:, quantity: int.max(1, quantity)))
     }
 
     _ -> Error(Nil)
@@ -458,10 +502,10 @@ fn options_loop(
 }
 
 fn victim(s: String, word: Splitter) -> Result(#(String, String), Nil) {
-  use #(slice, rest) <- result.try(keyword(s, word))
+  use #(slice, rest) <- result.try(try_keyword(s, word))
   case slice {
     "@" <> slice -> Ok(#(slice, rest))
-    "at" -> keyword(rest, word)
+    "at" -> try_keyword(rest, word)
     _ -> Ok(#(slice, rest))
   }
 }
@@ -471,7 +515,7 @@ fn at(s: String, word: Splitter) -> Result(#(String, String), Nil) {
   let rest = string.trim_start(rest)
   case string.lowercase(slice) {
     "@" <> keyword -> Ok(#(keyword, rest))
-    "at" -> keyword(rest, word)
+    "at" -> try_keyword(rest, word)
     _ -> Error(Nil)
   }
 }
@@ -588,12 +632,37 @@ fn chat_command(
   }
 }
 
-fn get_command(conn: Conn, command: Command(String)) -> Conn {
-  let raw_input = command.data
-  case ordinal_parse(conn, raw_input) {
-    Ok(search) -> conn.action(conn, act.item_get(search))
+fn get_command(conn: Conn, command: Command(List(Token))) -> Conn {
+  let result = case command.data {
+    // case 1: get all items in the room
+    [All] -> act.item_get_all() |> Ok
+
+    // case 2: get all items from a container
+    // [All, Keyword(container)] ->
+    //  ordinal_parse(conn, container)
+    //  |> result.map(act.item_get_all_in)
+    //
+    // case 3: get via a keyword specfied search
+    [Keyword(keyword)] ->
+      specified_search_parse(conn, keyword)
+      |> result.map(act.item_get)
+
+    // case 4: get from a container with a keyword specified search
+    // [Keyword(keyword), Keyword(container)] -> {
+    //  use search <- result.try(specified_search_parse(conn, keyword))
+    //  use container <- result.try(ordinal_parse(conn, container))
+    //  Ok(act.item_get_in(search, container))
+    // }
+    //
+    // default case: invalid pattern
+    _ -> Error(Nil)
+  }
+
+  case result {
+    Ok(act) -> conn.action(conn, act)
     Error(Nil) ->
-      render.error_room_request(world.ItemLookupFailed(keyword: raw_input))
+      // TODO: add an error union for various failure cases
+      render.error_room_request(world.ItemLookupFailed(keyword: ""))
       |> conn.renderln(conn, _)
   }
 }
@@ -613,10 +682,9 @@ fn drop_command(conn: Conn, command: Command(String)) -> Conn {
 fn kill_command(conn: Conn, command: Command(String)) -> Conn {
   let self = conn.character_get(conn)
   case to_victim(conn, command.data) {
-    Ok(Victim(keyword)) if self.fighting == world.NoTarget -> {
-      let keyword = keyword.OrdinalSearch(keyword:, ordinal: 1)
+    Ok(Victim(search)) if self.fighting == world.NoTarget -> {
       event.CombatRequestData(
-        victim: event.SearchWord(keyword),
+        victim: event.SearchWord(search),
         dam_roll: world.random(8),
         is_round_based: False,
       )
@@ -803,8 +871,10 @@ fn kick_command(conn: Conn, command: Command(Victim)) -> Conn {
       |> conn.renderln("You cannot do that to yourself!" |> view.Leaf)
       |> conn.prompt
 
-    Victim(Keyword(_, term)) -> {
+    Victim(search) -> {
+      let term = search.keyword.term
       let result = {
+        let term = search.keyword.term
         use user <- try(users.lookup(user, term))
         use user_subject <- try(character_registry.whereis(character, user.id))
         let world.MobileInternal(name:, ..) = conn.character_get(conn)
@@ -839,7 +909,8 @@ fn tele_to_command(conn: Conn, command: Command(Victim)) -> Conn {
     Self ->
       conn |> conn.renderln(view.Leaf("You're already there!")) |> conn.prompt
 
-    Victim(Keyword(_, term)) -> {
+    Victim(search) -> {
+      let term = search.keyword.term
       let result = {
         use users.User(id:, ..) <- try(users.lookup(user, term))
         use room_id <- try(presence.lookup(presence, id))
@@ -868,9 +939,9 @@ fn tele_other_command(conn: Conn, command: Command(TeleOtherArgs)) -> Conn {
   let named_actors.Lookup(user:, character:, ..) = conn.named_actors(conn)
   case victim {
     Self -> tele_command(conn, Command(Teleport, room_id))
-    Victim(keyword: Keyword(_, term)) -> {
+    Victim(search) -> {
       let result = {
-        use users.User(id:, ..) <- try(users.lookup(user, term))
+        use users.User(id:, ..) <- try(users.lookup(user, search.keyword.term))
         character_registry.whereis(character, id)
       }
 
@@ -885,9 +956,8 @@ fn tele_other_command(conn: Conn, command: Command(TeleOtherArgs)) -> Conn {
 
 fn slay_command(conn: Conn, command: Command(Victim)) -> Conn {
   case command.data {
-    Victim(keyword) -> {
-      let keyword = keyword.OrdinalSearch(keyword:, ordinal: 1)
-      conn.event(conn, event.Slay(event.SearchWord(keyword)))
+    Victim(search) -> {
+      conn.event(conn, event.Slay(event.SearchWord(search)))
     }
     Self ->
       conn
@@ -898,7 +968,8 @@ fn slay_command(conn: Conn, command: Command(Victim)) -> Conn {
 
 fn smite_command(conn: Conn, command: Command(Victim)) -> Conn {
   case command.data {
-    Victim(Keyword(_, term)) -> {
+    Victim(search) -> {
+      let term = search.keyword.term
       let result = {
         let named_actors.Lookup(presence:, ..) = conn.named_actors(conn)
         let victim_id = StringId(string.uppercase(term))
@@ -1108,7 +1179,7 @@ fn find_at(
   )
   keyword_from_term(conn, term)
   |> result.map(fn(keyword) { keyword.OrdinalSearch(keyword:, ordinal: 1) })
-  |> result.replace_error(Unknown(term))
+  |> result.replace_error(Unknown)
 }
 
 fn keyword_from_term(conn: Conn, term: String) -> Result(keyword.Keyword, Nil) {
@@ -1116,13 +1187,11 @@ fn keyword_from_term(conn: Conn, term: String) -> Result(keyword.Keyword, Nil) {
   keyword.from_term(keyword_actor, term)
 }
 
-fn to_victim(conn: Conn, search_term: String) -> Result(Victim, Nil) {
+fn to_victim(conn: Conn, raw_input: String) -> Result(Victim, Nil) {
   let self = conn.character_get(conn)
-  case is_auto(self, search_term) {
+  use search <- result.try(ordinal_parse(conn, raw_input))
+  case is_auto(self, search.keyword.term) {
     True -> Ok(Self)
-    False -> {
-      keyword_from_term(conn, search_term)
-      |> result.map(Victim)
-    }
+    False -> Ok(Victim(search))
   }
 }

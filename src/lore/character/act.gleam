@@ -34,9 +34,19 @@ pub fn communicate(data: event.RoomCommunicationData) -> Action {
   )
 }
 
-pub fn item_get(keyword: keyword.OrdinalSearch) -> Action {
+pub fn item_get(query: keyword.SpecifiedSearch) -> Action {
   Action(
-    event: event.ItemGet(keyword),
+    event: event.ItemGet(query),
+    id: world.generate_id(),
+    condition: no_conditions,
+    priority: event.Medium,
+    delay: min_delay,
+  )
+}
+
+pub fn item_get_all() -> Action {
+  Action(
+    event: event.ItemGetAll,
     id: world.generate_id(),
     condition: no_conditions,
     priority: event.Medium,

@@ -175,6 +175,7 @@ fn dispatch_from_character(
     event.DoorUpdateEnd(data) -> door_update(model, event, data)
     event.RoomCommunication(data) -> broadcast(model, event, data)
     event.ItemGet(data) -> item_get(model, event, data)
+    event.ItemGetAll -> item_get_all(model, event)
     event.ItemDrop(data) -> item_drop(model, event, data)
     event.CombatRequest(data) -> combat_request(model, event, data)
     event.Slay(data) -> combat_slay(model, event, data)
@@ -643,54 +644,80 @@ fn broadcast(
 fn item_get(
   model: Model,
   event: Event(CharacterToRoomEvent, CharacterMessage),
-  search_info: keyword.OrdinalSearch,
+  search_info: keyword.SpecifiedSearch,
 ) -> #(Model, RoomEffect(CharacterMessage)) {
-  let keyword.OrdinalSearch(keyword:, ..) = search_info
-  let result = {
-    use world.ItemInstance(id:, ..) as item_instance <- try(find_local_item(
-      model.room.items,
-      search_info,
-    ))
-
-    let update = {
-      let room = model.room
-      let filtered = list.filter(room.items, fn(item) { item.id != id })
-      let room = world.Room(..room, items: filtered)
-      Model(..model, room:)
-    }
-
-    let effect = case item_instance.was_touched {
-      True ->
-        [
-          // If item instance was previously touched by a mobile
-          // then it was dropped and thus scheduled for clean up. Cancel that.
-          effect.lazy(fn() {
-            janitor.item_cancel_clean_up(model.lookup.janitor, item_instance.id)
-          }),
-          effect.broadcast(event.ItemGetNotify(item_instance)),
-        ]
-        |> effect.batch
-
-      False -> {
-        let item_instance =
-          world.ItemInstance(..item_instance, was_touched: True)
-        effect.broadcast(event.ItemGetNotify(item_instance))
+  case keyword.partition(model.room.items, search_info, item_keyword_matches) {
+    // failure! no results found - nothing taken
+    #([], _) -> {
+      let term = case search_info {
+        keyword.Ordinal(keyword.OrdinalSearch(keyword:, ..)) -> keyword.term
+        keyword.Quantity(keyword.QuantitySearch(keyword:, ..)) -> keyword.term
       }
-    }
 
-    Ok(#(update, effect))
-  }
-
-  case result {
-    Ok(update) -> update
-
-    Error(_) -> {
       let effect =
-        event.ActFailed(world.ItemLookupFailed(keyword.term))
+        event.ActFailed(world.ItemLookupFailed(term))
         |> effect.send_character(event.from, _)
 
       #(model, effect)
     }
+
+    // success!
+    #(taken, rest) -> {
+      let update = {
+        let room = world.Room(..model.room, items: rest)
+        Model(..model, room:)
+      }
+
+      let effect =
+        list.map(taken, item_get_effect(_, model.lookup.janitor))
+        |> effect.batch
+
+      #(update, effect)
+    }
+  }
+}
+
+fn item_get_all(
+  model: Model,
+  _event: Event(CharacterToRoomEvent, CharacterMessage),
+) -> #(Model, RoomEffect(CharacterMessage)) {
+  let update = {
+    let room = world.Room(..model.room, items: [])
+    Model(..model, room:)
+  }
+
+  let effect = {
+    list.map(model.room.items, item_get_effect(_, model.lookup.janitor))
+    |> effect.batch
+  }
+
+  #(update, effect)
+}
+
+// Side effects for getting an item from the room
+fn item_get_effect(
+  item_instance: world.ItemInstance,
+  janitor: process.Name(janitor.Message),
+) -> RoomEffect(CharacterMessage) {
+  // If item instance was previously touched by a mobile
+  // then it was dropped and thus scheduled for clean up. Cancel that.
+  let result = case item_instance.was_touched {
+    True -> Ok(fn() { janitor.item_cancel_clean_up(janitor, item_instance.id) })
+    False -> Error(Nil)
+  }
+
+  // Item is being picked up for the first time, was_touched is true
+  let item_instance = case item_instance.was_touched {
+    True -> item_instance
+    False -> world.ItemInstance(..item_instance, was_touched: True)
+  }
+
+  let broadcast = effect.broadcast(event.ItemGetNotify(item_instance))
+
+  case result {
+    Ok(cancel_clean_up) ->
+      effect.batch([effect.lazy(cancel_clean_up), broadcast])
+    Error(Nil) -> broadcast
   }
 }
 
