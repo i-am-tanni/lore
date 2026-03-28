@@ -36,7 +36,7 @@ pub fn dispatch_player(
     event.Communication(data) -> notify(conn, event, data, render.communication)
     // item events
     //
-    event.ItemGetNotify(item) -> item_get(conn, event, item)
+    event.ItemGetNotify(list) -> item_get(conn, event, list)
     event.ItemDropNotify(item) -> item_drop(conn, event, item)
     event.ItemInspect(item) -> item_look_at(conn, item)
     // combat
@@ -136,31 +136,25 @@ fn notify_depart(
 fn item_get(
   conn: Conn,
   event: Event(CharacterEvent, RoomMessage),
-  item_instance: world.ItemInstance,
+  item_instances: List(world.ItemInstance),
 ) -> Conn {
-  let result = {
-    use item <- result.try(item_load(conn, item_instance))
-    let self = conn.character_get(conn)
-    case event.is_from_acting_character(event, self) {
-      True -> {
-        let update = [item_instance, ..self.inventory]
+  let self = conn.character_get(conn)
+  let acting_character = event.acting_character
 
-        conn
-        |> conn.character_put(world.MobileInternal(..self, inventory: update))
-        |> conn.renderln(render.item_get(self, event.acting_character, item))
-        |> Ok
-      }
-
-      False ->
-        conn.renderln(conn, render.item_get(self, event.acting_character, item))
-        |> Ok
+  let conn = case acting_character.id == self.id {
+    True -> {
+      let update = list.append(item_instances, self.inventory)
+      conn.character_put(conn, world.MobileInternal(..self, inventory: update))
     }
+
+    False -> conn
   }
 
-  case result {
-    Ok(update) -> conn.prompt(update)
-    Error(Nil) -> conn
-  }
+  list.filter_map(item_instances, item_load(conn, _))
+  |> list.fold(conn, fn(acc, item) {
+    conn.renderln(acc, render.item_get(self, acting_character, item))
+  })
+  |> conn.prompt
 }
 
 fn item_drop(

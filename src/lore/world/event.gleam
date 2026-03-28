@@ -166,7 +166,7 @@ pub type CharacterEvent {
   MoveCommit(to: Id(Room))
   DoorNotify(DoorNotifyData)
   Communication(CommunicationData)
-  ItemGetNotify(item: world.ItemInstance)
+  ItemGetNotify(item: List(world.ItemInstance))
   ItemDropNotify(item: world.ItemInstance)
   ItemInspect(item: world.ItemInstance)
   MobileInspectRequest(by: Subject(CharacterMessage))

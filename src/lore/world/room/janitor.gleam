@@ -34,7 +34,7 @@ pub type Message {
 
   /// Remove tracking.
   ///
-  Untrack(item_id: StringId(ItemInstance))
+  Untrack(item_ids: List(StringId(ItemInstance)))
 
   /// Check if there are any items due for clean up.
   ///
@@ -120,10 +120,10 @@ pub fn item_schedule_clean_up(
 ///
 pub fn item_cancel_clean_up(
   name: process.Name(Message),
-  item: StringId(ItemInstance),
+  items: List(StringId(ItemInstance)),
 ) -> Nil {
   process.named_subject(name)
-  |> actor.send(Untrack(item))
+  |> actor.send(Untrack(items))
 }
 
 fn recv(state: State, msg: Message) -> actor.Next(State, Message) {
@@ -133,7 +133,7 @@ fn recv(state: State, msg: Message) -> actor.Next(State, Message) {
       |> track_item_instance(state.tracking, _)
       |> Ok
 
-    Untrack(item_id) -> untrack_item_instance(state.tracking, item_id)
+    Untrack(list) -> list.try_fold(list, state.tracking, untrack_item_instance)
 
     Clean(cutoff) -> {
       let State(tracking:, room_registry:, self:) = state

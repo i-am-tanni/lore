@@ -668,12 +668,20 @@ fn item_get(
         Model(..model, room:)
       }
 
-      let effect =
-        list.map(taken, item_get_effect(_, model.lookup.janitor))
-        |> effect.batch
+      let effects = [
+        cancel_clean_up(model.lookup.janitor, taken),
+        effect.broadcast(event.ItemGetNotify(list.map(taken, mark_touched))),
+      ]
 
-      #(update, effect)
+      #(update, effect.batch(effects))
     }
+  }
+}
+
+fn mark_touched(item_instance: world.ItemInstance) -> world.ItemInstance {
+  case item_instance.was_touched {
+    True -> item_instance
+    False -> world.ItemInstance(..item_instance, was_touched: True)
   }
 }
 
@@ -686,38 +694,35 @@ fn item_get_all(
     Model(..model, room:)
   }
 
-  let effect = {
-    list.map(model.room.items, item_get_effect(_, model.lookup.janitor))
-    |> effect.batch
-  }
+  let items = model.room.items
+  let cancel_clean_up = cancel_clean_up(model.lookup.janitor, items)
+  let taken = list.map(items, mark_touched)
+  let effects = [
+    effect.broadcast(event.ItemGetNotify(taken)),
+    cancel_clean_up,
+  ]
 
-  #(update, effect)
+  #(update, effect.batch(effects))
 }
 
-// Side effects for getting an item from the room
-fn item_get_effect(
-  item_instance: world.ItemInstance,
+fn cancel_clean_up(
   janitor: process.Name(janitor.Message),
+  items: List(world.ItemInstance),
 ) -> RoomEffect(CharacterMessage) {
-  // If item instance was previously touched by a mobile
-  // then it was dropped and thus scheduled for clean up. Cancel that.
-  let result = case item_instance.was_touched {
-    True -> Ok(fn() { janitor.item_cancel_clean_up(janitor, item_instance.id) })
-    False -> Error(Nil)
-  }
+  let cancel_clean_list =
+    list.filter_map(items, fn(item_instance) {
+      case item_instance.was_touched {
+        True -> Ok(item_instance.id)
+        False -> Error(Nil)
+      }
+    })
 
-  // Item is being picked up for the first time, was_touched is true
-  let item_instance = case item_instance.was_touched {
-    True -> item_instance
-    False -> world.ItemInstance(..item_instance, was_touched: True)
-  }
+  case cancel_clean_list != [] {
+    True ->
+      fn() { janitor.item_cancel_clean_up(janitor, cancel_clean_list) }
+      |> effect.lazy
 
-  let broadcast = effect.broadcast(event.ItemGetNotify(item_instance))
-
-  case result {
-    Ok(cancel_clean_up) ->
-      effect.batch([effect.lazy(cancel_clean_up), broadcast])
-    Error(Nil) -> broadcast
+    False -> effect.EffectNone
   }
 }
 
