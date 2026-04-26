@@ -483,6 +483,9 @@ pub fn error_item(err: world.ErrorItem) -> View {
       int.to_string(item_id),
       " is invalid.",
     ]
+    world.ErrNotContainer -> ["That is not a container!"]
+    world.ErrEmpty -> ["There's nothing inside."]
+    world.ErrNotFoundInContainer -> ["That's not inside."]
   }
   |> view.Leaves
 }

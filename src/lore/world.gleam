@@ -3,7 +3,10 @@ import gleam/dict.{type Dict}
 import gleam/int
 import gleam/list
 import gleam/option.{type Option}
+import gleam/result
 import lore/character/flag
+import lore/server/my_list
+import lore/world/keyword
 
 pub type RoomTemplate
 
@@ -248,6 +251,9 @@ pub type ErrorItem {
   WearSlotFull(wear_slot: WearSlot, item: Item)
   WearSlotMissing(wear_slot: WearSlot)
   InvalidItemId(item_id: Id(Item))
+  ErrNotContainer
+  ErrEmpty
+  ErrNotFoundInContainer
 }
 
 pub type ErrorRoomRequest {
@@ -353,6 +359,73 @@ pub fn item_id(instance: ItemInstance) -> Id(Item) {
     Loading(item_id) -> item_id
     Loaded(Item(id:, ..)) -> id
   }
+}
+
+pub fn container_unpack(
+  instance: ItemInstance,
+) -> Result(List(ItemInstance), ErrorItem) {
+  case instance.contains {
+    Contains([]) -> Error(ErrEmpty)
+    NotContainer -> Error(ErrNotContainer)
+    Contains(contents) -> Ok(contents)
+  }
+}
+
+pub fn item_get_from_container(
+  list: List(ItemInstance),
+  container_keyword: keyword.OrdinalSearch,
+  keyword: keyword.SpecifiedSearch,
+) -> Result(#(List(ItemInstance), List(ItemInstance)), ErrorItem) {
+  use container <- result.try(
+    keyword.find(list, container_keyword, item_matches)
+    |> result.map_error(fn(_) {
+      let search_term = container_keyword.keyword.term
+      UnknownItem(search_term:, verb: "get in")
+    }),
+  )
+  use contents <- result.try(container_unpack(container))
+  case keyword.partition(contents, keyword, item_matches) {
+    #([], _) -> Error(ErrNotFoundInContainer)
+    #(found, rest) -> {
+      let updated_item = ItemInstance(..container, contains: Contains(rest))
+      let updated_list =
+        my_list.update(list, update_item(_, updated_item.id, updated_item))
+      Ok(#(found, updated_list))
+    }
+  }
+}
+
+pub fn item_get_all_from_container(
+  list: List(ItemInstance),
+  container_keyword: keyword.OrdinalSearch,
+) -> Result(#(List(ItemInstance), List(ItemInstance)), ErrorItem) {
+  use container <- result.try(
+    keyword.find(list, container_keyword, item_matches)
+    |> result.map_error(fn(_) {
+      let search_term = container_keyword.keyword.term
+      UnknownItem(search_term:, verb: "get all in")
+    }),
+  )
+  use contents <- result.try(container_unpack(container))
+  let updated_item = ItemInstance(..container, contains: Contains([]))
+  let updated_list =
+    my_list.update(list, update_item(_, updated_item.id, updated_item))
+  Ok(#(contents, updated_list))
+}
+
+pub fn update_item(
+  item: ItemInstance,
+  id: StringId(ItemInstance),
+  update: ItemInstance,
+) -> Result(ItemInstance, Nil) {
+  case item.id == id {
+    True -> Ok(update)
+    False -> Error(Nil)
+  }
+}
+
+pub fn item_matches(item_instance: ItemInstance, search_term: Int) -> Bool {
+  list.contains(item_instance.keywords, search_term)
 }
 
 pub fn affects_init() -> Affects {
