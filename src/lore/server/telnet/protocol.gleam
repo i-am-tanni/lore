@@ -131,7 +131,7 @@ pub fn init(
   named_actors: named_actors.Lookup,
 ) -> #(State, Option(Selector(Outgoing))) {
   let assert Ok(glisten.ConnectionInfo(ip_address:, ..)) =
-    glisten.get_client_info(conn)
+    glisten.get_connection_info(conn)
 
   let ip_address = glisten.ip_address_to_string(ip_address)
 

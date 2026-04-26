@@ -14,7 +14,7 @@ version = "0.0.1"
 
 [dependencies]
 logging = ">= 1.3.0 and < 2.0.0"
-glisten = ">= 8.0.0 and < 9.0.0"
+glisten = ">= 9.0.0 and < 10.0.0"
 gleam_erlang = ">= 1.1.0 and < 2.0.0"
 gleam_otp = ">= 1.0.0 and < 2.0.0"
 gleam_stdlib = ">= 0.60.0 and < 1.0.0"
