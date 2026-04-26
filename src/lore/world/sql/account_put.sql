@@ -6,4 +6,6 @@ VALUES ($1, $2,
   ELSE
     'user'::role_enum
   END
-);
+)
+RETURNING account_id
+;

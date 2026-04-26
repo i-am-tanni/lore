@@ -84,6 +84,7 @@ fn init_reception(
   let login_controller =
     controller.LoginFlash(
       score: 0,
+      account_id: 0,
       name: "",
       password_hash: "",
       splitter: splitter.new([" ", "\r\n", "\n"]),

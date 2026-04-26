@@ -50,6 +50,16 @@ WHERE LOWER(name) = LOWER($1);
   |> pog.execute(db)
 }
 
+/// A row you get from running the `account_put` query
+/// defined in `./src/lore/world/sql/account_put.sql`.
+///
+/// > 🐿️ This type definition was generated automatically using v4.6.0 of the
+/// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub type AccountPutRow {
+  AccountPutRow(account_id: Int)
+}
+
 /// Runs the `account_put` query
 /// defined in `./src/lore/world/sql/account_put.sql`.
 ///
@@ -60,8 +70,11 @@ pub fn account_put(
   db: pog.Connection,
   arg_1: String,
   arg_2: String,
-) -> Result(pog.Returned(Nil), pog.QueryError) {
-  let decoder = decode.map(decode.dynamic, fn(_) { Nil })
+) -> Result(pog.Returned(AccountPutRow), pog.QueryError) {
+  let decoder = {
+    use account_id <- decode.field(0, decode.int)
+    decode.success(AccountPutRow(account_id:))
+  }
 
   "INSERT INTO account (name, password_hash, role)
 VALUES ($1, $2,
@@ -71,7 +84,9 @@ VALUES ($1, $2,
   ELSE
     'user'::role_enum
   END
-);
+)
+RETURNING account_id
+;
 "
   |> pog.query
   |> pog.parameter(pog.text(arg_1))
@@ -335,18 +350,14 @@ pub fn keyword(
 
   "-- query keywords + user names
 
-WITH max_id AS (
-    -- Get the current maximum ID from the keyword table
-    SELECT COALESCE(MAX(keyword_id), 0) as start_val FROM keyword
-)
 SELECT keyword_id, keyword 
 FROM keyword
 
 UNION ALL
 -- union with user names
 SELECT 
-    -- generate a keyword_id on the fly for account names
-    (SELECT start_val FROM max_id) + ROW_NUMBER() OVER () AS keyword_id, 
+    -- reserve keywords above 10,000,000 for account names
+    10000000 + account_id AS keyword_id, 
     LOWER(name)
 FROM account;"
   |> pog.query

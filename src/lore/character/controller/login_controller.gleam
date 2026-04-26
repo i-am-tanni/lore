@@ -10,6 +10,7 @@ import lore/character/users
 import lore/character/view
 import lore/character/view/render
 import lore/world.{Id}
+import lore/world/keyword
 import lore/world/named_actors
 import lore/world/sql
 import pog
@@ -66,6 +67,7 @@ fn account_name(conn: Conn, flash: LoginFlash, input: String) -> Conn {
       LoginFlash(
         ..flash,
         stage: controller.LoginPassword,
+        account_id: account.account_id,
         password_hash: account.password_hash,
         name: account.name,
       ),
@@ -173,8 +175,20 @@ fn new_password_confirm(conn: Conn, flash: LoginFlash, input: String) -> Conn {
     Ok(True) -> {
       let lookup = conn.named_actors(conn)
       let db = pog.named_connection(lookup.db)
-      case sql.account_put(db, flash.name, flash.password_hash) {
-        Ok(_) -> login(conn, flash)
+      let result = {
+        use sql.AccountPutRow(account_id:) <- try(
+          query1(
+            sql.account_put(db, flash.name, flash.password_hash),
+            "Generating New Account",
+          )
+          |> result.replace_error(Nil),
+        )
+        let keyword_actor = conn.named_actors(conn).keyword
+        keyword.insert_new_user(keyword_actor, account_id, flash.name)
+        Ok(account_id)
+      }
+      case result {
+        Ok(account_id) -> login(conn, LoginFlash(..flash, account_id:))
         Error(_) -> conn.terminate(conn)
       }
     }
@@ -217,38 +231,49 @@ fn password(conn: Conn, flash: LoginFlash, input: String) -> Conn {
 
 fn login(conn: Conn, flash: LoginFlash) -> Conn {
   let name = flash.name
-  let world.MobileInternal(id:, ..) = conn.character_get(conn)
-  let equipment =
-    [#(world.Arms, world.EmptySlot)]
-    |> dict.from_list
+  let result = {
+    let name_lowercase = string.lowercase(name)
+    let keyword_actor = conn.named_actors(conn).keyword
+    use keyword_id <- result.try(keyword.to_id(keyword_actor, name_lowercase))
+    let world.MobileInternal(id:, ..) = conn.character_get(conn)
+    let equipment =
+      [#(world.Arms, world.EmptySlot)]
+      |> dict.from_list
 
-  let update =
-    world.MobileInternal(
-      id:,
-      name:,
-      room_id: Id(1),
-      template_id: world.Player(Id(0)),
-      role: world.Admin,
-      keywords: [],
-      pronouns: world.Feminine,
-      short: name <> " is standing here.",
-      inventory: [],
-      equipment:,
-      fighting: world.NoTarget,
-      affects: world.affects_init(),
-      hp: 20,
-      hp_max: 20,
-    )
+    let update =
+      world.MobileInternal(
+        id:,
+        name:,
+        room_id: Id(1),
+        template_id: world.Player(Id(0)),
+        role: world.Admin,
+        keywords: [keyword_id],
+        pronouns: world.Feminine,
+        short: name <> " is standing here.",
+        inventory: [],
+        equipment:,
+        fighting: world.NoTarget,
+        affects: world.affects_init(),
+        hp: 20,
+        hp_max: 20,
+      )
 
-  let named_actors.Lookup(user:, ..) = conn.named_actors(conn)
-  users.insert(user, flash.endpoint, name:, id:)
+    let named_actors.Lookup(user:, ..) = conn.named_actors(conn)
+    users.insert(user, flash.endpoint, name:, id:)
 
-  let next_flash = CharacterFlash(name)
-  conn
-  |> conn.echo_enable
-  |> conn.character_put(update)
-  |> conn.subscribe(world.General)
-  |> conn.next_controller(controller.Character(next_flash))
+    let next_flash = CharacterFlash(name)
+    conn
+    |> conn.echo_enable
+    |> conn.character_put(update)
+    |> conn.subscribe(world.General)
+    |> conn.next_controller(controller.Character(next_flash))
+    |> Ok
+  }
+
+  case result {
+    Ok(conn) -> conn
+    Error(_) -> conn.terminate(conn)
+  }
 }
 
 fn query1(

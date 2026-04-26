@@ -371,6 +371,10 @@ pub fn container_unpack(
   }
 }
 
+/// Returns a pair containing the list of items found via the search and 
+/// the updated list of items with the latter removed from the container's
+/// contents.
+/// 
 pub fn item_get_from_container(
   list: List(ItemInstance),
   container_keyword: keyword.OrdinalSearch,
@@ -395,6 +399,10 @@ pub fn item_get_from_container(
   }
 }
 
+/// Returns a pair containing the list of items unpacked from the container and 
+/// the updated list of items with the latter removed from the container's
+/// contents.
+/// 
 pub fn item_get_all_from_container(
   list: List(ItemInstance),
   container_keyword: keyword.OrdinalSearch,

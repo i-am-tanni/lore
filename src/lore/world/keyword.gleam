@@ -43,6 +43,9 @@ import lore/server/my_list
 import lore/world/sql
 import pog
 
+// Offset reserved for user names
+const user_keyword_offset = 10_000_000
+
 pub type Keyword {
   Keyword(id: Int, term: String)
 }
@@ -66,7 +69,13 @@ pub type SpecifiedSearch {
 }
 
 pub type Message {
+  /// Look up a keyword id given a keyword string
+  /// 
   Lookup(caller: process.Subject(Result(Int, Nil)), keyword: String)
+
+  /// Add a new user's keyword at run time
+  /// 
+  NewUser(id: Int, keyword: String)
 }
 
 type HashData {
@@ -104,7 +113,7 @@ fn init(
   let lookup =
     list.fold(keyword_rows, dict.new(), fn(acc, row) {
       let sql.KeywordRow(keyword_id:, keyword:) = row
-      insert(acc, hash(keyword), Keyword(id: keyword_id, term: keyword))
+      insert(acc, keyword_id, keyword)
     })
 
   State(lookup:)
@@ -129,6 +138,17 @@ pub fn to_id(
 ) -> Result(Int, Nil) {
   process.named_subject(actor_name)
   |> actor.call(1000, Lookup(caller: _, keyword:))
+}
+
+/// an async call to add a new user's name and keyword_id to the store
+/// 
+pub fn insert_new_user(
+  actor_name: process.Name(Message),
+  id: Int,
+  keyword: String,
+) -> Nil {
+  process.named_subject(actor_name)
+  |> actor.send(NewUser(id:, keyword:))
 }
 
 pub fn find(
@@ -175,8 +195,18 @@ pub fn partition(
 }
 
 fn recv(state: State, msg: Message) -> actor.Next(State, Message) {
-  let Lookup(caller:, keyword:) = msg
-  actor.send(caller, lookup(state.lookup, keyword))
+  let state = case msg {
+    Lookup(caller:, keyword:) -> {
+      actor.send(caller, lookup(state.lookup, keyword))
+      state
+    }
+
+    NewUser(id:, keyword:) -> {
+      let id = id + user_keyword_offset
+      State(lookup: insert(state.lookup, id, keyword))
+    }
+  }
+
   actor.continue(state)
 }
 
@@ -203,9 +233,11 @@ fn lookup(lookup: Dict(Int, HashData), input: String) -> Result(Int, Nil) {
 
 fn insert(
   lookup: Dict(Int, HashData),
-  hash: Int,
-  keyword_data: Keyword,
+  id: Int,
+  term: String,
 ) -> Dict(Int, HashData) {
+  let keyword_data = Keyword(id:, term:)
+  let hash = hash(term)
   let value = case dict.get(lookup, hash) {
     Error(Nil) -> Perfect(keyword_data)
     Ok(Perfect(first_match)) -> Collisions([keyword_data, first_match])

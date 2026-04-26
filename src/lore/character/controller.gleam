@@ -32,6 +32,7 @@ pub type LoginFlash {
   LoginFlash(
     stage: LoginStage,
     score: Int,
+    account_id: Int,
     name: String,
     splitter: splitter.Splitter,
     password_hash: String,
