@@ -1,7 +1,7 @@
 -module(lore_ffi).
 
 -export([
-    iolist_map/2, iolist_map_fold/3
+    iolist_map/2, iolist_map_fold/3, maps_safe_next/1
 ]).
 
 % Recurses through any nested lists and then applies the Fun to any elements
@@ -26,3 +26,12 @@ iolist_map_fold(IoList, Acc0, Fun) when is_list(IoList) ->
     );
 iolist_map_fold(Element, Acc, Fun) ->
     Fun(Acc, Element).
+
+%% @doc Wraps maps:next/1 to return a standardized ok/error tuple.
+maps_safe_next(Iterator) ->
+    case maps:next(Iterator) of
+        none ->
+            {error, nil};
+        Success ->
+            {ok, Success}
+    end.
