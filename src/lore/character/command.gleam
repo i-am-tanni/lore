@@ -17,6 +17,7 @@ import lore/character/socials
 import lore/character/users
 import lore/character/view
 import lore/character/view/render
+import lore/server/my_dict
 import lore/world.{type Id, type Item, type Room, Id, StringId}
 import lore/world/event
 import lore/world/items
@@ -265,7 +266,9 @@ fn whisper_args(
   }
 }
 
-fn emote_text(s: String) -> Result(Command(event.RoomCommunicationData), String) {
+fn emote_text(
+  s: String,
+) -> Result(Command(event.RoomCommunicationData), String) {
   Ok(Command(Emote, event.EmoteData(text: quote(s))))
 }
 
@@ -451,7 +454,10 @@ fn ordinal_parse(conn: Conn, s: String) -> Result(keyword.OrdinalSearch, Nil) {
   }
 }
 
-fn quantity_parse(conn: Conn, s: String) -> Result(keyword.QuantitySearch, Nil) {
+fn quantity_parse(
+  conn: Conn,
+  s: String,
+) -> Result(keyword.QuantitySearch, Nil) {
   let conn.Splitters(quantity:, ..) = conn.splitters(conn)
   case splitter.split(quantity, s) {
     #(quantity, "*", keyword) -> {
@@ -790,7 +796,7 @@ fn remove_command(conn: Conn, command: Command(String)) -> Conn {
         world.UnknownItem(search_term:, verb: "wearing")
       }),
     )
-    dict_find_map_nth(equipment, 1, fn(wear_slot, wearing) {
+    my_dict.find_map_nth(equipment, 1, fn(wear_slot, wearing) {
       case wearing {
         world.EmptySlot -> Error(Nil)
         world.Wearing(item) ->
@@ -1142,32 +1148,6 @@ fn verb_missing_arg_err(verb: Verb) -> String {
     // verbs without args that will never have this error
     Inventory | Equipment | Social | SuperInvisible | GodMode | AutoRevive -> ""
   }
-}
-
-// Like list.find_map with an ordinal, but for dicts.
-//
-fn dict_find_map_nth(
-  dict: dict.Dict(a, b),
-  ordinal: Int,
-  one_that_is_desired: fn(a, b) -> Result(c, Nil),
-) -> Result(c, Nil) {
-  let #(result, _) =
-    // This can be improved with a short circuit on success
-    dict.fold(
-      dict,
-      #(Error(Nil), int.absolute_value(ordinal)),
-      fn(acc, key, val) {
-        let #(finding, ordinal) = acc
-        use <- bool.guard(result.is_ok(finding), acc)
-        case one_that_is_desired(key, val) {
-          Ok(result) if ordinal <= 1 -> #(Ok(result), 1)
-          Ok(_) -> #(Error(Nil), ordinal - 1)
-          Error(Nil) -> acc
-        }
-      },
-    )
-
-  result
 }
 
 fn find_at(

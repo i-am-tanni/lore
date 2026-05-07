@@ -1,4 +1,5 @@
 import gleam/dict.{type Dict}
+import gleam/result
 
 pub type Iterator(k, v)
 
@@ -15,7 +16,6 @@ fn find_nth_loop(
   ordinal: Int,
   one_that_is_desired: fn(k, v) -> Bool,
 ) -> Result(#(k, v), Nil) {
-  echo "ok"
   case next(iterator) {
     Ok(#(key, val, next_iterator)) -> {
       case one_that_is_desired(key, val) {
@@ -26,6 +26,27 @@ fn find_nth_loop(
     }
 
     Error(Nil) -> Error(Nil)
+  }
+}
+
+pub fn find_map_nth(
+  dict: Dict(k, v),
+  ordinal: Int,
+  one_that_is_desired: fn(k, v) -> Result(b, Nil),
+) -> Result(b, Nil) {
+  find_map_nth_loop(to_iterator(dict), ordinal, one_that_is_desired)
+}
+
+fn find_map_nth_loop(
+  iterator: Iterator(k, v),
+  ordinal: Int,
+  one_that_is_desired: fn(k, v) -> Result(b, Nil),
+) -> Result(b, Nil) {
+  use #(key, val, next_iterator) <- result.try(next(iterator))
+  case one_that_is_desired(key, val) {
+    Ok(x) if ordinal <= 1 -> Ok(x)
+    Ok(_) -> find_map_nth_loop(next_iterator, ordinal - 1, one_that_is_desired)
+    Error(Nil) -> find_map_nth_loop(next_iterator, ordinal, one_that_is_desired)
   }
 }
 
