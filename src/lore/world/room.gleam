@@ -181,6 +181,7 @@ fn dispatch_from_character(
     event.Slay(data) -> combat_slay(model, event, data)
     event.UpdateCharacter ->
       update_character_in_room(model, event, event.acting_character)
+    event.Return(data) -> #(model, effect.send_character(event.from, data))
   }
 
   effect.realize(

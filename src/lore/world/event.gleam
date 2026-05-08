@@ -198,6 +198,9 @@ pub type CharacterToRoomEvent {
   CombatRequest(CombatRequestData)
   Slay(SearchTerm(Mobile))
   UpdateCharacter
+  /// Characters can bounce internal events off the room for physical actions
+  /// e.g. getting something out of a container or wearing / removing equipment
+  Return(CharacterEvent)
 }
 
 /// The zone polls the desination room whether it accepts or rejects the move.
