@@ -786,10 +786,10 @@ fn wear_command(conn: Conn, command: Command(String)) -> Conn {
 fn remove_command(conn: Conn, command: Command(String)) -> Conn {
   let self = conn.character_get(conn)
   let equipment = self.equipment
-  let search_term = command.data
-  let err = world.UnknownItem(search_term:, verb: "wearing")
 
   let result = {
+    let search_term = command.data
+    let err = world.UnknownItem(search_term:, verb: "wearing")
     let keyword_actor = conn.named_actors(conn).keyword
     use keyword_id <- result.try(
       keyword.to_id(keyword_actor, search_term)
