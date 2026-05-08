@@ -787,28 +787,26 @@ fn remove_command(conn: Conn, command: Command(String)) -> Conn {
   let self = conn.character_get(conn)
   let equipment = self.equipment
   let search_term = command.data
+  let err = world.UnknownItem(search_term:, verb: "wearing")
 
   let result = {
     let keyword_actor = conn.named_actors(conn).keyword
     use keyword_id <- result.try(
       keyword.to_id(keyword_actor, search_term)
-      |> result.map_error(fn(_) {
-        world.UnknownItem(search_term:, verb: "wearing")
-      }),
+      |> result.replace_error(err),
     )
-    my_dict.find_map_nth(equipment, 1, fn(wear_slot, wearing) {
-      case wearing {
-        world.EmptySlot -> Error(Nil)
-        world.Wearing(item) ->
-          case item_matches(item, keyword_id) {
-            True -> Ok(#(wear_slot, item))
-            False -> Error(Nil)
-          }
-      }
-    })
-    |> result.map_error(fn(_) {
-      world.UnknownItem(search_term:, verb: "wearing")
-    })
+    let found =
+      my_dict.find_nth(equipment, 1, fn(_wear_slot, wearing) {
+        case wearing {
+          world.EmptySlot -> False
+          world.Wearing(item) -> item_matches(item, keyword_id)
+        }
+      })
+
+    case found {
+      Ok(#(wear_slot, world.Wearing(item))) -> Ok(#(wear_slot, item))
+      _ -> Error(err)
+    }
   }
 
   case result {
