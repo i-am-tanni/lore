@@ -19,7 +19,7 @@ pub type Id(a) {
 /// An id generated during runtime.
 ///
 pub type StringId(a) {
-  StringId(String)
+  StringId(id: String)
 }
 
 pub type Vote(reason) {

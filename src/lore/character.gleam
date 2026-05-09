@@ -40,7 +40,7 @@ type State {
     endpoint: Option(Subject(Outgoing)),
     self: Subject(CharacterMessage),
     cooldown: conn.GlobalCooldown,
-    actions: List(event.Action),
+    actions: List(conn.Action),
     named_actors: named_actors.Lookup,
     splitters: conn.Splitters,
     subscribed: Set(world.ChatChannel),
@@ -51,7 +51,7 @@ type State {
 // Action queue data is held in this struct temporarily before constructing the
 // next State.
 type ActionSummary {
-  ActionSummary(cooldown: conn.GlobalCooldown, actions: List(event.Action))
+  ActionSummary(cooldown: conn.GlobalCooldown, actions: List(conn.Action))
 }
 
 /// When a connection is received, this starts the login sequence.
@@ -222,7 +222,7 @@ fn recv(
     // if cooldown expired, try to process any lazy actions queued
     event.CooldownExpired(id: expected) ->
       case state.cooldown {
-        conn.Busy(id:, ..) if expected == id ->
+        conn.Busy(id:, ..) if expected == id.id ->
           case state.actions {
             [] -> State(..state, cooldown: conn.Idle)
 

@@ -11,7 +11,6 @@
 import gleam/dict.{type Dict}
 import gleam/erlang/process.{type Subject}
 import gleam/option.{type Option}
-import gleam/order
 import lore/character/view
 import lore/server/output
 import lore/world.{
@@ -26,55 +25,6 @@ import lore/world/keyword
 ///
 pub type Event(a, b) {
   Event(data: a, from: Subject(b), acting_character: Mobile)
-}
-
-pub type Priority {
-  Lag
-  High
-  Medium
-  Low
-}
-
-pub fn is_priority_gt(a: Priority, b: Priority) -> Bool {
-  compare_priority(a, b) == order.Gt
-}
-
-fn compare_priority(a: Priority, with b: Priority) -> order.Order {
-  case a == b {
-    True -> order.Eq
-    False ->
-      case a == Lag || priority_to_int(a) > priority_to_int(b) {
-        True -> order.Gt
-        False -> order.Lt
-      }
-  }
-}
-
-fn priority_to_int(priority: Priority) -> Int {
-  case priority {
-    Lag -> 4
-    High -> 3
-    Medium -> 2
-    Low -> 1
-  }
-}
-
-/// A lazy CharacterToRoomEvent that consumes time to perform.
-/// Condition is required to pass in order to perform. Examples:
-/// - For crafts, does the character have the requisite components?
-/// - Is the character in the right position to perform the action?
-///
-pub type Action {
-  /// Priority determines cancellability of the current action.
-  /// Delay determines the cooldown time in ms after the action is performed.
-  ///
-  Action(
-    id: StringId(Action),
-    condition: fn(world.MobileInternal) -> Result(world.MobileInternal, String),
-    priority: Priority,
-    delay: Int,
-    event: CharacterToRoomEvent,
-  )
 }
 
 /// A type that returns the completion status of an event sent via
@@ -124,7 +74,7 @@ pub type CharacterMessage {
   /// A timed signal sent by the character themself to trigger the next action
   /// in the queue.
   ///
-  CooldownExpired(id: StringId(Action))
+  CooldownExpired(id: String)
   /// A notification was received
   ///
   Chat(ChatData)

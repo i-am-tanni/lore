@@ -10,6 +10,7 @@ import gleam/bool
 import gleam/erlang/process.{type Subject, type Timer}
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/order
 import gleam/result
 import gleam/set.{type Set}
 import lore/character/controller.{type Controller}
@@ -38,7 +39,7 @@ pub opaque type Conn {
     events: List(EventToSend),
     output: List(Text),
     out_of_band: List(output.OutOfBand),
-    actions: List(event.Action),
+    actions: List(Action),
     publish: List(ChatData),
     update_character: Option(world.MobileInternal),
     next_controller: Option(Controller),
@@ -77,12 +78,37 @@ pub type EventToSend {
   )
 }
 
+pub type Priority {
+  Lag
+  High
+  Medium
+  Low
+}
+
+/// A lazy CharacterToRoomEvent that consumes time to perform.
+/// Condition is required to pass in order to perform. Examples:
+/// - For crafts, does the character have the requisite components?
+/// - Is the character in the right position to perform the action?
+///
+pub type Action {
+  /// Priority determines cancellability of the current action.
+  /// Delay determines the cooldown time in ms after the action is performed.
+  ///
+  Action(
+    id: world.StringId(Action),
+    condition: fn(world.MobileInternal) -> Result(world.MobileInternal, String),
+    priority: Priority,
+    delay: Int,
+    event: event.CharacterToRoomEvent,
+  )
+}
+
 /// On global cooldown, you can only cancel if action priority exceeds the
 /// cooldown priority. Upon cancel any queued actions will be discarded in favor
 /// of the requested higher priority action.
 ///
 pub type GlobalCooldown {
-  Busy(id: StringId(event.Action), priority: event.Priority, timer: Timer)
+  Busy(id: StringId(Action), priority: Priority, timer: Timer)
   Idle
 }
 
@@ -97,7 +123,7 @@ pub type Response {
     flash: Controller,
     next_controller: Option(Controller),
     events: List(EventToSend),
-    actions: List(event.Action),
+    actions: List(Action),
     output: List(Text),
     out_of_band: List(output.OutOfBand),
     publish: List(ChatData),
@@ -286,7 +312,7 @@ pub fn event_to_room(
 /// If more than one action is required, it is recommended to use `conn.actions`
 /// instead of piping a series of `.action()` as that will be more efficient.
 ///
-pub fn action(conn: Conn, action: event.Action) -> Conn {
+pub fn action(conn: Conn, action: Action) -> Conn {
   case conn.actions {
     [] -> Conn(..conn, actions: [action])
     // An append was chosen here rather than prepending + reversing
@@ -304,7 +330,7 @@ pub fn action(conn: Conn, action: event.Action) -> Conn {
 
 /// Adds a list of actions for processing.
 ///
-pub fn actions(conn: Conn, actions: List(event.Action)) -> Conn {
+pub fn actions(conn: Conn, actions: List(Action)) -> Conn {
   case conn.actions {
     [] -> Conn(..conn, actions: actions)
     queue -> Conn(..conn, actions: list.append(queue, actions))
@@ -453,7 +479,7 @@ type ErrorAction {
 }
 
 // Convert actions to events if they can be performed. Stash the remainder.
-fn process_actions(conn: Conn, actions: List(event.Action)) -> Conn {
+fn process_actions(conn: Conn, actions: List(Action)) -> Conn {
   case actions {
     [] -> Conn(..conn, actions: [])
     [first, ..rest] -> {
@@ -468,9 +494,13 @@ fn process_actions(conn: Conn, actions: List(event.Action)) -> Conn {
           delay if delay <= 0 -> Conn(..conn, cooldown: Idle)
           // if delay is > 0, schedule a cooldown expiration notification to self
           delay -> {
-            let event.Action(id:, priority:, ..) = first
+            let Action(id:, priority:, ..) = first
             let timer =
-              process.send_after(conn.self, delay, event.CooldownExpired(id:))
+              process.send_after(
+                conn.self,
+                delay,
+                event.CooldownExpired(id: id.id),
+              )
 
             Conn(..conn, cooldown: Busy(id:, priority:, timer:))
           }
@@ -496,16 +526,40 @@ fn process_actions(conn: Conn, actions: List(event.Action)) -> Conn {
 // Character can act if either:
 // - Idle
 // - the requested action's priority exceeds cooldown's priority level
-fn is_busy(cooldown: GlobalCooldown, action: event.Action) -> Bool {
+fn is_busy(cooldown: GlobalCooldown, action: Action) -> Bool {
   case cooldown {
     Idle -> False
     Busy(priority:, timer:, ..) ->
-      case event.is_priority_gt(action.priority, priority) {
+      case is_priority_gt(action.priority, priority) {
         True -> {
           process.cancel_timer(timer)
           False
         }
         False -> True
       }
+  }
+}
+
+pub fn is_priority_gt(a: Priority, b: Priority) -> Bool {
+  compare_priority(a, b) == order.Gt
+}
+
+fn compare_priority(a: Priority, with b: Priority) -> order.Order {
+  case a == b {
+    True -> order.Eq
+    False ->
+      case a == Lag || priority_to_int(a) > priority_to_int(b) {
+        True -> order.Gt
+        False -> order.Lt
+      }
+  }
+}
+
+fn priority_to_int(priority: Priority) -> Int {
+  case priority {
+    Lag -> 4
+    High -> 3
+    Medium -> 2
+    Low -> 1
   }
 }
