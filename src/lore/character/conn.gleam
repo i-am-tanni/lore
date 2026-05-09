@@ -28,9 +28,6 @@ import splitter.{type Splitter}
 /// to be returned to the calling controller.
 ///
 pub opaque type Conn {
-  /// action_fun is required to get around a cyclical import that I'm not smart
-  /// enough to avoid at this moment.
-  ///
   Conn(
     self: process.Subject(CharacterMessage),
     character: world.MobileInternal,
