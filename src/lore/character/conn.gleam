@@ -99,8 +99,16 @@ pub type Action {
     condition: fn(world.MobileInternal) -> Result(world.MobileInternal, String),
     priority: Priority,
     delay: Int,
-    event: event.CharacterToRoomEvent,
+    event: ActionScope,
   )
+}
+
+/// Determines if the action is something to be executed lazily or sent to the
+/// room.
+/// 
+pub type ActionScope {
+  External(event.CharacterToRoomEvent)
+  Internal(fn(Conn) -> Conn)
 }
 
 /// On global cooldown, you can only cancel if action priority exceeds the
@@ -478,10 +486,32 @@ type ErrorAction {
   ActFailed(String)
 }
 
-// Convert actions to events if they can be performed. Stash the remainder.
 fn process_actions(conn: Conn, actions: List(Action)) -> Conn {
+  let #(conn, rest) = process_actions_loop(Conn(..conn, actions: []), actions)
+
+  // If actions NEVER trigger other actions, we can simplify and 
+  // do away with the logic that follows
+  case conn.actions, rest {
+    // If no new actions prepended this iteration, done.
+    [], [] -> conn
+    [], rest -> Conn(..conn, actions: rest)
+    // ..else the processed actions generated NEW actions and we should
+    // prepemd and process those too
+    new_actions, [] -> process_actions(conn, new_actions)
+    new_actions, rest ->
+      // Assume any new actions are an extension of the action that triggered
+      // and thus should be first in line
+      process_actions(conn, list.append(new_actions, rest))
+  }
+}
+
+// Convert actions to events if they can be performed. Stash the remainder.
+fn process_actions_loop(
+  conn: Conn,
+  actions: List(Action),
+) -> #(Conn, List(Action)) {
   case actions {
-    [] -> Conn(..conn, actions: [])
+    [] -> #(conn, [])
     [first, ..rest] -> {
       let result = {
         use <- bool.guard(is_busy(conn.cooldown, first), Error(ErrBusy))
@@ -505,19 +535,23 @@ fn process_actions(conn: Conn, actions: List(Action)) -> Conn {
             Conn(..conn, cooldown: Busy(id:, priority:, timer:))
           }
         }
-        Ok(event(conn, first.event))
+        case first.event {
+          External(data) -> event(conn, data)
+          Internal(lazy_fun) -> lazy_fun(conn)
+        }
+        |> Ok
       }
 
       case result {
         // If busy, must wait til cooldown completes or cancel the cooldown with
         // a higher priority action to perform next action.
-        Error(ErrBusy) -> Conn(..conn, actions:)
+        Error(ErrBusy) -> #(conn, actions)
         // If the act fails, assume all other queued actions depend on its
         // success and cancel.
-        Error(ActFailed(_reason)) -> Conn(..conn, actions: [], cooldown: Idle)
+        Error(ActFailed(_reason)) -> #(Conn(..conn, cooldown: Idle), [])
         // ..else the action was successfully converted into an event and we
         // can try to process another.
-        Ok(update) -> process_actions(update, rest)
+        Ok(update) -> process_actions_loop(update, rest)
       }
     }
   }
@@ -530,18 +564,20 @@ fn is_busy(cooldown: GlobalCooldown, action: Action) -> Bool {
   case cooldown {
     Idle -> False
     Busy(priority:, timer:, ..) ->
-      case is_priority_gt(action.priority, priority) {
-        True -> {
+      case is_priority_gte(priority, action.priority) {
+        True -> True
+        // Action priority exceeds priority of current cooldown
+        // Therefore, no longer busy.
+        False -> {
           process.cancel_timer(timer)
           False
         }
-        False -> True
       }
   }
 }
 
-pub fn is_priority_gt(a: Priority, b: Priority) -> Bool {
-  compare_priority(a, b) == order.Gt
+fn is_priority_gte(a: Priority, b: Priority) -> Bool {
+  compare_priority(a, b) != order.Lt
 }
 
 fn compare_priority(a: Priority, with b: Priority) -> order.Order {

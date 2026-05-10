@@ -1,4 +1,4 @@
-import lore/character/conn.{type Action, Action, Medium}
+import lore/character/conn.{type Action, Action, External, Medium}
 import lore/world
 import lore/world/event
 import lore/world/keyword
@@ -7,7 +7,7 @@ const min_delay = 500
 
 pub fn move(direction: world.Direction) -> Action {
   Action(
-    event: event.MoveRequest(direction),
+    event: External(event.MoveRequest(direction)),
     id: world.generate_id(),
     condition: no_conditions,
     priority: Medium,
@@ -17,7 +17,7 @@ pub fn move(direction: world.Direction) -> Action {
 
 pub fn toggle_door(data: event.DoorToggleData) -> Action {
   Action(
-    event: event.DoorToggle(data),
+    event: External(event.DoorToggle(data)),
     id: world.generate_id(),
     condition: no_conditions,
     priority: Medium,
@@ -27,7 +27,7 @@ pub fn toggle_door(data: event.DoorToggleData) -> Action {
 
 pub fn communicate(data: event.RoomCommunicationData) -> Action {
   Action(
-    event: event.RoomCommunication(data),
+    event: External(event.RoomCommunication(data)),
     id: world.generate_id(),
     condition: no_conditions,
     priority: Medium,
@@ -37,7 +37,7 @@ pub fn communicate(data: event.RoomCommunicationData) -> Action {
 
 pub fn item_get(query: keyword.SpecifiedSearch) -> Action {
   Action(
-    event: event.ItemGet(query),
+    event: External(event.ItemGet(query)),
     id: world.generate_id(),
     condition: no_conditions,
     priority: Medium,
@@ -47,7 +47,7 @@ pub fn item_get(query: keyword.SpecifiedSearch) -> Action {
 
 pub fn item_get_all() -> Action {
   Action(
-    event: event.ItemGetAll,
+    event: External(event.ItemGetAll),
     id: world.generate_id(),
     condition: no_conditions,
     priority: Medium,
@@ -57,7 +57,7 @@ pub fn item_get_all() -> Action {
 
 pub fn item_drop(item_instance: world.ItemInstance) -> Action {
   Action(
-    event: event.ItemDrop(item_instance),
+    event: External(event.ItemDrop(item_instance)),
     id: world.generate_id(),
     condition: no_conditions,
     priority: Medium,
@@ -67,7 +67,7 @@ pub fn item_drop(item_instance: world.ItemInstance) -> Action {
 
 pub fn kill(data: event.CombatRequestData) -> Action {
   Action(
-    event: event.CombatRequest(data),
+    event: External(event.CombatRequest(data)),
     id: world.generate_id(),
     condition: no_conditions,
     priority: Medium,
