@@ -439,6 +439,7 @@ pub fn is_subscribed(conn: Conn, channel: world.ChatChannel) -> Bool {
 /// Transforms a conn into a completed response to be processed by the caller.
 ///
 pub fn to_response(conn: Conn) -> Response {
+  // No need to list.reverse actions because actions are appended when added
   let conn = case conn.actions {
     [] -> conn
     actions -> process_actions(conn, actions)
