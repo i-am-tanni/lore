@@ -1,6 +1,5 @@
 import gleam/list
 import gleam/string
-import gleeunit/should
 import hyphenation
 import hyphenation/language
 import lore/character/view
@@ -10,8 +9,7 @@ const lorem_ipsum = "Gleam is a friendly language for building type-safe systems
 pub fn hyphenation_test() {
   let hyphenator = hyphenation.hyphenator(language.EnglishUS)
 
-  hyphenation.hyphenate("building", hyphenator)
-  |> should.equal(["build", "ing"])
+  assert hyphenation.hyphenate("building", hyphenator) == ["build", "ing"]
 }
 
 pub fn word_wrap_test() {
