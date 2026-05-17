@@ -119,6 +119,7 @@ pub type CharacterEvent {
   ItemGetNotify(item: List(world.ItemInstance))
   ItemDropNotify(item: world.ItemInstance)
   ItemInspect(item: world.ItemInstance)
+  ItemGetInNotify(found: List(world.ItemInstance), from: world.ItemInstance)
   MobileInspectRequest(by: Subject(CharacterMessage))
   MobileInspectResponse(character: world.MobileInternal)
   CombatCommit(CombatCommitData)
@@ -141,6 +142,8 @@ pub type CharacterToRoomEvent {
   ItemGet(keyword: keyword.SpecifiedSearch)
   ItemGetAll
   ItemDrop(item_instance: world.ItemInstance)
+  ItemGetAllIn(container: keyword.OrdinalSearch)
+  ItemGetIn(ContainerSearchData)
   RejoinRoom
   DoorToggle(DoorToggleData)
   DoorUpdateEnd(DoorUpdateData)
@@ -291,6 +294,13 @@ pub type CombatRequestData {
     victim: SearchTerm(Mobile),
     dam_roll: Int,
     is_round_based: Bool,
+  )
+}
+
+pub type ContainerSearchData {
+  ContainerSearchData(
+    container_keyword: keyword.OrdinalSearch,
+    item_keyword: keyword.SpecifiedSearch,
   )
 }
 

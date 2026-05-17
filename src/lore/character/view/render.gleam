@@ -323,6 +323,88 @@ pub fn item_get(
   |> view.Leaves
 }
 
+pub fn items_get_from_container_3p(
+  items_table: process.Name(items.Message),
+  acting_character: world.Mobile,
+  items: List(world.ItemInstance),
+  container: world.ItemInstance,
+) -> View {
+  let result = {
+    use container <- result.try(items.load_from_instance(items_table, container))
+    use items <- result.try(
+      list.try_map(items, items.load_from_instance(items_table, _)),
+    )
+    case items {
+      // if there was only one item retrieved from the container
+      [item] ->
+        [acting_character.name, " gets ", item.name, " from ", container.name]
+        |> view.Leaves
+
+      // if there are multiple items retrieved from the container
+      items -> {
+        let prelude =
+          [
+            acting_character.name,
+            " gets the following items from ",
+            container.name,
+            ":",
+          ]
+          |> view.Leaves
+
+        let items =
+          list.map(items, fn(item) { item.name |> view.Leaf })
+          |> view.join("\n")
+
+        [prelude, items] |> view.join("\n")
+      }
+    }
+    |> Ok
+  }
+
+  case result {
+    Ok(view) -> view
+    Error(_) -> view.Blank
+  }
+}
+
+pub fn items_get_from_container_self(
+  items_table: process.Name(items.Message),
+  items: List(world.ItemInstance),
+  container: world.ItemInstance,
+) -> View {
+  let result = {
+    use container <- result.try(items.load_from_instance(items_table, container))
+    use items <- result.try(
+      list.try_map(items, items.load_from_instance(items_table, _)),
+    )
+    case items {
+      // if there was only one item retrieved from the container
+      [item] ->
+        ["You get ", item.name, " from ", container.name]
+        |> view.Leaves
+
+      // if there are multiple items retrieved from the container
+      items -> {
+        let prelude =
+          ["You get ", "the following items from ", container.name, ":"]
+          |> view.Leaves
+
+        let items =
+          list.map(items, fn(item) { item.name |> view.Leaf })
+          |> view.join("\n")
+
+        [prelude, items] |> view.join("\n")
+      }
+    }
+    |> Ok
+  }
+
+  case result {
+    Ok(view) -> view
+    Error(_) -> view.Blank
+  }
+}
+
 pub fn item_drop(
   self: world.MobileInternal,
   acting_character: world.Mobile,
@@ -641,7 +723,9 @@ pub fn communication(
       ]
       |> view.Leaves
 
-    event.SayAt(text:, at:, adverb:) if is_acting_character && self_id == at.id ->
+    event.SayAt(text:, at:, adverb:)
+      if is_acting_character && self_id == at.id
+    ->
       [
         "You ",
         adverb_to_string(adverb),
@@ -971,7 +1055,10 @@ pub fn smite_1p(name: String) -> View {
   |> view.Leaves
 }
 
-fn damage_notify(perspective: Perspective, data: event.CombatCommitData) -> View {
+fn damage_notify(
+  perspective: Perspective,
+  data: event.CombatCommitData,
+) -> View {
   let event.CombatCommitData(victim:, attacker:, damage:) = data
   let victim_hp_max = victim.hp_max
 
@@ -1003,7 +1090,10 @@ fn damage_notify(perspective: Perspective, data: event.CombatCommitData) -> View
   |> view.Leaves
 }
 
-fn death_notify(perspective: Perspective, data: event.CombatCommitData) -> View {
+fn death_notify(
+  perspective: Perspective,
+  data: event.CombatCommitData,
+) -> View {
   let event.CombatCommitData(victim:, attacker:, ..) = data
   case perspective {
     Attacker -> ["&YYou have killed ", character_name(victim), "!0;"]

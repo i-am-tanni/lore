@@ -177,6 +177,8 @@ fn dispatch_from_character(
     event.ItemGet(data) -> item_get(model, event, data)
     event.ItemGetAll -> item_get_all(model, event)
     event.ItemDrop(data) -> item_drop(model, event, data)
+    event.ItemGetAllIn(data) -> item_get_all_in(model, event, data)
+    event.ItemGetIn(data) -> item_get_item_in(model, event, data)
     event.CombatRequest(data) -> combat_request(model, event, data)
     event.Slay(data) -> combat_slay(model, event, data)
     event.UpdateCharacter ->
@@ -703,6 +705,51 @@ fn item_get_all(
   ]
 
   #(update, effect.batch(effects))
+}
+
+fn item_get_all_in(
+  model: Model,
+  event: Event(CharacterToRoomEvent, CharacterMessage),
+  container_search: keyword.OrdinalSearch,
+) -> #(Model, RoomEffect(CharacterMessage)) {
+  let room = model.room
+  case world.item_get_all_from_container(room.items, container_search) {
+    Ok(#(found, container, items)) -> {
+      let room = world.Room(..room, items:)
+      let update = Model(..model, room:)
+      let effect = effect.broadcast(event.ItemGetInNotify(found, container))
+      #(update, effect)
+    }
+
+    Error(error) -> {
+      let effect = effect.renderln(event.from, render.error_item(error))
+      #(model, effect)
+    }
+  }
+}
+
+fn item_get_item_in(
+  model: Model,
+  event: Event(CharacterToRoomEvent, CharacterMessage),
+  data: event.ContainerSearchData,
+) -> #(Model, RoomEffect(CharacterMessage)) {
+  let room = model.room
+  let event.ContainerSearchData(container_search, item_keyword) = data
+  case
+    world.item_get_from_container(room.items, container_search, item_keyword)
+  {
+    Ok(#(found, container, items)) -> {
+      let room = world.Room(..room, items:)
+      let update = Model(..model, room:)
+      let effect = effect.broadcast(event.ItemGetInNotify(found, container))
+      #(update, effect)
+    }
+
+    Error(error) -> {
+      let effect = effect.renderln(event.from, render.error_item(error))
+      #(model, effect)
+    }
+  }
 }
 
 fn cancel_clean_up(

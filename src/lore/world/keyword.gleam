@@ -35,6 +35,7 @@
 
 import gleam/dict.{type Dict}
 import gleam/erlang/process
+import gleam/int
 import gleam/list
 import gleam/otp/actor
 import gleam/result
@@ -42,6 +43,7 @@ import logging
 import lore/server/my_list
 import lore/world/sql
 import pog
+import splitter
 
 // Offset reserved for user names
 const user_keyword_offset = 10_000_000
@@ -191,6 +193,54 @@ pub fn partition(
       }
 
     Quantity(search) -> partition_take(list, search, predicate)
+  }
+}
+
+pub fn specified_search_parse(
+  actor_name: process.Name(Message),
+  s: String,
+  quantity_splitter: splitter.Splitter,
+  ordinal_splitter: splitter.Splitter,
+) -> Result(SpecifiedSearch, Nil) {
+  use <- result.lazy_or(
+    quantity_parse(actor_name, s, quantity_splitter)
+    |> result.map(Quantity),
+  )
+  ordinal_parse(actor_name, s, ordinal_splitter)
+  |> result.map(Ordinal)
+}
+
+pub fn ordinal_parse(
+  actor_name: process.Name(Message),
+  s: String,
+  ordinal_splitter: splitter.Splitter,
+) -> Result(OrdinalSearch, Nil) {
+  case splitter.split(ordinal_splitter, s) {
+    #(ordinal, ".", keyword) -> {
+      let ordinal = int.parse(ordinal) |> result.unwrap(1)
+      use keyword <- result.try(from_term(actor_name, keyword))
+      Ok(OrdinalSearch(keyword:, ordinal:))
+    }
+    _ -> {
+      use keyword <- result.try(from_term(actor_name, s))
+      Ok(OrdinalSearch(keyword:, ordinal: 1))
+    }
+  }
+}
+
+pub fn quantity_parse(
+  actor_name: process.Name(Message),
+  s: String,
+  quantity_splitter: splitter.Splitter,
+) -> Result(QuantitySearch, Nil) {
+  case splitter.split(quantity_splitter, s) {
+    #(quantity, "*", keyword) -> {
+      use quantity <- result.try(int.parse(quantity))
+      use keyword <- result.try(from_term(actor_name, keyword))
+      Ok(QuantitySearch(keyword:, quantity: int.max(1, quantity)))
+    }
+
+    _ -> Error(Nil)
   }
 }
 

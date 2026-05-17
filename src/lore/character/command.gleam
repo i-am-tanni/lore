@@ -431,41 +431,20 @@ fn try_keyword(s: String, word: Splitter) -> Result(#(String, String), Nil) {
 
 fn specified_search_parse(
   conn: Conn,
-  s: String,
+  keyword: String,
 ) -> Result(keyword.SpecifiedSearch, Nil) {
-  use <- result.lazy_or(quantity_parse(conn, s) |> result.map(keyword.Quantity))
-  ordinal_parse(conn, s) |> result.map(keyword.Ordinal)
+  let conn.Splitters(ordinal:, quantity:, ..) = conn.splitters(conn)
+  conn.named_actors(conn).keyword
+  |> keyword.specified_search_parse(keyword:, ordinal:, quantity:)
 }
 
-fn ordinal_parse(conn: Conn, s: String) -> Result(keyword.OrdinalSearch, Nil) {
-  let conn.Splitters(ordinal:, ..) = conn.splitters(conn)
-  case splitter.split(ordinal, s) {
-    #(ordinal, ".", keyword) -> {
-      let ordinal = int.parse(ordinal) |> result.unwrap(1)
-      use keyword <- result.try(keyword_from_term(conn, keyword))
-      Ok(keyword.OrdinalSearch(keyword:, ordinal:))
-    }
-    _ -> {
-      use keyword <- result.try(keyword_from_term(conn, s))
-      Ok(keyword.OrdinalSearch(keyword:, ordinal: 1))
-    }
-  }
-}
-
-fn quantity_parse(
+fn ordinal_parse(
   conn: Conn,
-  s: String,
-) -> Result(keyword.QuantitySearch, Nil) {
-  let conn.Splitters(quantity:, ..) = conn.splitters(conn)
-  case splitter.split(quantity, s) {
-    #(quantity, "*", keyword) -> {
-      use quantity <- result.try(int.parse(quantity))
-      use keyword <- result.try(keyword_from_term(conn, keyword))
-      Ok(keyword.QuantitySearch(keyword:, quantity: int.max(1, quantity)))
-    }
-
-    _ -> Error(Nil)
-  }
+  keyword: String,
+) -> Result(keyword.OrdinalSearch, Nil) {
+  let conn.Splitters(ordinal:, ..) = conn.splitters(conn)
+  conn.named_actors(conn).keyword
+  |> keyword.ordinal_parse(keyword, ordinal)
 }
 
 // Parsers is a list of #(tag, option_parser_fun)
@@ -566,7 +545,7 @@ fn look_at_command(conn: Conn, command: Command(String)) -> Conn {
     use <- bool.guard(is_auto(self, search.keyword.term), Ok(LookSelf))
     // Search inventory first
     use <- result.lazy_or(
-      keyword.find(self.inventory, search, item_matches)
+      keyword.find(self.inventory, search, world.item_matches)
       |> result.map(LookItem),
     )
     // ..and if that fails, search the room
@@ -642,22 +621,22 @@ fn get_command(conn: Conn, command: Command(List(Token))) -> Conn {
     [All] -> act.item_get_all() |> Ok
 
     // case 2: get all items from a container
-    // [All, Keyword(container)] ->
-    //  ordinal_parse(conn, container)
-    //  |> result.map(act.item_get_all_in)
-    //
+    [All, Keyword(container)] ->
+      ordinal_parse(conn, container)
+      |> result.map(act.get_all_from_container_self)
+
     // case 3: get via a keyword specfied search
     [Keyword(keyword)] ->
       specified_search_parse(conn, keyword)
       |> result.map(act.item_get)
 
     // case 4: get from a container with a keyword specified search
-    // [Keyword(keyword), Keyword(container)] -> {
-    //  use search <- result.try(specified_search_parse(conn, keyword))
-    //  use container <- result.try(ordinal_parse(conn, container))
-    //  Ok(act.item_get_in(search, container))
-    // }
-    //
+    [Keyword(keyword), Keyword(container)] -> {
+      use search <- result.try(specified_search_parse(conn, keyword))
+      use container <- result.try(ordinal_parse(conn, container))
+      Ok(act.get_item_from_container_self(container, search))
+    }
+
     // default case: invalid pattern
     _ -> Error(Nil)
   }
@@ -1015,10 +994,6 @@ fn role(conn: Conn) -> world.Role {
   conn.character_get(conn).role
 }
 
-fn item_matches(item_instance: world.ItemInstance, search_term: Int) -> Bool {
-  list.contains(item_instance.keywords, search_term)
-}
-
 fn find_item(
   conn: Conn,
   inventory: List(world.ItemInstance),
@@ -1026,7 +1001,7 @@ fn find_item(
 ) -> Result(world.ItemInstance, Nil) {
   let keyword_actor = conn.named_actors(conn).keyword
   use keyword_id <- result.try(keyword.to_id(keyword_actor, keyword))
-  list.find(inventory, item_matches(_, keyword_id))
+  list.find(inventory, world.item_matches(_, keyword_id))
 }
 
 fn verb_missing_arg_err(verb: Verb) -> String {

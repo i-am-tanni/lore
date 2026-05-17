@@ -1,3 +1,13 @@
+//// Acts are discrete physical actions a user or npc can perform.
+//// - delay: a cooldown until the next action can be performed
+//// - condition: requirements to be able to perform the action
+//// - priority: is the cooldown cancellable?
+//// 
+//// There are two kinds of actions:
+//// - External - The action requries data from the room
+//// - Internal - The action requires no data from the room
+//// 
+
 import gleam/bool
 import gleam/dict
 import gleam/list
@@ -5,6 +15,7 @@ import gleam/result
 import lore/character/conn.{
   type Action, type Conn, Action, External, Internal, Medium,
 }
+import lore/character/view
 import lore/character/view/render
 import lore/server/my_dict
 import lore/world
@@ -15,6 +26,9 @@ import lore/world/named_actors
 
 const min_delay = 500
 
+///
+/// Action constructors
+/// 
 pub fn move(direction: world.Direction) -> Action {
   Action(
     event: External(event.MoveRequest(direction)),
@@ -105,14 +119,32 @@ pub fn wear_item(search_term: String) -> Action {
   )
 }
 
-fn no_conditions(
-  character: world.MobileInternal,
-) -> Result(world.MobileInternal, String) {
-  Ok(character)
+pub fn get_all_from_container_self(container: keyword.OrdinalSearch) -> Action {
+  Action(
+    event: Internal(do_get_all_from_container_self(_, container)),
+    id: world.generate_id(),
+    condition: no_conditions,
+    priority: Medium,
+    delay: min_delay,
+  )
+}
+
+pub fn get_item_from_container_self(
+  container: keyword.OrdinalSearch,
+  search: keyword.SpecifiedSearch,
+) -> Action {
+  Action(
+    event: Internal(do_get_item_from_container_self(_, container, search)),
+    id: world.generate_id(),
+    condition: no_conditions,
+    priority: Medium,
+    delay: min_delay,
+  )
 }
 
 ///
-/// Business logic for actions
+/// Business logic for INTERNAL actions
+/// i.e. actions that require no data from the room
 /// 
 fn do_remove_item(conn: Conn, search_term: String) -> Conn {
   let self = conn.character_get(conn)
@@ -129,7 +161,7 @@ fn do_remove_item(conn: Conn, search_term: String) -> Conn {
       my_dict.find_nth(equipment, 1, fn(_wear_slot, wearing) {
         case wearing {
           world.EmptySlot -> False
-          world.Wearing(item) -> item_matches(item, keyword_id)
+          world.Wearing(item) -> world.item_matches(item, keyword_id)
         }
       })
 
@@ -148,12 +180,12 @@ fn do_remove_item(conn: Conn, search_term: String) -> Conn {
         inventory: [item_instance, ..self.inventory],
       )
       |> conn.character_put(conn, _)
-      |> conn.renderln(render.item_remove(items, item_instance))
+      |> renderln_if_user(render.item_remove(items, item_instance))
       |> conn.prompt
     }
 
     Error(error) -> {
-      conn |> conn.renderln(render.error_item(error)) |> conn.prompt
+      conn |> renderln_if_user(render.error_item(error)) |> conn.prompt
     }
   }
 }
@@ -202,22 +234,66 @@ fn do_wear_item(conn: Conn, search_term: String) -> Conn {
 
       conn
       |> conn.character_put(updated_character)
-      |> conn.renderln(render.item_wear(item))
+      |> renderln_if_user(render.item_wear(item))
       |> conn.prompt
     }
 
     Error(error) ->
-      conn |> conn.renderln(render.error_item(error)) |> conn.prompt
+      conn |> renderln_if_user(render.error_item(error)) |> conn.prompt
+  }
+}
+
+fn do_get_all_from_container_self(
+  conn: Conn,
+  container_keyword: keyword.OrdinalSearch,
+) -> Conn {
+  let self = conn.character_get(conn)
+  case world.item_get_all_from_container(self.inventory, container_keyword) {
+    Ok(#(found, container, inventory)) -> {
+      let inventory = list.fold(found, inventory, list.prepend)
+      let items_actor = conn.named_actors(conn).items
+
+      conn
+      |> conn.character_put(world.MobileInternal(..self, inventory:))
+      |> renderln_if_user(render.items_get_from_container_self(
+        items_actor,
+        found,
+        container,
+      ))
+    }
+
+    Error(error) -> renderln_if_user(conn, render.error_item(error))
+  }
+}
+
+fn do_get_item_from_container_self(
+  conn: Conn,
+  container_keyword: keyword.OrdinalSearch,
+  keyword: keyword.SpecifiedSearch,
+) -> Conn {
+  let self = conn.character_get(conn)
+  case
+    world.item_get_from_container(self.inventory, container_keyword, keyword)
+  {
+    Ok(#(found, container, inventory)) -> {
+      let inventory = list.fold(found, inventory, list.prepend)
+      let items_actor = conn.named_actors(conn).items
+
+      conn
+      |> conn.character_put(world.MobileInternal(..self, inventory:))
+      |> renderln_if_user(render.items_get_from_container_self(
+        items_actor,
+        found,
+        container,
+      ))
+    }
+    Error(error) -> renderln_if_user(conn, render.error_item(error))
   }
 }
 
 ///
 /// Helper Functions
 /// 
-fn item_matches(item_instance: world.ItemInstance, search_term: Int) -> Bool {
-  list.contains(item_instance.keywords, search_term)
-}
-
 fn find_item(
   conn: Conn,
   inventory: List(world.ItemInstance),
@@ -225,5 +301,18 @@ fn find_item(
 ) -> Result(world.ItemInstance, Nil) {
   let keyword_actor = conn.named_actors(conn).keyword
   use keyword_id <- result.try(keyword.to_id(keyword_actor, keyword))
-  list.find(inventory, item_matches(_, keyword_id))
+  list.find(inventory, world.item_matches(_, keyword_id))
+}
+
+fn no_conditions(
+  character: world.MobileInternal,
+) -> Result(world.MobileInternal, String) {
+  Ok(character)
+}
+
+fn renderln_if_user(conn: Conn, view: view.View) -> Conn {
+  case conn.is_player(conn) {
+    True -> conn.renderln(conn, view)
+    False -> conn
+  }
 }

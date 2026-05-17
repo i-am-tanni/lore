@@ -379,7 +379,7 @@ pub fn item_get_from_container(
   list: List(ItemInstance),
   container_keyword: keyword.OrdinalSearch,
   keyword: keyword.SpecifiedSearch,
-) -> Result(#(List(ItemInstance), List(ItemInstance)), ErrorItem) {
+) -> Result(#(List(ItemInstance), ItemInstance, List(ItemInstance)), ErrorItem) {
   use container <- result.try(
     keyword.find(list, container_keyword, item_matches)
     |> result.map_error(fn(_) {
@@ -394,7 +394,7 @@ pub fn item_get_from_container(
       let updated_item = ItemInstance(..container, contains: Contains(rest))
       let updated_list =
         my_list.update(list, update_item(_, updated_item.id, updated_item))
-      Ok(#(found, updated_list))
+      Ok(#(found, updated_item, updated_list))
     }
   }
 }
@@ -406,7 +406,7 @@ pub fn item_get_from_container(
 pub fn item_get_all_from_container(
   list: List(ItemInstance),
   container_keyword: keyword.OrdinalSearch,
-) -> Result(#(List(ItemInstance), List(ItemInstance)), ErrorItem) {
+) -> Result(#(List(ItemInstance), ItemInstance, List(ItemInstance)), ErrorItem) {
   use container <- result.try(
     keyword.find(list, container_keyword, item_matches)
     |> result.map_error(fn(_) {
@@ -418,7 +418,7 @@ pub fn item_get_all_from_container(
   let updated_item = ItemInstance(..container, contains: Contains([]))
   let updated_list =
     my_list.update(list, update_item(_, updated_item.id, updated_item))
-  Ok(#(contents, updated_list))
+  Ok(#(contents, updated_item, updated_list))
 }
 
 pub fn update_item(
