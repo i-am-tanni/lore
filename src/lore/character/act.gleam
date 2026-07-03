@@ -142,6 +142,29 @@ pub fn get_item_from_container_self(
   )
 }
 
+pub fn put_item_into_container_self(
+  container: keyword.OrdinalSearch,
+  search: keyword.SpecifiedSearch,
+) -> Action {
+  Action(
+    event: Internal(do_put_item_into_container_self(_, container, search)),
+    id: world.generate_id(),
+    condition: no_conditions,
+    priority: Medium,
+    delay: min_delay,
+  )
+}
+
+pub fn put_all_into_container_self(container: keyword.OrdinalSearch) -> Action {
+  Action(
+    event: Internal(do_put_all_into_container_self(_, container)),
+    id: world.generate_id(),
+    condition: no_conditions,
+    priority: Medium,
+    delay: min_delay,
+  )
+}
+
 ///
 /// Business logic for INTERNAL actions
 /// i.e. actions that require no data from the room
@@ -180,12 +203,12 @@ fn do_remove_item(conn: Conn, search_term: String) -> Conn {
         inventory: [item_instance, ..self.inventory],
       )
       |> conn.character_put(conn, _)
-      |> renderln_if_user(render.item_remove(items, item_instance))
+      |> renderln_if_user(fn() { render.item_remove(items, item_instance) })
       |> conn.prompt
     }
 
     Error(error) -> {
-      conn |> renderln_if_user(render.error_item(error)) |> conn.prompt
+      conn |> renderln_if_user(fn() { render.error_item(error) }) |> conn.prompt
     }
   }
 }
@@ -234,60 +257,163 @@ fn do_wear_item(conn: Conn, search_term: String) -> Conn {
 
       conn
       |> conn.character_put(updated_character)
-      |> renderln_if_user(render.item_wear(item))
+      |> renderln_if_user(fn() { render.item_wear(item) })
       |> conn.prompt
     }
 
     Error(error) ->
-      conn |> renderln_if_user(render.error_item(error)) |> conn.prompt
+      conn |> renderln_if_user(fn() { render.error_item(error) }) |> conn.prompt
   }
 }
 
 fn do_get_all_from_container_self(
   conn: Conn,
-  container_keyword: keyword.OrdinalSearch,
+  container: keyword.OrdinalSearch,
 ) -> Conn {
   let self = conn.character_get(conn)
-  case world.item_get_all_from_container(self.inventory, container_keyword) {
+  case world.item_get_all_from_container(self.inventory, container) {
     Ok(#(found, container, inventory)) -> {
       let inventory = list.fold(found, inventory, list.prepend)
       let items_actor = conn.named_actors(conn).items
 
       conn
       |> conn.character_put(world.MobileInternal(..self, inventory:))
-      |> renderln_if_user(render.items_get_from_container_self(
-        items_actor,
-        found,
-        container,
-      ))
+      |> renderln_if_user(fn() {
+        render.items_get_from_container_self(items_actor, found, container)
+      })
+      |> conn.prompt
     }
 
-    Error(error) -> renderln_if_user(conn, render.error_item(error))
+    // If getting all items from a container on your person fails, try the room
+    Error(_) -> conn.event(conn, event.ItemGetAllIn(container:))
   }
 }
 
 fn do_get_item_from_container_self(
   conn: Conn,
   container_keyword: keyword.OrdinalSearch,
-  keyword: keyword.SpecifiedSearch,
+  item_keyword: keyword.SpecifiedSearch,
 ) -> Conn {
   let self = conn.character_get(conn)
-  case
-    world.item_get_from_container(self.inventory, container_keyword, keyword)
-  {
+  let result =
+    world.item_get_from_container(
+      self.inventory,
+      container_keyword,
+      item_keyword,
+    )
+
+  case result {
     Ok(#(found, container, inventory)) -> {
       let inventory = list.fold(found, inventory, list.prepend)
       let items_actor = conn.named_actors(conn).items
 
       conn
       |> conn.character_put(world.MobileInternal(..self, inventory:))
-      |> renderln_if_user(render.items_get_from_container_self(
-        items_actor,
-        found,
-        container,
-      ))
+      |> renderln_if_user(fn() {
+        render.items_get_from_container_self(items_actor, found, container)
+      })
+      |> conn.prompt
     }
-    Error(error) -> renderln_if_user(conn, render.error_item(error))
+
+    // If getting an item from a container on your person fails, try the room
+    Error(_) ->
+      event.ContainerSearchData(container_keyword:, item_keyword:)
+      |> event.ItemGetIn
+      |> conn.event(conn, _)
+  }
+}
+
+fn do_put_all_into_container_self(
+  conn: Conn,
+  container_keyword: keyword.OrdinalSearch,
+) -> Conn {
+  let self = conn.character_get(conn)
+  let inventory = self.inventory
+
+  let result = {
+    // pop the container out of the list so that you cannot put it into itself
+    use #(container, rest) <- result.try(
+      keyword.pop_nth_match(inventory, container_keyword, world.item_matches)
+      |> result.map_error(fn(_) {
+        world.ErrUnknownContainer(container_keyword.keyword.term)
+      }),
+    )
+    world.item_put_in_container(container, rest, [])
+  }
+
+  case result {
+    Ok(world.ContainerInsert(container:, inserted:, rejected:, ..)) -> {
+      let items_table = conn.named_actors(conn).items
+      let inventory = rejected.rejects
+
+      conn
+      |> conn.character_put(world.MobileInternal(..self, inventory:))
+      |> renderln_if_user(fn() {
+        render.items_get_from_container_self(items_table, inserted, container)
+      })
+      |> conn.prompt
+    }
+
+    // If container is unknown, try the room
+    Error(world.ErrUnknownContainer(_)) ->
+      conn
+      |> conn.character_put(world.MobileInternal(..self, inventory: []))
+      |> conn.event(event.ItemPutIn(inventory, container_keyword))
+
+    Error(err) ->
+      conn
+      |> renderln_if_user(fn() { render.error_item(err) })
+      |> conn.prompt
+  }
+}
+
+fn do_put_item_into_container_self(
+  conn: Conn,
+  container_keyword: keyword.OrdinalSearch,
+  item_keyword: keyword.SpecifiedSearch,
+) -> Conn {
+  let self = conn.character_get(conn)
+  let inventory = self.inventory
+
+  let result = {
+    // pop the container out of the list so that you cannot put it into itself
+    use #(container, rest) <- result.try(
+      keyword.pop_nth_match(inventory, container_keyword, world.item_matches)
+      |> result.map_error(fn(_) {
+        world.ErrUnknownContainer(container_keyword.keyword.term)
+      }),
+    )
+    use #(found, rest) <- result.try(world.items_partition(
+      rest,
+      item_keyword,
+      "put in",
+    ))
+    world.item_put_in_container(container, found, rest)
+  }
+
+  case result {
+    Ok(world.ContainerInsert(container:, inserted:, rejected:, context:)) -> {
+      let items_table = conn.named_actors(conn).items
+      let inventory = list.append(rejected.rejects, [container, ..context])
+
+      conn
+      |> conn.character_put(world.MobileInternal(..self, inventory:))
+      |> renderln_if_user(fn() {
+        render.items_get_from_container_self(items_table, inserted, container)
+      })
+      |> conn.prompt
+    }
+
+    // If container is unknown, try the room
+    Error(world.ErrUnknownContainer(_)) ->
+      conn
+      |> conn.character_put(world.MobileInternal(..self, inventory: []))
+      |> conn.event(event.ItemPutIn(inventory, container_keyword))
+
+    Error(err) ->
+      conn
+      |> renderln_if_user(fn() { render.error_item(err) })
+      |> conn.prompt
   }
 }
 
@@ -310,9 +436,10 @@ fn no_conditions(
   Ok(character)
 }
 
-fn renderln_if_user(conn: Conn, view: view.View) -> Conn {
+// Lazily render only if the character is a user or puppeted by one
+fn renderln_if_user(conn: Conn, view: fn() -> view.View) -> Conn {
   case conn.is_player(conn) {
-    True -> conn.renderln(conn, view)
+    True -> conn.renderln(conn, view())
     False -> conn
   }
 }

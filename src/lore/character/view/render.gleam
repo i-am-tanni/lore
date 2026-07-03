@@ -8,7 +8,7 @@ import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result.{try}
-import gleam/string_tree
+import gleam/string_tree.{type StringTree}
 import lore/character/flag
 import lore/character/users
 import lore/character/view.{type View}
@@ -342,20 +342,16 @@ pub fn items_get_from_container_3p(
 
       // if there are multiple items retrieved from the container
       items -> {
-        let prelude =
+        let preamble =
           [
             acting_character.name,
             " gets the following items from ",
             container.name,
             ":",
           ]
-          |> view.Leaves
+          |> string_tree.from_strings
 
-        let items =
-          list.map(items, fn(item) { item.name |> view.Leaf })
-          |> view.join("\n")
-
-        [prelude, items] |> view.join("\n")
+        items_list(preamble, items)
       }
     }
     |> Ok
@@ -385,15 +381,85 @@ pub fn items_get_from_container_self(
 
       // if there are multiple items retrieved from the container
       items -> {
-        let prelude =
-          ["You get ", "the following items from ", container.name, ":"]
-          |> view.Leaves
+        let preamble =
+          ["You get the following items from ", container.name, ":"]
+          |> string_tree.from_strings
 
-        let items =
-          list.map(items, fn(item) { item.name |> view.Leaf })
-          |> view.join("\n")
+        items_list(preamble, items)
+      }
+    }
+    |> Ok
+  }
 
-        [prelude, items] |> view.join("\n")
+  case result {
+    Ok(view) -> view
+    Error(_) -> view.Blank
+  }
+}
+
+pub fn items_put_into_container_self(
+  items_table: process.Name(items.Message),
+  items: List(world.ItemInstance),
+  container: world.ItemInstance,
+) -> View {
+  let result = {
+    use container <- result.try(items.load_from_instance(items_table, container))
+    use items <- result.try(
+      list.try_map(items, items.load_from_instance(items_table, _)),
+    )
+    case items {
+      // if there was only one item retrieved from the container
+      [item] ->
+        ["You put ", item.name, " into ", container.name]
+        |> view.Leaves
+
+      // if there are multiple items retrieved from the container
+      items -> {
+        let preamble =
+          ["You put the following items into ", container.name, ":"]
+          |> string_tree.from_strings
+
+        items_list(preamble, items)
+      }
+    }
+    |> Ok
+  }
+
+  case result {
+    Ok(view) -> view
+    Error(_) -> view.Blank
+  }
+}
+
+pub fn items_put_into_container_3p(
+  items_table: process.Name(items.Message),
+  acting_character: world.Mobile,
+  items: List(world.ItemInstance),
+  container: world.ItemInstance,
+) -> View {
+  let result = {
+    use container <- result.try(items.load_from_instance(items_table, container))
+    use items <- result.try(
+      list.try_map(items, items.load_from_instance(items_table, _)),
+    )
+    case items {
+      // if there was only one item retrieved from the container
+      [item] ->
+        [acting_character.name, " puts ", item.name, " into ", container.name]
+        |> view.Leaves
+
+      // if there are multiple items retrieved from the container
+      items -> {
+        let preamble =
+          [
+            acting_character.name,
+            " puts the following items into ",
+            container.name,
+            ":",
+          ]
+          |> string_tree.from_strings
+
+        items_list(preamble, items)
       }
     }
     |> Ok
@@ -453,6 +519,15 @@ pub fn wear_slot_to_string(wear_slot: world.WearSlot) -> String {
     world.Arms -> "arms"
     world.CannotWear -> "[Invalid Wear Slot]"
   }
+}
+
+fn items_list(preamble: StringTree, items: List(world.Item)) -> View {
+  list.fold(items, preamble, fn(acc, item) {
+    ["    ", item.name, "\n"]
+    |> string_tree.from_strings
+    |> string_tree.append_tree(acc, _)
+  })
+  |> view.Tree
 }
 
 //
@@ -568,6 +643,7 @@ pub fn error_item(err: world.ErrorItem) -> View {
     world.ErrNotContainer -> ["That is not a container!"]
     world.ErrEmpty -> ["There's nothing inside."]
     world.ErrNotFoundInContainer -> ["That's not inside."]
+    world.ErrUnknownContainer(term) -> [term, " isn't here to put that in."]
   }
   |> view.Leaves
 }
@@ -1025,11 +1101,8 @@ pub fn round_summary(
   let participants = dict.delete(participants, self.id) |> dict.values
 
   let prelude =
-    [
-      "You ",
-      health_feedback_1p(self),
-    ]
-    |> view.Leaves
+    health_feedback_1p(self)
+    |> view.Leaf
 
   let rest =
     list.filter_map(participants, fn(participant) {
@@ -1166,14 +1239,14 @@ fn damage_feedback(damage: Int, victim_hp_max: Int) -> String {
 fn health_feedback_1p(mobile: world.MobileInternal) -> String {
   let hp_percent = 100 * mobile.hp / mobile.hp_max
   case hp_percent {
-    _ if hp_percent >= 100 -> "are in excellent condition."
-    _ if hp_percent >= 90 -> "have a few scratches."
-    _ if hp_percent >= 75 -> "have some small wounds and bruises."
-    _ if hp_percent >= 50 -> "have quite a few wounds."
-    _ if hp_percent >= 30 -> "have some big nasty wounds and scratches."
-    _ if hp_percent >= 15 -> "look pretty hurt."
-    _ if hp_percent >= 0 -> "are in awful condition."
-    _ -> "are bleeding to death."
+    _ if hp_percent >= 100 -> "You are in excellent condition."
+    _ if hp_percent >= 90 -> "You have a few scratches."
+    _ if hp_percent >= 75 -> "You have some small wounds and bruises."
+    _ if hp_percent >= 50 -> "You have quite a few wounds."
+    _ if hp_percent >= 30 -> "You have some big nasty wounds and scratches."
+    _ if hp_percent >= 15 -> "You look pretty hurt."
+    _ if hp_percent >= 0 -> "You are in awful condition."
+    _ -> "You are bleeding to death."
   }
 }
 

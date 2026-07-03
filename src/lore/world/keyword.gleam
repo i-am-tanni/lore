@@ -142,6 +142,13 @@ pub fn to_id(
   |> actor.call(1000, Lookup(caller: _, keyword:))
 }
 
+pub fn to_term(search_info: SpecifiedSearch) -> String {
+  case search_info {
+    Ordinal(OrdinalSearch(keyword:, ..)) -> keyword.term
+    Quantity(QuantitySearch(keyword:, ..)) -> keyword.term
+  }
+}
+
 /// an async call to add a new user's name and keyword_id to the store
 /// 
 pub fn insert_new_user(
@@ -198,9 +205,9 @@ pub fn partition(
 
 pub fn specified_search_parse(
   actor_name: process.Name(Message),
-  s: String,
-  quantity_splitter: splitter.Splitter,
-  ordinal_splitter: splitter.Splitter,
+  keyword s: String,
+  quantity quantity_splitter: splitter.Splitter,
+  ordinal ordinal_splitter: splitter.Splitter,
 ) -> Result(SpecifiedSearch, Nil) {
   use <- result.lazy_or(
     quantity_parse(actor_name, s, quantity_splitter)

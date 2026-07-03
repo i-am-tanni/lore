@@ -179,6 +179,9 @@ fn dispatch_from_character(
     event.ItemDrop(data) -> item_drop(model, event, data)
     event.ItemGetAllIn(data) -> item_get_all_in(model, event, data)
     event.ItemGetIn(data) -> item_get_item_in(model, event, data)
+    event.ItemFindAndPutIn(data) -> item_find_and_put_in(model, event, data)
+    event.ItemPutIn(items, container) ->
+      item_put_in(model, event, items, container)
     event.CombatRequest(data) -> combat_request(model, event, data)
     event.Slay(data) -> combat_slay(model, event, data)
     event.UpdateCharacter ->
@@ -651,11 +654,7 @@ fn item_get(
   case keyword.partition(model.room.items, search_info, item_keyword_matches) {
     // failure! no results found - nothing taken
     #([], _) -> {
-      let term = case search_info {
-        keyword.Ordinal(keyword.OrdinalSearch(keyword:, ..)) -> keyword.term
-        keyword.Quantity(keyword.QuantitySearch(keyword:, ..)) -> keyword.term
-      }
-
+      let term = keyword.to_term(search_info)
       let effect =
         event.ActFailed(world.ItemLookupFailed(term))
         |> effect.send_character(event.from, _)
@@ -715,8 +714,10 @@ fn item_get_all_in(
   let room = model.room
   case world.item_get_all_from_container(room.items, container_search) {
     Ok(#(found, container, items)) -> {
-      let room = world.Room(..room, items:)
-      let update = Model(..model, room:)
+      let update = {
+        let room = world.Room(..room, items:)
+        Model(..model, room:)
+      }
       let effect = effect.broadcast(event.ItemGetInNotify(found, container))
       #(update, effect)
     }
@@ -739,9 +740,89 @@ fn item_get_item_in(
     world.item_get_from_container(room.items, container_search, item_keyword)
   {
     Ok(#(found, container, items)) -> {
-      let room = world.Room(..room, items:)
-      let update = Model(..model, room:)
+      let update = {
+        let room = world.Room(..room, items:)
+        Model(..model, room:)
+      }
       let effect = effect.broadcast(event.ItemGetInNotify(found, container))
+      #(update, effect)
+    }
+
+    Error(error) -> {
+      let effect = effect.renderln(event.from, render.error_item(error))
+      #(model, effect)
+    }
+  }
+}
+
+fn item_find_and_put_in(
+  model: Model,
+  event: Event(CharacterToRoomEvent, CharacterMessage),
+  data: event.ContainerSearchData,
+) -> #(Model, RoomEffect(CharacterMessage)) {
+  let room = model.room
+  let event.ContainerSearchData(container_keyword, item_keyword) = data
+  let result = {
+    use #(container, rest) <- result.try(
+      keyword.pop_nth_match(room.items, container_keyword, world.item_matches)
+      |> result.map_error(fn(_) {
+        world.ErrUnknownContainer(container_keyword.keyword.term)
+      }),
+    )
+
+    use #(found, rest) <- result.try(world.items_partition(
+      rest,
+      item_keyword,
+      "put in",
+    ))
+    world.item_put_in_container(container, found, rest)
+  }
+
+  case result {
+    Ok(world.ContainerInsert(container:, inserted:, context:, rejected:)) -> {
+      let update = {
+        let items = list.append(rejected.rejects, [container, ..context])
+        let room = world.Room(..room, items:)
+        Model(..model, room:)
+      }
+      let insertion =
+        world.ContainerInsert(container:, inserted:, rejected:, context: [])
+      let effect = effect.broadcast(event.ItemFindAndPutInNotify(insertion))
+      #(update, effect)
+    }
+
+    Error(error) -> {
+      let effect = effect.renderln(event.from, render.error_item(error))
+      #(model, effect)
+    }
+  }
+}
+
+fn item_put_in(
+  model: Model,
+  event: Event(CharacterToRoomEvent, CharacterMessage),
+  to_insert: List(world.ItemInstance),
+  container_keyword: keyword.OrdinalSearch,
+) -> #(Model, RoomEffect(CharacterMessage)) {
+  let room = model.room
+  let items = room.items
+  let result = {
+    use #(container, rest) <- result.try(
+      keyword.pop_nth_match(items, container_keyword, world.item_matches)
+      |> result.map_error(fn(_) {
+        world.ErrUnknownContainer(container_keyword.keyword.term)
+      }),
+    )
+    world.item_put_in_container(container, to_insert, rest)
+  }
+
+  case result {
+    Ok(world.ContainerInsert(container:, inserted:, context:, ..)) -> {
+      let update = {
+        let room = world.Room(..room, items: [container, ..context])
+        Model(..model, room:)
+      }
+      let effect = effect.broadcast(event.ItemPutInNotify(inserted, container))
       #(update, effect)
     }
 

@@ -120,6 +120,8 @@ pub type CharacterEvent {
   ItemDropNotify(item: world.ItemInstance)
   ItemInspect(item: world.ItemInstance)
   ItemGetInNotify(found: List(world.ItemInstance), from: world.ItemInstance)
+  ItemPutInNotify(list: List(world.ItemInstance), container: world.ItemInstance)
+  ItemFindAndPutInNotify(world.ContainerInsert)
   MobileInspectRequest(by: Subject(CharacterMessage))
   MobileInspectResponse(character: world.MobileInternal)
   CombatCommit(CombatCommitData)
@@ -144,6 +146,8 @@ pub type CharacterToRoomEvent {
   ItemDrop(item_instance: world.ItemInstance)
   ItemGetAllIn(container: keyword.OrdinalSearch)
   ItemGetIn(ContainerSearchData)
+  ItemFindAndPutIn(ContainerSearchData)
+  ItemPutIn(items: List(world.ItemInstance), container: keyword.OrdinalSearch)
   RejoinRoom
   DoorToggle(DoorToggleData)
   DoorUpdateEnd(DoorUpdateData)

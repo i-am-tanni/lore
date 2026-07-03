@@ -200,6 +200,24 @@ pub type ItemInstance {
   )
 }
 
+/// Intermediary type returned when items are successfully inserted into a
+/// container
+pub type ContainerInsert {
+  /// - Overflow are any items that were unable to be inserted assuming
+  /// that insertion was successful for any items.
+  /// - Context is the updated list of items the container is a member of
+  ContainerInsert(
+    container: ItemInstance,
+    inserted: List(ItemInstance),
+    rejected: ContainerRejected,
+    context: List(ItemInstance),
+  )
+}
+
+pub type ContainerRejected {
+  ContainerRejected(rejects: List(ItemInstance), errors: List(String))
+}
+
 pub type SpawnGroup {
   /// - is_despawn_on_reset: determines if the spawn group will despawn all
   /// active instances on reset or whether it will only spawn inactives
@@ -254,6 +272,7 @@ pub type ErrorItem {
   ErrNotContainer
   ErrEmpty
   ErrNotFoundInContainer
+  ErrUnknownContainer(search_term: String)
 }
 
 pub type ErrorRoomRequest {
@@ -393,7 +412,7 @@ pub fn item_get_from_container(
     #(found, rest) -> {
       let updated_item = ItemInstance(..container, contains: Contains(rest))
       let updated_list =
-        my_list.update(list, update_item(_, updated_item.id, updated_item))
+        my_list.update(list, item_update(_, updated_item.id, updated_item))
       Ok(#(found, updated_item, updated_list))
     }
   }
@@ -415,13 +434,46 @@ pub fn item_get_all_from_container(
     }),
   )
   use contents <- result.try(container_unpack(container))
-  let updated_item = ItemInstance(..container, contains: Contains([]))
+  let updated_container = ItemInstance(..container, contains: Contains([]))
   let updated_list =
-    my_list.update(list, update_item(_, updated_item.id, updated_item))
-  Ok(#(contents, updated_item, updated_list))
+    my_list.update(list, item_update(_, updated_container.id, updated_container))
+  Ok(#(contents, updated_container, updated_list))
 }
 
-pub fn update_item(
+pub fn item_put_in_container(
+  container container: ItemInstance,
+  to_insert items: List(ItemInstance),
+  context context: List(ItemInstance),
+) -> Result(ContainerInsert, ErrorItem) {
+  // Returns the updated container and any overflow items that could not be 
+  // inserted
+  use insertion <- result.try(container_insert(container, items))
+  let #(container, inserted, rejected) = insertion
+  ContainerInsert(container:, inserted:, rejected:, context:)
+  |> Ok
+}
+
+/// Attempts to put items into a container and returns the updated container
+/// along with any items that were UNABLE to be inserted
+pub fn container_insert(
+  container: ItemInstance,
+  items_to_insert: List(ItemInstance),
+) -> Result(#(ItemInstance, List(ItemInstance), ContainerRejected), ErrorItem) {
+  use contents <- result.try(container_unpack(container))
+  let updated_container =
+    ItemInstance(
+      ..container,
+      contains: Contains(list.append(items_to_insert, contents)),
+    )
+  #(
+    updated_container,
+    items_to_insert,
+    ContainerRejected(rejects: [], errors: []),
+  )
+  |> Ok
+}
+
+pub fn item_update(
   item: ItemInstance,
   id: StringId(ItemInstance),
   update: ItemInstance,
@@ -429,6 +481,17 @@ pub fn update_item(
   case item.id == id {
     True -> Ok(update)
     False -> Error(Nil)
+  }
+}
+
+pub fn items_partition(
+  list: List(ItemInstance),
+  search: keyword.SpecifiedSearch,
+  verb: String,
+) -> Result(#(List(ItemInstance), List(ItemInstance)), ErrorItem) {
+  case keyword.partition(list, search, item_matches) {
+    #([], _) -> Error(UnknownItem(keyword.to_term(search), verb))
+    success -> Ok(success)
   }
 }
 

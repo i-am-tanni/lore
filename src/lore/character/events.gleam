@@ -40,7 +40,10 @@ pub fn dispatch_player(
     event.ItemDropNotify(item) -> item_drop(conn, event, item)
     event.ItemGetInNotify(found, container) ->
       item_get_in(conn, event, found, from: container)
-
+    event.ItemPutInNotify(items, container) ->
+      item_put_in(conn, event, items, into: container)
+    event.ItemFindAndPutInNotify(data) ->
+      item_put_in(conn, event, data.inserted, into: data.container)
     event.ItemInspect(item) -> item_look_at(conn, item)
     // combat
     //
@@ -229,6 +232,30 @@ fn item_get_in(
       render.items_get_from_container_self(items_table, items, container)
     view.Witness ->
       render.items_get_from_container_3p(
+        items_table,
+        acting_character,
+        items,
+        container,
+      )
+  }
+  |> conn.renderln(conn, _)
+}
+
+fn item_put_in(
+  conn: Conn,
+  event: Event(CharacterEvent, RoomMessage),
+  items: List(world.ItemInstance),
+  into container: world.ItemInstance,
+) -> Conn {
+  let self = conn.character_get(conn)
+  let items_table = conn.named_actors(conn).items
+  let acting_character = event.acting_character
+
+  case view.perspective_simple(self, acting_character) {
+    view.Self ->
+      render.items_put_into_container_self(items_table, items, container)
+    view.Witness ->
+      render.items_put_into_container_3p(
         items_table,
         acting_character,
         items,

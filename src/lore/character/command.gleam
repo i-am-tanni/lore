@@ -119,6 +119,12 @@ pub fn parse(conn: Conn, input: String) -> Conn {
         Ok(Command(Get, tokenize_item_args(rest, word))),
       )
     "dr" | "drop" -> command(conn, drop_command, keyword_arg(Drop, rest, word))
+    "p" | "put" ->
+      command(
+        conn,
+        put_command,
+        Ok(Command(Get, tokenize_item_args(rest, word))),
+      )
     "who" -> who_command(conn)
     "quit" -> quit_command(conn)
     "i" | "inventory" -> command_nil(conn, Inventory, inventory_command)
@@ -638,6 +644,29 @@ fn get_command(conn: Conn, command: Command(List(Token))) -> Conn {
     }
 
     // default case: invalid pattern
+    _ -> Error(Nil)
+  }
+
+  case result {
+    Ok(act) -> conn.action(conn, act)
+    Error(Nil) ->
+      // TODO: add an error union for various failure cases
+      render.error_room_request(world.ItemLookupFailed(keyword: ""))
+      |> conn.renderln(conn, _)
+  }
+}
+
+fn put_command(conn: Conn, command: Command(List(Token))) -> Conn {
+  let result = case command.data {
+    [All, Keyword(container)] ->
+      ordinal_parse(conn, container)
+      |> result.map(act.put_all_into_container_self)
+
+    [Keyword(keyword), Keyword(container)] -> {
+      use search <- result.try(specified_search_parse(conn, keyword))
+      use container <- result.try(ordinal_parse(conn, container))
+      Ok(act.put_item_into_container_self(container, search))
+    }
     _ -> Error(Nil)
   }
 
