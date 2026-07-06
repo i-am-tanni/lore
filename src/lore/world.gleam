@@ -199,8 +199,8 @@ pub type ItemInstance {
 /// Intermediary type returned when items are successfully inserted into a
 /// container
 pub type ContainerInsert {
-  /// - Overflow are any items that were unable to be inserted assuming
-  /// that insertion was successful for any items.
+  /// - Rejected are any items that were unable to be inserted assuming
+  /// that insertion was successful for any items. E.g. overflow.
   /// - Context is the updated list of items the container is a member of
   ContainerInsert(
     container: ItemInstance,
