@@ -24,7 +24,7 @@ pub fn main() {
   let start_result = {
     use server_ip <- result.try(env_var("SERVER_IP"))
     use port <- result.try(env_var("PORT"))
-    use database_name <- result.try(env_var("DB_NAME"))
+    use database_url <- result.try(env_var("DATABASE_URL"))
 
     logging.configure()
 
@@ -49,7 +49,7 @@ pub fn main() {
     |> static_supervisor.add(start_database_connection(
       named_actors.db,
       server_ip,
-      database_name,
+      database_url,
     ))
     |> static_supervisor.add(named_actors.supervised(named_actors))
     |> static_supervisor.add(mob_factory_supervised(named_actors))
@@ -100,16 +100,19 @@ fn telnet_supervised(
 pub fn start_database_connection(
   pool_name: process.Name(pog.Message),
   server_ip: String,
-  database_name: String,
+  database_url: String,
 ) {
   logging.log(logging.Info, "Starting Database Connection")
 
-  let pool_child =
-    pog.default_config(pool_name)
+  let assert Ok(pool_child) = {
+    use config <- result.try(pog.url_config(pool_name, database_url))
+    config
+    |> echo
     |> pog.host(server_ip)
-    |> pog.database(database_name)
     |> pog.pool_size(15)
     |> pog.supervised
+    |> Ok
+  }
 
   static_supervisor.new(static_supervisor.RestForOne)
   |> static_supervisor.add(pool_child)
