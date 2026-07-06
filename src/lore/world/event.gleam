@@ -146,11 +146,11 @@ pub type CharacterToRoomEvent {
   ItemDrop(item_instance: world.ItemInstance)
   ItemGetAllIn(container: keyword.OrdinalSearch)
   ItemGetIn(ContainerSearchData)
-  // The item(s) and container are both NOT found and we are looking in the room
+  /// The item(s) and container are both NOT found and we are looking in the room
   ItemFindAndPutIn(ContainerSearchData)
-  // The item(s) are already found but we need to find a container in the room
+  /// The item(s) are already found but we need to find a container in the room
   ItemPutIn(items: List(world.ItemInstance), container: keyword.OrdinalSearch)
-  // Quietly rejoin the room after a crash
+  /// Quietly rejoin the room after a crash
   RejoinRoom
   DoorToggle(DoorToggleData)
   DoorUpdateEnd(DoorUpdateData)
