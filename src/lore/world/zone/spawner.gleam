@@ -11,6 +11,7 @@ import gleam/result.{try}
 import gleam/set
 import lore/character/character_registry
 import lore/character/users
+import lore/server/bit_set.{BitSet}
 import lore/world.{
   type Id, type Mobile, type Npc, type Room, type SpawnGroup, type StringId, Id,
   MobSpawn, SpawnGroup,
@@ -32,7 +33,10 @@ pub type SpawnError(a) {
 
 /// Resets the spawns in the group
 ///
-pub fn reset_group(group: SpawnGroup, lookup: named_actors.Lookup) -> SpawnGroup {
+pub fn reset_group(
+  group: SpawnGroup,
+  lookup: named_actors.Lookup,
+) -> SpawnGroup {
   use <- bool.guard(!group.is_enabled, group)
   case group.is_despawn_on_reset {
     True ->
@@ -202,7 +206,7 @@ fn to_mobile(
     inventory: [],
     equipment: dict.new(),
     fighting: world.NoTarget,
-    affects: world.affects_init(),
+    affects: BitSet(0),
     hp: hp_max,
     hp_max:,
   )

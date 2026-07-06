@@ -9,6 +9,7 @@ import lore/character/controller.{
 import lore/character/users
 import lore/character/view
 import lore/character/view/render
+import lore/server/bit_set.{BitSet}
 import lore/world.{Id}
 import lore/world/keyword
 import lore/world/named_actors
@@ -253,7 +254,7 @@ fn login(conn: Conn, flash: LoginFlash) -> Conn {
         inventory: [],
         equipment:,
         fighting: world.NoTarget,
-        affects: world.affects_init(),
+        affects: BitSet(0),
         hp: 20,
         hp_max: 20,
       )

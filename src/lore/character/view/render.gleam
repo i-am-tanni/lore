@@ -9,9 +9,10 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result.{try}
 import gleam/string_tree.{type StringTree}
-import lore/character/flag
+
 import lore/character/users
 import lore/character/view.{type View}
+import lore/server/bit_set
 import lore/world.{type Direction, type Mobile, type Room, type StringId}
 import lore/world/event
 import lore/world/items
@@ -139,7 +140,11 @@ pub fn room_view(room: Room, observer: world.Mobile) -> View {
     // filter out observer
     |> list.filter(fn(character) {
       observer_id != character.id
-      && !flag.affect_has(character.affects, flag.SuperInvisible)
+      && !bit_set.in(
+        character.affects,
+        world.SuperInvisible,
+        world.mob_affect_to_int,
+      )
     })
     |> list.map(fn(character) {
       [character.short, "\n"]

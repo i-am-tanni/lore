@@ -11,11 +11,11 @@ import lore/character/act
 import lore/character/character_registry
 import lore/character/conn.{type Conn}
 import lore/character/events
-import lore/character/flag
 import lore/character/socials
 import lore/character/users
 import lore/character/view
 import lore/character/view/render
+import lore/server/bit_set
 import lore/world.{type Id, type Item, type Room, Id, StringId}
 import lore/world/event
 import lore/world/items
@@ -949,15 +949,14 @@ fn mobile_spawn_command(conn: Conn, command: Command(Id(world.Npc))) -> Conn {
 
 fn invis_command(conn: Conn, _: Command(_)) -> Conn {
   let self = conn.character_get(conn)
-  let affects = self.affects
-  let flags = flag.affect_toggle(affects.flags, flag.SuperInvisible)
-  let msg = case flag.affect_has(flags, flag.SuperInvisible) {
+  let flags = affect_toggle(self.affects, world.SuperInvisible)
+  let msg = case affect_in(flags, world.SuperInvisible) {
     True -> "You cloak yourself in night. You are now invisible!"
     False ->
       "You remove your nighted cloak and walk in the light. You are visible!"
   }
 
-  world.MobileInternal(..self, affects: world.Affects(flags:))
+  world.MobileInternal(..self, affects: flags)
   |> conn.character_put(conn, _)
   |> conn.renderln(view.Leaf(msg))
   |> conn.prompt
@@ -966,16 +965,15 @@ fn invis_command(conn: Conn, _: Command(_)) -> Conn {
 
 fn god_mode_command(conn: Conn, _: Command(_)) -> Conn {
   let self = conn.character_get(conn)
-  let affects = self.affects
-  let flags = flag.affect_toggle(affects.flags, flag.GodMode)
-  let msg = case flag.affect_has(flags, flag.GodMode) {
+  let affects = affect_toggle(self.affects, world.GodMode)
+  let msg = case affect_in(affects, world.GodMode) {
     True ->
       "Your flesh no longer knows the sting of steel. You have activated god mode!"
     False ->
       "You make yourself vulnerable to the string of steel. You have deactivated god mode!"
   }
 
-  world.MobileInternal(..self, affects: world.Affects(flags:))
+  world.MobileInternal(..self, affects: affects)
   |> conn.character_put(conn, _)
   |> conn.renderln(view.Leaf(msg))
   |> conn.prompt
@@ -984,15 +982,14 @@ fn god_mode_command(conn: Conn, _: Command(_)) -> Conn {
 
 fn auto_revive_command(conn: Conn, _: Command(_)) -> Conn {
   let self = conn.character_get(conn)
-  let affects = self.affects
-  let flags = flag.affect_toggle(affects.flags, flag.AutoRevive)
-  let msg = case flag.affect_has(flags, flag.AutoRevive) {
+  let affects = affect_toggle(self.affects, world.AutoRevive)
+  let msg = case affect_in(affects, world.AutoRevive) {
     True -> "Your flesh no longer knows death. You have activated auto-revive!"
     False ->
       "You make yourself vulnerable to death's embrace. You have deactivated auto-revive!"
   }
 
-  world.MobileInternal(..self, affects: world.Affects(flags:))
+  world.MobileInternal(..self, affects: affects)
   |> conn.character_put(conn, _)
   |> conn.renderln(view.Leaf(msg))
   |> conn.prompt
@@ -1083,4 +1080,18 @@ fn to_victim(conn: Conn, raw_input: String) -> Result(Victim, Nil) {
     True -> Ok(Self)
     False -> Ok(Victim(search))
   }
+}
+
+fn affect_in(
+  affects: bit_set.BitSet(world.MobAffect),
+  flag: world.MobAffect,
+) -> Bool {
+  bit_set.in(affects, flag, world.mob_affect_to_int)
+}
+
+fn affect_toggle(
+  affects: bit_set.BitSet(world.MobAffect),
+  flag: world.MobAffect,
+) -> bit_set.BitSet(world.MobAffect) {
+  bit_set.toggle(affects, flag, world.mob_affect_to_int)
 }

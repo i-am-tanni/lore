@@ -4,7 +4,7 @@ import gleam/int
 import gleam/list
 import gleam/option.{type Option}
 import gleam/result
-import lore/character/flag
+import lore/server/bit_set.{type BitSet, BitSet}
 import lore/server/my_list
 import lore/world/keyword
 
@@ -108,7 +108,7 @@ pub type Mobile {
     pronouns: PronounKind,
     short: String,
     fighting: Fighting,
-    affects: flag.Affects,
+    affects: BitSet(MobAffect),
     hp: Int,
     hp_max: Int,
   )
@@ -117,10 +117,6 @@ pub type Mobile {
 pub type Role {
   Admin
   User
-}
-
-pub type Affects {
-  Affects(flags: flag.Affects)
 }
 
 /// Private internal mobile data.
@@ -141,7 +137,7 @@ pub type MobileInternal {
     pronouns: PronounKind,
     short: String,
     fighting: Fighting,
-    affects: Affects,
+    affects: BitSet(MobAffect),
     hp: Int,
     hp_max: Int,
   )
@@ -330,10 +326,9 @@ pub fn trim_character(character: MobileInternal) -> Mobile {
     hp:,
     hp_max:,
     fighting:,
+    affects:,
     ..,
   ) = character
-
-  let Affects(flags: affects) = character.affects
 
   Mobile(
     id:,
@@ -360,7 +355,7 @@ pub fn mobile_identity() -> Mobile {
     pronouns: PronounNeutral,
     short: "",
     fighting: NoTarget,
-    affects: flag.Affects(0),
+    affects: BitSet(0),
     hp: 0,
     hp_max: 0,
   )
@@ -499,10 +494,6 @@ pub fn item_matches(item_instance: ItemInstance, search_term: Int) -> Bool {
   list.contains(item_instance.keywords, search_term)
 }
 
-pub fn affects_init() -> Affects {
-  Affects(flags: flag.Affects(0))
-}
-
 pub fn unwrap_id(id: Id(a)) -> Int {
   let Id(a) = id
   a
@@ -538,3 +529,17 @@ const neutral = Pronoun(
   his: "their",
   himself: "themself",
 )
+
+pub type MobAffect {
+  SuperInvisible
+  GodMode
+  AutoRevive
+}
+
+pub fn mob_affect_to_int(flag: MobAffect) -> Int {
+  case flag {
+    SuperInvisible -> 0
+    GodMode -> 1
+    AutoRevive -> 2
+  }
+}

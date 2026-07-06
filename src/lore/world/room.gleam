@@ -13,9 +13,9 @@ import gleam/result.{try}
 import gleam/set
 import gleam/time/duration
 import gleam/time/timestamp
-import lore/character/flag
 import lore/character/view
 import lore/character/view/render
+import lore/server/bit_set
 import lore/server/my_list
 import lore/world.{
   type ErrorRoomRequest, type Id, type Mobile, type Room, type StringId, Closed,
@@ -978,7 +978,7 @@ fn combat_request(
   let result = {
     use victim <- try(find_local_character(model.room.characters, data.victim))
     use <- bool.guard(
-      flag.affect_has(victim.affects, flag.GodMode),
+      affect_in(victim.affects, world.GodMode),
       Error(world.VictimHasGodMode),
     )
     use <- bool.guard(is_pvp(attacker, victim), Error(world.PvpForbidden))
@@ -1166,7 +1166,7 @@ fn round_process_action(
     use attacker <- try(dict.get(participants, attacker_id))
     use victim <- try(dict.get(participants, victim_id))
     use <- bool.guard(attacker.hp <= 0 || victim.hp <= 0, Error(Nil))
-    use <- bool.guard(flag.affect_has(victim.affects, flag.GodMode), Error(Nil))
+    use <- bool.guard(affect_in(victim.affects, world.GodMode), Error(Nil))
     let victim = case victim.hp - dam_roll {
       hp if hp > 0 -> world.Mobile(..victim, hp:)
       hp -> world.Mobile(..victim, hp:, fighting: world.NoTarget)
@@ -1215,7 +1215,7 @@ fn combat_slay(
   let result = {
     use victim <- try(find_local_character(characters, victim))
     use <- bool.guard(
-      flag.affect_has(victim.affects, flag.GodMode),
+      affect_in(victim.affects, world.GodMode),
       Error(world.VictimHasGodMode),
     )
     let damage = victim.hp_max * 6
@@ -1339,4 +1339,11 @@ fn character_keyword_matches(character: world.Mobile, keyword_id: Int) -> Bool {
 
 fn xdesc_keyword_matches(xdesc: world.ExtraDesc, keyword_id: Int) -> Bool {
   list.contains(xdesc.keywords, keyword_id)
+}
+
+fn affect_in(
+  bit_set: bit_set.BitSet(world.MobAffect),
+  flag: world.MobAffect,
+) -> Bool {
+  bit_set.in(bit_set, flag, world.mob_affect_to_int)
 }

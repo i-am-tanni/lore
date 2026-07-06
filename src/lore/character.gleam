@@ -22,6 +22,7 @@ import lore/character/controller/login_controller
 import lore/character/controller/spawn_controller
 import lore/character/view
 import lore/character/view/render
+import lore/server/bit_set.{BitSet}
 import lore/server/output
 import lore/world.{Id, Player}
 import lore/world/communication
@@ -108,7 +109,7 @@ fn init_reception(
       inventory: [],
       equipment: dict.new(),
       fighting: world.NoTarget,
-      affects: world.affects_init(),
+      affects: BitSet(0),
       hp: 20,
       hp_max: 20,
     )

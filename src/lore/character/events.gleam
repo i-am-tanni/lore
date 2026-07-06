@@ -8,9 +8,9 @@ import gleam/option.{None, Some}
 import gleam/result.{try}
 import lore/character/act
 import lore/character/conn.{type Conn}
-import lore/character/flag
 import lore/character/view
 import lore/character/view/render
+import lore/server/bit_set
 import lore/world.{type Id, type Room}
 import lore/world/event.{type CharacterEvent, type Event, type RoomMessage}
 import lore/world/items
@@ -328,7 +328,8 @@ fn combat_commit_round(
       |> result.map(sync_mobile(_, self)),
     )
 
-    let has_auto_revive = flag.affect_has(self.affects.flags, flag.AutoRevive)
+    let has_auto_revive = affect_in(self.affects, world.AutoRevive)
+
     let conn =
       conn
       |> conn.character_put(self)
@@ -369,8 +370,15 @@ fn sync_mobile(
   self: world.MobileInternal,
 ) -> world.MobileInternal {
   let world.Mobile(hp:, fighting:, ..) = update
-  case flag.affect_has(self.affects.flags, flag.AutoRevive) {
+  case affect_in(self.affects, world.AutoRevive) {
     True -> world.MobileInternal(..self, hp: self.hp_max, fighting:)
     False -> world.MobileInternal(..self, hp:, fighting:)
   }
+}
+
+fn affect_in(
+  bit_set: bit_set.BitSet(world.MobAffect),
+  flag: world.MobAffect,
+) -> Bool {
+  bit_set.in(bit_set, flag, world.mob_affect_to_int)
 }
