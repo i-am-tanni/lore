@@ -209,6 +209,7 @@ pub fn item_look_at(conn: Conn, item_instance: world.ItemInstance) -> Conn {
 
       conn
       |> conn.renderln(render.item_inspect(item))
+      |> conn.renderln(view.Blank)
       |> conn.renderln(render.item_contains(items, contents))
       |> conn.prompt
     }

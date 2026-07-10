@@ -454,7 +454,10 @@ pub fn container_insert(
   container: ItemInstance,
   items_to_insert: List(ItemInstance),
 ) -> Result(#(ItemInstance, List(ItemInstance), ContainerRejected), ErrorItem) {
-  use contents <- result.try(container_unpack(container))
+  use contents <- result.try(case container.contains {
+    Contains(contents) -> Ok(contents)
+    NotContainer -> Error(ErrNotContainer)
+  })
   let updated_container =
     ItemInstance(
       ..container,

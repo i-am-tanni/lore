@@ -399,7 +399,7 @@ fn do_put_item_into_container_self(
       conn
       |> conn.character_put(world.MobileInternal(..self, inventory:))
       |> renderln_if_user(fn() {
-        render.items_get_from_container_self(items_table, inserted, container)
+        render.items_put_into_container_self(items_table, inserted, container)
       })
       |> conn.prompt
     }
