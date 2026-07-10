@@ -102,7 +102,7 @@ RETURNING account_id
 /// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
 ///
 pub type ContainersRow {
-  ContainersRow(container_id: Int, item_id: Int)
+  ContainersRow(container_id: Int, item_id: Option(Int), item_quantity: Int)
 }
 
 /// Runs the `containers` query
@@ -116,11 +116,18 @@ pub fn containers(
 ) -> Result(pog.Returned(ContainersRow), pog.QueryError) {
   let decoder = {
     use container_id <- decode.field(0, decode.int)
-    use item_id <- decode.field(1, decode.int)
-    decode.success(ContainersRow(container_id:, item_id:))
+    use item_id <- decode.field(1, decode.optional(decode.int))
+    use item_quantity <- decode.field(2, decode.int)
+    decode.success(ContainersRow(container_id:, item_id:, item_quantity:))
   }
 
-  "SELECT container_id, item_id FROM container_kit;
+  "SELECT 
+  c.container_id, 
+  i.item_id, 
+  COALESCE(i.item_quantity, 0) AS item_quantity
+FROM container as c
+LEFT JOIN container_item as i
+ON c.container_id = i.container_id;
 "
   |> pog.query
   |> pog.returning(decoder)
@@ -311,7 +318,7 @@ pub fn items(
   c.container_id,
   k_agg.keywords as keywords
 FROM item as i
-LEFT JOIN container_kit as c 
+LEFT JOIN container_item as c 
   ON c.item_id = i.item_id
 INNER JOIN (
   SELECT item_id, ARRAY_AGG(keyword_id) as keywords

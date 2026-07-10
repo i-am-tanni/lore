@@ -5,11 +5,11 @@
 import gleam/dict.{type Dict}
 import gleam/erlang/process
 import gleam/list
+import gleam/option.{None, Some}
 import gleam/otp/actor
 import gleam/result
 import glets/table
 import logging
-import lore/server/my_list
 import lore/world.{type Id, type Item, Id}
 import lore/world/sql
 import pog
@@ -57,11 +57,10 @@ fn init(
       |> result.replace_error("Failed to start ets table: 'items'"),
     )
     let db = pog.named_connection(db)
-    use returned <- result.try(
+    use pog.Returned(rows: item_rows, ..) <- result.try(
       sql.items(db)
       |> result.replace_error("Could not get items from the database!"),
     )
-    let pog.Returned(rows: item_rows, ..) = returned
     use pog.Returned(rows: container_kits, ..) <- result.try(
       sql.containers(db)
       |> result.replace_error("Could not get container kits from the database!"),
@@ -69,8 +68,22 @@ fn init(
 
     // populate table
     let container_kits =
-      my_list.group_by(container_kits, fn(container) {
-        #(container.container_id, container.item_id)
+      // sort of like a list.group_by
+      list.fold(container_kits, dict.new(), fn(acc, row) {
+        case row.item_id {
+          Some(item_id) ->
+            case dict.get(acc, row.container_id) {
+              Ok(item_ids) ->
+                dict.insert(acc, row.container_id, [item_id, ..item_ids])
+              Error(Nil) -> dict.insert(acc, row.container_id, [item_id])
+            }
+
+          None ->
+            case dict.has_key(acc, row.container_id) {
+              True -> acc
+              False -> dict.insert(acc, row.container_id, [])
+            }
+        }
       })
 
     list.map(item_rows, fn(row) {
@@ -112,7 +125,10 @@ fn to_item(row: sql.ItemsRow) -> world.Item {
   )
 }
 
-pub fn insert_many(table_name: process.Name(Message), items: List(Item)) -> Nil {
+pub fn insert_many(
+  table_name: process.Name(Message),
+  items: List(Item),
+) -> Nil {
   let items = list.map(items, fn(item) { #(item.id, item) })
 
   table_name

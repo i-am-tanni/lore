@@ -6,7 +6,7 @@ SELECT
   c.container_id,
   k_agg.keywords as keywords
 FROM item as i
-LEFT JOIN container_kit as c 
+LEFT JOIN container_item as c 
   ON c.item_id = i.item_id
 INNER JOIN (
   SELECT item_id, ARRAY_AGG(keyword_id) as keywords
