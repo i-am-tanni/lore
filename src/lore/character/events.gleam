@@ -264,6 +264,7 @@ fn item_put_in(
       )
   }
   |> conn.renderln(conn, _)
+  |> conn.prompt()
 }
 
 fn item_load(
