@@ -405,10 +405,20 @@ fn do_put_item_into_container_self(
     }
 
     // If container is unknown, try the room
-    Error(world.ErrUnknownContainer(_)) ->
-      conn
-      |> conn.character_put(world.MobileInternal(..self, inventory: []))
-      |> conn.event(event.ItemPutIn(inventory, container_keyword))
+    Error(world.ErrUnknownContainer(_)) -> {
+      case world.items_partition(inventory, item_keyword, "put in") {
+        Ok(#(found, rest)) ->
+          conn
+          |> conn.character_put(world.MobileInternal(..self, inventory: rest))
+          |> conn.event(event.ItemPutIn(found, container_keyword))
+
+        Error(_) ->
+          conn.event(
+            conn,
+            event.ItemFindAndPutIn(container_keyword, item_keyword),
+          )
+      }
+    }
 
     Error(err) ->
       conn

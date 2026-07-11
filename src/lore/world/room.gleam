@@ -179,7 +179,8 @@ fn dispatch_from_character(
     event.ItemDrop(data) -> item_drop(model, event, data)
     event.ItemGetAllIn(data) -> item_get_all_in(model, event, data)
     event.ItemGetIn(data) -> item_get_item_in(model, event, data)
-    event.ItemFindAndPutIn(data) -> item_find_and_put_in(model, event, data)
+    event.ItemFindAndPutIn(container_keyword, item_keyword) ->
+      item_find_and_put_in(model, event, container_keyword, item_keyword)
     event.ItemPutIn(items, container) ->
       item_put_in(model, event, items, container)
     event.CombatRequest(data) -> combat_request(model, event, data)
@@ -758,10 +759,10 @@ fn item_get_item_in(
 fn item_find_and_put_in(
   model: Model,
   event: Event(CharacterToRoomEvent, CharacterMessage),
-  data: event.ContainerSearchData,
+  container_keyword: keyword.OrdinalSearch,
+  item_keyword: keyword.SpecifiedSearch,
 ) -> #(Model, RoomEffect(CharacterMessage)) {
   let room = model.room
-  let event.ContainerSearchData(container_keyword, item_keyword) = data
   let result = {
     use #(container, rest) <- result.try(
       keyword.pop_nth_match(room.items, container_keyword, world.item_matches)
@@ -782,8 +783,7 @@ fn item_find_and_put_in(
     Ok(world.ContainerInsert(container:, inserted:, context:, rejected:)) -> {
       let update = {
         let items = list.append(rejected.rejects, [container, ..context])
-        let room = world.Room(..room, items:)
-        Model(..model, room:)
+        Model(..model, room: world.Room(..room, items:))
       }
       let insertion =
         world.ContainerInsert(container:, inserted:, rejected:, context: [])

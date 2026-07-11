@@ -147,7 +147,10 @@ pub type CharacterToRoomEvent {
   ItemGetAllIn(container: keyword.OrdinalSearch)
   ItemGetIn(ContainerSearchData)
   /// The item(s) and container are both NOT found and we are looking in the room
-  ItemFindAndPutIn(ContainerSearchData)
+  ItemFindAndPutIn(
+    container_keyword: keyword.OrdinalSearch,
+    item_keyword: keyword.SpecifiedSearch,
+  )
   /// The item(s) are already found but we need to find a container in the room
   ItemPutIn(items: List(world.ItemInstance), container: keyword.OrdinalSearch)
   /// Quietly rejoin the room after a crash
