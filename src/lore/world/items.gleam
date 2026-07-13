@@ -229,17 +229,16 @@ fn item_instance(
   use item: Item <- result.try(table.lookup(table_name, Id(raw_item_id)))
   case dict.get(container_kits, raw_item_id) {
     Ok(contents) -> {
-      let contains =
+      let contents =
         list.filter_map(contents, fn(id) {
           item_instance(table_name, id, container_kits)
         })
-        |> world.Contains
 
       world.ItemInstance(
         id: world.generate_id(),
         item: world.Loading(Id(raw_item_id)),
         keywords: item.keywords,
-        contains:,
+        contains: to_container(item, contents),
         was_touched: False,
       )
     }
@@ -249,7 +248,7 @@ fn item_instance(
         id: world.generate_id(),
         item: world.Loading(Id(raw_item_id)),
         keywords: item.keywords,
-        contains: world.Contains([]),
+        contains: to_container(item, []),
         was_touched: False,
       )
 
@@ -263,4 +262,18 @@ fn item_instance(
       )
   }
   |> Ok
+}
+
+fn to_container(
+  _item_prototype: Item,
+  contents: List(world.ItemInstance),
+) -> world.Container {
+  world.Contains(world.ContainerData(
+    contents:,
+    access: world.Open,
+    is_always_open: True,
+    key_id: None,
+    max_volume: 99,
+    max_size: 99,
+  ))
 }

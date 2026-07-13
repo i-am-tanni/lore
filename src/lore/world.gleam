@@ -4,6 +4,7 @@ import gleam/int
 import gleam/list
 import gleam/option.{type Option}
 import gleam/result
+import glisten/socket/options
 import lore/server/bit_set.{type BitSet, BitSet}
 import lore/server/my_list
 import lore/world/keyword
@@ -153,8 +154,21 @@ pub type TemplateId {
 }
 
 pub type Container {
-  Contains(List(ItemInstance))
+  Contains(data: ContainerData)
   NotContainer
+}
+
+pub type ContainerData {
+  ContainerData(
+    access: AccessState,
+    contents: List(ItemInstance),
+    // Can this container be locked and if so they key must be specifeid
+    key_id: Option(Id(Item)),
+    // Override any access state
+    is_always_open: Bool,
+    max_volume: Int,
+    max_size: Int,
+  )
 }
 
 pub type WearSlot {
@@ -379,9 +393,13 @@ pub fn container_unpack(
   instance: ItemInstance,
 ) -> Result(List(ItemInstance), ErrorItem) {
   case instance.contains {
-    Contains([]) -> Error(ErrEmpty)
+    Contains(data) ->
+      case data.contents {
+        [] -> Error(ErrEmpty)
+        contents -> Ok(contents)
+      }
+
     NotContainer -> Error(ErrNotContainer)
-    Contains(contents) -> Ok(contents)
   }
 }
 
@@ -405,7 +423,7 @@ pub fn item_get_from_container(
   case keyword.partition(contents, keyword, item_matches) {
     #([], _) -> Error(ErrNotFoundInContainer)
     #(found, rest) -> {
-      let updated_item = ItemInstance(..container, contains: Contains(rest))
+      let updated_item = container_update_contents(container, rest)
       let updated_list =
         my_list.update(list, item_update(_, updated_item.id, updated_item))
       Ok(#(found, updated_item, updated_list))
@@ -429,7 +447,7 @@ pub fn item_get_all_from_container(
     }),
   )
   use contents <- result.try(container_unpack(container))
-  let updated_container = ItemInstance(..container, contains: Contains([]))
+  let updated_container = container_update_contents(container, [])
   let updated_list =
     my_list.update(list, item_update(_, updated_container.id, updated_container))
   Ok(#(contents, updated_container, updated_list))
@@ -455,20 +473,31 @@ pub fn container_insert(
   items_to_insert: List(ItemInstance),
 ) -> Result(#(ItemInstance, List(ItemInstance), ContainerRejected), ErrorItem) {
   use contents <- result.try(case container.contains {
-    Contains(contents) -> Ok(contents)
+    Contains(ContainerData(contents:, ..)) -> Ok(contents)
     NotContainer -> Error(ErrNotContainer)
   })
   let updated_container =
-    ItemInstance(
-      ..container,
-      contains: Contains(list.append(items_to_insert, contents)),
-    )
+    container_update_contents(container, list.append(items_to_insert, contents))
   #(
     updated_container,
     items_to_insert,
     ContainerRejected(rejects: [], errors: []),
   )
   |> Ok
+}
+
+fn container_update_contents(
+  item_instance: ItemInstance,
+  contents: List(ItemInstance),
+) -> ItemInstance {
+  case item_instance.contains {
+    Contains(container_data) -> {
+      let data = ContainerData(..container_data, contents:)
+      ItemInstance(..item_instance, contains: Contains(data))
+    }
+
+    NotContainer -> item_instance
+  }
 }
 
 pub fn item_update(

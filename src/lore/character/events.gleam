@@ -204,7 +204,7 @@ pub fn item_look_at(conn: Conn, item_instance: world.ItemInstance) -> Conn {
       |> conn.renderln(render.item_inspect(item))
       |> conn.prompt
 
-    Ok(item), world.Contains(contents) -> {
+    Ok(item), world.Contains(world.ContainerData(contents:, ..)) -> {
       let named_actors.Lookup(items:, ..) = conn.named_actors(conn)
 
       conn
