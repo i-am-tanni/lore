@@ -4,7 +4,6 @@ import gleam/int
 import gleam/list
 import gleam/option.{type Option}
 import gleam/result
-import glisten/socket/options
 import lore/server/bit_set.{type BitSet, BitSet}
 import lore/server/my_list
 import lore/world/keyword
