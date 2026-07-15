@@ -67,7 +67,7 @@ const default_symbol = " "
 
 // The default map render if an error is encountered
 const uncharted = [
-  " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", "&123@0;", " ",
+  " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", you_are_here, " ",
   " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ",
 ]
 
