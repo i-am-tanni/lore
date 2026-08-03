@@ -18,6 +18,8 @@ pub type Message {
   InsertMany(key_vals: List(#(Id(Item), Item)))
   Insert(item_id: Id(Item), item: Item)
   Delete(item_id: Id(Item))
+  /// Item instances are generated as a call to keep table lookups from leaking
+  /// container information.
   ItemInstance(
     caller: process.Subject(Result(world.ItemInstance, Nil)),
     item_id: Id(Item),
