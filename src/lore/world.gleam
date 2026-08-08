@@ -293,7 +293,7 @@ pub type ErrorRoomRequest {
   DoorErr(ErrorDoor)
   NotFound(keyword: String)
   PvpForbidden
-  VictimHasGodMode
+  VictimHasAffGodMode
 }
 
 pub type ErrorMove {
@@ -562,15 +562,15 @@ const neutral = Pronoun(
 )
 
 pub type MobAffect {
-  SuperInvisible
-  GodMode
-  AutoRevive
+  AffSuperInvisible
+  AffGodMode
+  AffAutoRevive
 }
 
 pub fn mob_affect_to_int(flag: MobAffect) -> Int {
   case flag {
-    SuperInvisible -> 0
-    GodMode -> 1
-    AutoRevive -> 2
+    AffSuperInvisible -> 0
+    AffGodMode -> 1
+    AffAutoRevive -> 2
   }
 }

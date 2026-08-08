@@ -86,6 +86,7 @@ type HashData {
 }
 
 type State {
+  // Look up hash to get the keyword_id
   State(lookup: Dict(Int, HashData))
 }
 
@@ -112,13 +113,24 @@ fn init(
     |> result.replace_error("Could not get keywords from the database!"),
   )
 
-  let lookup =
+  let data =
     list.fold(keyword_rows, dict.new(), fn(acc, row) {
       let sql.KeywordRow(keyword_id:, keyword:) = row
       insert(acc, keyword_id, keyword)
     })
 
-  State(lookup:)
+  // check that the corpse keyword exists and matches the expected keyword_id
+  case lookup(data, "corpse") {
+    Ok(0) -> Nil
+    _ ->
+      logging.log(
+        logging.Warning,
+        "Expected keyword_id: 0, keyword: 'corpse' record not found in the db! 
+        Please add or edit room.corpse_generate()!",
+      )
+  }
+
+  State(lookup: data)
   |> actor.initialised
   |> actor.returning(self)
   |> Ok
@@ -281,6 +293,7 @@ fn lookup(lookup: Dict(Int, HashData), input: String) -> Result(Int, Nil) {
     Collisions(collisions) ->
       list.find_map(collisions, fn(keyword_data) {
         case keyword_data {
+          // Assumes there will be no duplicates!
           Keyword(id:, term:) if term == input -> Ok(id)
           _ -> Error(Nil)
         }

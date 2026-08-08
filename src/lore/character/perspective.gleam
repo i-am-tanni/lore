@@ -47,18 +47,17 @@ pub const you = Pronoun(he: "you", him: "you", his: "your", himself: "yourself")
 /// A text record that considers multiple perspectives
 /// 
 pub type EventText {
-  /// Auto is an act that can target self or another victim
+  /// Vict is an act that can target a victim, but NOT the self
   /// 
-  EventTextAuto(
+  EventTextVict(
     p3: String,
     p1: String,
     p2: String,
-    p1_auto: String,
-    p3_auto: String,
+    /// Optional strings. If left blank will use p1 and p3 as a template for 
+    /// self-targeted actions.
+    p1_auto: Option(String),
+    p3_auto: Option(String),
   )
-  /// Vict is an act that can target a victim, but NOT the self
-  /// 
-  EventTextVict(p3: String, p1: String, p2: String)
   /// An act that has no victim that can witness the act
   /// 
   EventText(p3: String, p1: String)
@@ -110,8 +109,10 @@ pub fn render(
       let victim = case text {
         // Victim override if you targeted yourself and there is no special text
         // for doing so!
-        EventTextVict(..) if perspective == SubjectAuto ->
+        EventTextVict(p1_auto: None, ..) if perspective == SubjectAuto ->
           Participant(..victim, name: "yourself", pronoun: you)
+        EventTextVict(p3_auto: None, ..) if perspective == WitnessAuto ->
+          Participant(..victim, name: victim.pronoun.himself)
         _ -> victim
       }
 
@@ -139,13 +140,14 @@ fn select(text: EventText, perspective: Perspective) -> String {
     Subject, _ -> text.p1
     Witness, _ -> text.p3
     Victim, EventTextVict(p2:, ..) -> p2
-    Victim, EventTextAuto(p2:, ..) -> p2
-    SubjectAuto, EventTextAuto(p1_auto:, ..) -> p1_auto
-    WitnessAuto, EventTextAuto(p3_auto:, ..) -> p3_auto
+    // Overrides if optional p1_auto and p3_auto strings are empty
+    SubjectAuto, EventTextVict(p1_auto: None, ..) -> text.p1
+    WitnessAuto, EventTextVict(p3_auto: None, ..) -> text.p3
+    // Otherwise use what is available
+    SubjectAuto, EventTextVict(p1_auto: Some(p1_auto), ..) -> p1_auto
+    WitnessAuto, EventTextVict(p3_auto: Some(p3_auto), ..) -> p3_auto
     // Error recovery
-    Victim, EventText(p3:, ..) -> p3
-    SubjectAuto, _ -> text.p1
-    WitnessAuto, _ -> text.p3
+    _, EventText(p3:, ..) -> p3
   }
 }
 

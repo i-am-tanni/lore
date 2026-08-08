@@ -52,9 +52,9 @@ type Verb {
   Teleport
   ItemSpawn
   MobileSpawn
-  SuperInvisible
-  GodMode
-  AutoRevive
+  AffSuperInvisible
+  AffGodMode
+  AffAutoRevive
 }
 
 type Victim {
@@ -174,15 +174,15 @@ pub fn parse(conn: Conn, input: String) -> Conn {
       })
     "@invis" ->
       admin_command(conn, role(conn), invis_command, fn() {
-        Ok(Command(SuperInvisible, Nil))
+        Ok(Command(AffSuperInvisible, Nil))
       })
     "@god" ->
       admin_command(conn, role(conn), god_mode_command, fn() {
-        Ok(Command(GodMode, Nil))
+        Ok(Command(AffGodMode, Nil))
       })
     "@autorevive" ->
       admin_command(conn, role(conn), auto_revive_command, fn() {
-        Ok(Command(AutoRevive, Nil))
+        Ok(Command(AffAutoRevive, Nil))
       })
     social ->
       command(conn, social_command, social_args(conn, social, rest, word))
@@ -949,8 +949,8 @@ fn mobile_spawn_command(conn: Conn, command: Command(Id(world.Npc))) -> Conn {
 
 fn invis_command(conn: Conn, _: Command(_)) -> Conn {
   let self = conn.character_get(conn)
-  let flags = affect_toggle(self.affects, world.SuperInvisible)
-  let msg = case affect_in(flags, world.SuperInvisible) {
+  let flags = affect_toggle(self.affects, world.AffSuperInvisible)
+  let msg = case affect_in(flags, world.AffSuperInvisible) {
     True -> "You cloak yourself in night. You are now invisible!"
     False ->
       "You remove your nighted cloak and walk in the light. You are visible!"
@@ -965,8 +965,8 @@ fn invis_command(conn: Conn, _: Command(_)) -> Conn {
 
 fn god_mode_command(conn: Conn, _: Command(_)) -> Conn {
   let self = conn.character_get(conn)
-  let affects = affect_toggle(self.affects, world.GodMode)
-  let msg = case affect_in(affects, world.GodMode) {
+  let affects = affect_toggle(self.affects, world.AffGodMode)
+  let msg = case affect_in(affects, world.AffGodMode) {
     True ->
       "Your flesh no longer knows the sting of steel. You have activated god mode!"
     False ->
@@ -982,8 +982,8 @@ fn god_mode_command(conn: Conn, _: Command(_)) -> Conn {
 
 fn auto_revive_command(conn: Conn, _: Command(_)) -> Conn {
   let self = conn.character_get(conn)
-  let affects = affect_toggle(self.affects, world.AutoRevive)
-  let msg = case affect_in(affects, world.AutoRevive) {
+  let affects = affect_toggle(self.affects, world.AffAutoRevive)
+  let msg = case affect_in(affects, world.AffAutoRevive) {
     True -> "Your flesh no longer knows death. You have activated auto-revive!"
     False ->
       "You make yourself vulnerable to death's embrace. You have deactivated auto-revive!"
@@ -1052,7 +1052,12 @@ fn verb_missing_arg_err(verb: Verb) -> String {
     Remove ->
       "What would you like to remove? Provide either a wear location or item keyword."
     // verbs without args that will never have this error
-    Inventory | Equipment | Social | SuperInvisible | GodMode | AutoRevive -> ""
+    Inventory
+    | Equipment
+    | Social
+    | AffSuperInvisible
+    | AffGodMode
+    | AffAutoRevive -> ""
   }
 }
 

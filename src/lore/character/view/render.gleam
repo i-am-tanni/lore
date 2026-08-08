@@ -142,7 +142,7 @@ pub fn room_view(room: Room, observer: world.Mobile) -> View {
       observer_id != character.id
       && !bit_set.in(
         character.affects,
-        world.SuperInvisible,
+        world.AffSuperInvisible,
         world.mob_affect_to_int,
       )
     })
@@ -612,7 +612,7 @@ pub fn error_room_request(error: world.ErrorRoomRequest) -> View {
 
     world.PvpForbidden -> "You cannot attack other players." |> view.Leaf
 
-    world.VictimHasGodMode ->
+    world.VictimHasAffGodMode ->
       "You are forbidden to attack an immortal" |> view.Leaf
   }
 }

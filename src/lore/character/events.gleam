@@ -330,7 +330,7 @@ fn combat_commit_round(
       |> result.map(sync_mobile(_, self)),
     )
 
-    let has_auto_revive = affect_in(self.affects, world.AutoRevive)
+    let has_auto_revive = affect_in(self.affects, world.AffAutoRevive)
 
     let conn =
       conn
@@ -372,7 +372,7 @@ fn sync_mobile(
   self: world.MobileInternal,
 ) -> world.MobileInternal {
   let world.Mobile(hp:, fighting:, ..) = update
-  case affect_in(self.affects, world.AutoRevive) {
+  case affect_in(self.affects, world.AffAutoRevive) {
     True -> world.MobileInternal(..self, hp: self.hp_max, fighting:)
     False -> world.MobileInternal(..self, hp:, fighting:)
   }

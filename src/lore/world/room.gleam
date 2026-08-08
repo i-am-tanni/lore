@@ -33,6 +33,9 @@ import lore/world/room/room_registry
 
 const combat_round_len_in_ms = 3000
 
+// This was set in the DB via a migration
+const corpse_keyword_id = 0
+
 type Timer {
   Timer(timer: process.Timer, fire_at: timestamp.Timestamp)
   Cancelled
@@ -304,6 +307,7 @@ type CombatRoundTemp {
   CombatRoundTemp(
     participants: Dict(StringId(world.Mobile), world.Mobile),
     commits: List(event.CombatPollData),
+    // whether to continue combat or not
     continue: Bool,
   )
 }
@@ -978,8 +982,8 @@ fn combat_request(
   let result = {
     use victim <- try(find_local_character(model.room.characters, data.victim))
     use <- bool.guard(
-      affect_in(victim.affects, world.GodMode),
-      Error(world.VictimHasGodMode),
+      affect_in(victim.affects, world.AffGodMode),
+      Error(world.VictimHasAffGodMode),
     )
     use <- bool.guard(is_pvp(attacker, victim), Error(world.PvpForbidden))
     event.CombatPollData(
@@ -1060,6 +1064,24 @@ fn combat_process(
       _ -> None
     }
 
+    let room = model.room
+    let #(effects, items) = case !is_victim_alive {
+      True -> {
+        let corpse = corpse_generate(victim, [])
+        let corpse_clean_up =
+          effect.lazy(fn() {
+            janitor.item_schedule_clean_up(
+              model.lookup.janitor,
+              what: corpse.id,
+              at: room.id,
+              in: duration.minutes(5),
+            )
+          })
+        #([corpse_clean_up], [corpse, ..room.items])
+      }
+      False -> #([], room.items)
+    }
+
     // update room
     let room = {
       let characters = case attacker_update {
@@ -1078,7 +1100,7 @@ fn combat_process(
           my_list.update(characters, update_character(_, victim.id, victim))
       }
 
-      world.Room(..model.room, characters:)
+      world.Room(..room, characters:, items:)
     }
 
     let attacker = option.unwrap(attacker_update, attacker)
@@ -1088,15 +1110,21 @@ fn combat_process(
       |> event.CombatCommit
       |> effect.broadcast
 
+    // if victim is alive and fighting but the room thinks there is no combat
     case is_victim_alive && !model.is_in_combat {
       True -> {
         let update = Model(..model, room:, is_in_combat: True)
-        let effects = [combat_commit, effect.broadcast(event.CombatRoundPoll)]
+        let effects = [
+          combat_commit,
+          effect.broadcast(event.CombatRoundPoll),
+          ..effects
+        ]
         #(update, effect.batch(effects))
       }
+
       False -> {
-        let update = Model(..model, room:, is_in_combat: False)
-        #(update, combat_commit)
+        let update = Model(..model, is_in_combat: False)
+        #(update, effect.batch([combat_commit, ..effects]))
       }
     }
     |> Ok
@@ -1138,7 +1166,19 @@ fn combat_round_trigger(
       my_list.update(characters, fn(character) {
         dict.get(participants, character.id)
       })
-    let room = world.Room(..model.room, characters:)
+
+    let corpses =
+      dict.to_list(participants)
+      |> list.filter_map(fn(pair) {
+        let #(_id, mobile) = pair
+        case mobile.hp < 0 {
+          True -> Ok(corpse_generate(mobile, []))
+          False -> Error(Nil)
+        }
+      })
+    let room = model.room
+    let room =
+      world.Room(..room, characters:, items: list.append(corpses, room.items))
 
     case continue {
       True -> Model(..model, room:, combat_queue: [])
@@ -1166,7 +1206,7 @@ fn round_process_action(
     use attacker <- try(dict.get(participants, attacker_id))
     use victim <- try(dict.get(participants, victim_id))
     use <- bool.guard(attacker.hp <= 0 || victim.hp <= 0, Error(Nil))
-    use <- bool.guard(affect_in(victim.affects, world.GodMode), Error(Nil))
+    use <- bool.guard(affect_in(victim.affects, world.AffGodMode), Error(Nil))
     let victim = case victim.hp - dam_roll {
       hp if hp > 0 -> world.Mobile(..victim, hp:)
       hp -> world.Mobile(..victim, hp:, fighting: world.NoTarget)
@@ -1194,7 +1234,7 @@ fn round_process_action(
       event.CombatPollData(attacker_id:, victim_id:, dam_roll: dam_roll)
       |> list.prepend(commits, _)
 
-    // Continue only if any victims have hp > 0
+    // Continue with next round only if any victims have hp > 0
     let continue = continue || victim.hp > 0
 
     Ok(CombatRoundTemp(participants:, commits:, continue:))
@@ -1215,8 +1255,8 @@ fn combat_slay(
   let result = {
     use victim <- try(find_local_character(characters, victim))
     use <- bool.guard(
-      affect_in(victim.affects, world.GodMode),
-      Error(world.VictimHasGodMode),
+      affect_in(victim.affects, world.AffGodMode),
+      Error(world.VictimHasAffGodMode),
     )
     let damage = victim.hp_max * 6
     let victim = world.Mobile(..victim, hp: victim.hp - damage)
@@ -1346,4 +1386,35 @@ fn affect_in(
   flag: world.MobAffect,
 ) -> Bool {
   bit_set.in(bit_set, flag, world.mob_affect_to_int)
+}
+
+fn corpse_generate(
+  mobile: world.Mobile,
+  contents: List(world.ItemInstance),
+) -> world.ItemInstance {
+  let name = "a corpse of " <> mobile.name <> "."
+  let keywords = [corpse_keyword_id, ..mobile.keywords]
+
+  world.ItemInstance(
+    id: world.generate_id(),
+    keywords:,
+    was_touched: False,
+    item: world.Loaded(world.Item(
+      id: world.Id(0),
+      keywords:,
+      name:,
+      short: name,
+      long: "It's hard to look at..",
+      is_container: True,
+      wear_slot: world.CannotWear,
+    )),
+    contains: world.Contains(world.ContainerData(
+      access: Open,
+      contents:,
+      is_always_open: True,
+      key_id: None,
+      max_volume: 99,
+      max_size: 99,
+    )),
+  )
 }

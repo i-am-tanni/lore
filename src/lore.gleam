@@ -107,7 +107,6 @@ pub fn start_database_connection(
   let assert Ok(pool_child) = {
     use config <- result.try(pog.url_config(pool_name, database_url))
     config
-    |> echo
     |> pog.host(server_ip)
     |> pog.pool_size(15)
     |> pog.supervised
