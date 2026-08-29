@@ -297,10 +297,14 @@ pub fn item_contains(
 ) -> View {
   case container_contents(item_table, instances) {
     items if items != [] ->
-      [view.Leaf("You look inside and see:"), ..items]
+      [view.Leaf("Contents:"), ..items]
       |> view.join("\n")
 
-    _ -> view.Leaf("You look inside and see:\n    Nothing.")
+    _ ->
+      view.Leaf(
+        "Contents:
+    Empty!",
+      )
   }
 }
 

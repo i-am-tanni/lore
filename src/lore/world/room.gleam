@@ -1065,7 +1065,7 @@ fn combat_process(
     }
 
     let room = model.room
-    let #(effects, items) = case !is_victim_alive {
+    let #(schedule_corpse_clean_up, items) = case !is_victim_alive {
       True -> {
         let corpse = corpse_generate(victim, [])
         let corpse_clean_up =
@@ -1117,14 +1117,14 @@ fn combat_process(
         let effects = [
           combat_commit,
           effect.broadcast(event.CombatRoundPoll),
-          ..effects
+          ..schedule_corpse_clean_up
         ]
         #(update, effect.batch(effects))
       }
 
       False -> {
         let update = Model(..model, is_in_combat: False)
-        #(update, effect.batch([combat_commit, ..effects]))
+        #(update, effect.batch([combat_commit, ..schedule_corpse_clean_up]))
       }
     }
     |> Ok
@@ -1162,6 +1162,7 @@ fn combat_round_trigger(
     |> list.fold(actions, _, round_process_action)
 
   let update = {
+    let room = model.room
     let characters =
       my_list.update(characters, fn(character) {
         dict.get(participants, character.id)
@@ -1171,15 +1172,16 @@ fn combat_round_trigger(
       dict.to_list(participants)
       |> list.filter_map(fn(pair) {
         let #(_id, mobile) = pair
-        case mobile.hp < 0 {
+        case mobile.hp < 0 && !affect_in(mobile.affects, world.AffAutoRevive) {
           True -> Ok(corpse_generate(mobile, []))
           False -> Error(Nil)
         }
       })
-    let room = model.room
+
     let room =
       world.Room(..room, characters:, items: list.append(corpses, room.items))
 
+    // continue if any victims are alive
     case continue {
       True -> Model(..model, room:, combat_queue: [])
       False -> Model(..model, room:, combat_queue: [], is_in_combat: False)
