@@ -30,5 +30,6 @@ connection at `src/lore/server/telnet/protocol.gleam`.
 - ✅ Spawn groups with resets
 - ✅ Accounts
 - ✅ Basic Admin Commands (teleport to room, invisible, spawn item, god mode, slay monster, kick player)
-- ⬜ Wearable Equipment
-- ⬜ Corpses
+- ✅ Wearable Equipment
+- ✅ Corpses
+- ⬜ Persistence
