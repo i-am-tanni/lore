@@ -140,6 +140,7 @@ pub type CharacterToRoomEvent {
   LookAt(keyword: keyword.OrdinalSearch)
   MoveRequest(exit_keyword: Direction)
   MoveArrive(MoveArriveData)
+  MoveAbort(reason: world.ErrorRoomRequest)
   TeleportRequest(to_room_id: Id(Room))
   ItemGet(keyword: keyword.SpecifiedSearch)
   ItemGetAll
@@ -186,6 +187,7 @@ pub type MoveDepartData {
   MoveDepartData(
     exit_keyword: Option(Direction),
     subject: Subject(CharacterMessage),
+    to_room_id: Id(Room),
   )
 }
 

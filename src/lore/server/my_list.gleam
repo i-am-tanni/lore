@@ -5,6 +5,7 @@ import gleam/bool
 import gleam/dict.{type Dict}
 import gleam/int
 import gleam/list.{Continue, Stop}
+import gleam/option.{type Option, None, Some}
 import gleam/pair
 import gleam/result
 
@@ -132,7 +133,10 @@ pub fn at(list: List(a), index: Int) -> Result(a, Nil) {
 /// Similar to `list.group`, but the values are mapped.
 /// Warning! The lists are reversed.
 ///
-pub fn group_by(list: List(a), group_fun: fn(a) -> #(k, v)) -> Dict(k, List(v)) {
+pub fn group_by(
+  list: List(a),
+  group_fun: fn(a) -> #(k, v),
+) -> Dict(k, List(v)) {
   list.fold(list, dict.new(), fn(acc, x) {
     let #(key, val) = group_fun(x)
     case dict.get(acc, key) {
@@ -302,6 +306,35 @@ pub fn partition_take_loop(
         True ->
           partition_take_loop(rest, up_to_n - 1, categorize, [first, ..acc])
         False -> partition_take_loop(rest, up_to_n, categorize, acc)
+      }
+  }
+}
+
+// If found returns the first match in the list and the list with all matches
+// rejected. If not found, returns an error.
+// WARNING! All matches are removed!
+//
+pub fn find_reject(
+  list: List(a),
+  fun: fn(a) -> Bool,
+) -> Result(#(a, List(a)), Nil) {
+  find_reject_loop(list, fun, None, [])
+}
+
+pub fn find_reject_loop(
+  list: List(a),
+  fun: fn(a) -> Bool,
+  found: Option(a),
+  acc: List(a),
+) -> Result(#(a, List(a)), Nil) {
+  case list, found {
+    [], None -> Error(Nil)
+    [], Some(found) -> Ok(#(found, list.reverse(acc)))
+    [first, ..rest], _ ->
+      case fun(first) {
+        True if found == None -> find_reject_loop(rest, fun, Some(first), acc)
+        True -> find_reject_loop(rest, fun, found, acc)
+        False -> find_reject_loop(rest, fun, found, [first, ..acc])
       }
   }
 }

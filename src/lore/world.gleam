@@ -298,6 +298,7 @@ pub type ErrorRoomRequest {
 
 pub type ErrorMove {
   Unauthorized
+  SubjectMissingFromRoom
 }
 
 pub type ErrorDoor {

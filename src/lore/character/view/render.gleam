@@ -664,6 +664,7 @@ pub fn error_not_carrying() -> View {
 fn error_move(error: world.ErrorMove) -> View {
   case error {
     world.Unauthorized -> "You lack the permissions to enter." |> view.Leaf
+    world.SubjectMissingFromRoom -> "Hold your horses!" |> view.Leaf
   }
 }
 

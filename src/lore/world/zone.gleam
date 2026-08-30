@@ -120,16 +120,15 @@ pub fn move_request(
   data: event.MoveKickoffData,
 ) -> Nil {
   let result = {
-    let MoveKickoffData(to_room_id:, from: subject, ..) = data
+    let MoveKickoffData(to_room_id:, from:, ..) = data
     // Ask arrival if move is OK to proceed and block until answer is received
-    let lookup =
+    use to_room_subject <- result.try(
       room_registry.whereis(named_actors.room, to_room_id)
-      |> result.replace_error(world.RoomLookupFailed(to_room_id))
-
-    use to_room_subject <- result.try(lookup)
-    use Approved <- result.try(move_poll(to_room_subject, data))
+      |> result.replace_error(world.RoomLookupFailed(to_room_id)),
+    )
     // ..if approved, notify the character to update their room id
-    process.send(subject, move_commit(event.from, data))
+    process.send(from, move_commit(event.from, data))
+    use Approved <- result.try(move_poll(to_room_subject, data))
     // and then block until departure is completed so we can start the arrival.
     let Done = process.call(event.from, 1000, move_depart(_, data))
     Ok(process.send(to_room_subject, move_arrive(data.from, data)))
@@ -138,7 +137,7 @@ pub fn move_request(
   case result {
     Ok(_) -> Nil
     Error(reason) ->
-      process.send(data.from, move_abort(event.from, reason, data))
+      process.send(event.from, move_abort(data.from, reason, data))
   }
 }
 
@@ -178,25 +177,25 @@ fn move_commit(
 }
 
 fn move_abort(
-  from_room_subject: Subject(RoomMessage),
+  from_subject: Subject(event.CharacterMessage),
   reason: world.ErrorRoomRequest,
   data: event.MoveKickoffData,
-) -> event.CharacterMessage {
-  let event.MoveKickoffData(from_room_id:, acting_character:, ..) = data
-  let data = event.ActFailed(reason)
+) -> event.RoomMessage {
+  let event.MoveKickoffData(acting_character:, ..) = data
+  let data = event.MoveAbort(reason)
 
-  event.new(from: from_room_subject, acting_character:, data:)
-  |> event.RoomToCharacter
-  |> event.RoomSent(from: from_room_id)
+  event.new(from: from_subject, acting_character:, data:)
+  |> event.CharacterToRoom
 }
 
 fn move_depart(
   self: Subject(event.Done),
   data: event.MoveKickoffData,
 ) -> RoomMessage {
-  let event.MoveKickoffData(acting_character:, exit_keyword:, ..) = data
+  let event.MoveKickoffData(acting_character:, exit_keyword:, to_room_id:, ..) =
+    data
   let data =
-    event.MoveDepartData(exit_keyword: exit_keyword, subject: data.from)
+    event.MoveDepartData(subject: data.from, to_room_id:, exit_keyword:)
     |> event.MoveDepart
 
   event.new(from: self, acting_character:, data:)

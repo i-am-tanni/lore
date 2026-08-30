@@ -169,8 +169,9 @@ fn dispatch_from_character(
   let model = to_model(state)
   let #(model, effect) = case event.data {
     event.MoveRequest(data) -> move_request(model, event, data)
-    event.TeleportRequest(data) -> teleport_request(model, event, data)
     event.MoveArrive(data) -> move_arrive(model, event, data)
+    event.MoveAbort(reason) -> move_abort(model, event, reason)
+    event.TeleportRequest(data) -> teleport_request(model, event, data)
     event.Look -> look_room(model, event)
     event.LookAt(data) -> look_at(model, event, data)
     event.RejoinRoom -> rejoin_room(model, event)
@@ -331,28 +332,44 @@ fn move_request(
   let result = {
     // If exit exists, confirm room subject and send to the zone.
     // This cannot fail as only characters can initiate move events
-    let acting_character = event.acting_character
     use exit_match <- try(find_local_exit(model.room.exits, exit_keyword))
     use _ <- try(can_access(exit_match))
+    let acting_character = event.acting_character
+    let id = acting_character.id
+    let room = model.room
+    use _found <- result.try(
+      list.find(room.characters, fn(mobile) { mobile.id == id })
+      |> result.map_error(fn(_) { world.MoveErr(world.SubjectMissingFromRoom) }),
+    )
+    let filtered = list.filter(room.characters, fn(mobile) { mobile.id != id })
     let world.RoomExit(from_room_id:, to_room_id:, ..) = exit_match
 
-    event.MoveKickoffData(
-      from: event.from,
-      acting_character:,
-      from_room_id:,
-      to_room_id:,
-      exit_keyword: Some(exit_keyword),
-    )
-    |> event.MoveKickoff
-    |> Ok
+    let model = {
+      let room = world.Room(..room, characters: filtered)
+      Model(..model, room:)
+    }
+
+    let effect =
+      event.MoveKickoffData(
+        from: event.from,
+        acting_character:,
+        from_room_id:,
+        to_room_id:,
+        exit_keyword: Some(exit_keyword),
+      )
+      |> event.MoveKickoff
+      |> effect.send_zone
+
+    Ok(#(model, effect))
   }
 
-  let effect = case result {
-    Ok(move_proceed) -> effect.send_zone(move_proceed)
-    Error(reason) -> effect.send_character(event.from, event.ActFailed(reason))
+  case result {
+    Ok(result) -> result
+    Error(reason) -> {
+      let effect = effect.send_character(event.from, event.ActFailed(reason))
+      #(model, effect)
+    }
   }
-
-  #(model, effect)
 }
 
 /// The initial movement request by a character for an exit keyword.
@@ -365,25 +382,43 @@ fn teleport_request(
   let result = {
     // If exit exists, proceed, lookup room subject, and send to zone
     // This cannot fail as only characters can initiate move events
+    let room = model.room
     let acting_character = event.acting_character
-
-    event.MoveKickoffData(
-      from: event.from,
-      acting_character:,
-      from_room_id: model.room.id,
-      to_room_id:,
-      exit_keyword: None,
+    let id = acting_character.id
+    use _found <- result.try(
+      list.find(room.characters, fn(mobile) { mobile.id == id })
+      |> result.map_error(fn(_) { world.MoveErr(world.SubjectMissingFromRoom) }),
     )
-    |> event.MoveKickoff
-    |> Ok
+
+    let effect =
+      event.MoveKickoffData(
+        from: event.from,
+        acting_character:,
+        from_room_id: model.room.id,
+        to_room_id:,
+        exit_keyword: None,
+      )
+      |> event.MoveKickoff
+      |> effect.send_zone
+
+    let model = {
+      let filtered =
+        list.filter(room.characters, fn(mobile) { mobile.id != id })
+
+      let room = world.Room(..room, characters: filtered)
+      Model(..model, room:)
+    }
+
+    Ok(#(model, effect))
   }
 
-  let effect = case result {
-    Ok(move_proceed) -> effect.send_zone(move_proceed)
-    Error(reason) -> effect.send_character(event.from, event.ActFailed(reason))
+  case result {
+    Ok(success) -> success
+    Error(reason) -> {
+      let effect = effect.send_character(event.from, event.ActFailed(reason))
+      #(model, effect)
+    }
   }
-
-  #(model, effect)
 }
 
 /// Destination room votes whether to accept the character's move.
@@ -404,14 +439,16 @@ fn move_depart(
   data: event.MoveDepartData,
 ) -> #(Model, RoomEffect(event.Done)) {
   let acting_character = event.acting_character
-  let event.MoveDepartData(exit_keyword:, subject:) = data
+  let subject = data.subject
   let notification =
-    event.NotifyDepartData(exit_keyword:, acting_character:)
+    event.NotifyDepartData(data.exit_keyword, acting_character:)
     |> event.MoveNotifyDepart
 
   let model = {
     let to_remove_id = event.acting_character.id
     let room = model.room
+    // Even though we already filtered at the request stage,
+    // filter again just in case
     let filtered =
       list.filter(room.characters, fn(character) {
         character.id != to_remove_id
@@ -427,6 +464,21 @@ fn move_depart(
   ]
 
   #(model, effect.batch(effects))
+}
+
+// Move failed
+// Add character back to departure room and send failure message
+fn move_abort(
+  model: Model,
+  event: Event(event.CharacterToRoomEvent, CharacterMessage),
+  reason: world.ErrorRoomRequest,
+) -> #(Model, RoomEffect(CharacterMessage)) {
+  let room = model.room
+  let room =
+    world.Room(..room, characters: [event.acting_character, ..room.characters])
+  let model = Model(..model, room:)
+  let effect = effect.send_character(event.from, event.ActFailed(reason))
+  #(model, effect)
 }
 
 fn move_arrive(
