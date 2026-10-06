@@ -73,12 +73,10 @@ fn init(
       // sort of like a list.group_by
       list.fold(container_kits, dict.new(), fn(acc, row) {
         case row.item_id {
-          Some(item_id) ->
-            case dict.get(acc, row.container_id) {
-              Ok(item_ids) ->
-                dict.insert(acc, row.container_id, [item_id, ..item_ids])
-              Error(Nil) -> dict.insert(acc, row.container_id, [item_id])
-            }
+          Some(item_id) -> {
+            let items = result.unwrap(dict.get(acc, row.container_id), [])
+            dict.insert(acc, row.container_id, [item_id, ..items])
+          }
 
           None ->
             case dict.has_key(acc, row.container_id) {
