@@ -4,12 +4,14 @@
 
 import gleam/dict.{type Dict}
 import gleam/erlang/process
+import gleam/function
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/otp/actor
 import gleam/result
 import glets/table
 import logging
+import lore/server/my_list
 import lore/world.{type Id, type Item, Id}
 import lore/world/sql
 import pog
@@ -70,21 +72,13 @@ fn init(
 
     // populate table
     let container_kits =
-      // sort of like a list.group_by
-      list.fold(container_kits, dict.new(), fn(acc, row) {
+      list.filter_map(container_kits, fn(row) {
         case row.item_id {
-          Some(item_id) -> {
-            let items = result.unwrap(dict.get(acc, row.container_id), [])
-            dict.insert(acc, row.container_id, [item_id, ..items])
-          }
-
-          None ->
-            case dict.has_key(acc, row.container_id) {
-              True -> acc
-              False -> dict.insert(acc, row.container_id, [])
-            }
+          Some(item_id) -> Ok(#(row.container_id, item_id))
+          None -> Error(Nil)
         }
       })
+      |> my_list.group_by(function.identity)
 
     list.map(item_rows, fn(row) {
       let item = to_item(row)
@@ -227,40 +221,24 @@ fn item_instance(
   container_kits: Dict(Int, List(Int)),
 ) -> Result(world.ItemInstance, Nil) {
   use item: Item <- result.try(table.lookup(table_name, Id(raw_item_id)))
-  case dict.get(container_kits, raw_item_id) {
-    Ok(contents) -> {
-      let contents =
-        list.filter_map(contents, fn(id) {
-          item_instance(table_name, id, container_kits)
-        })
 
-      world.ItemInstance(
-        id: world.generate_id(),
-        item: world.Loading(Id(raw_item_id)),
-        keywords: item.keywords,
-        contains: to_container(item, contents),
-        was_touched: False,
-      )
-    }
-
-    Error(Nil) if item.is_container ->
-      world.ItemInstance(
-        id: world.generate_id(),
-        item: world.Loading(Id(raw_item_id)),
-        keywords: item.keywords,
-        contains: to_container(item, []),
-        was_touched: False,
-      )
-
-    Error(Nil) ->
-      world.ItemInstance(
-        id: world.generate_id(),
-        item: world.Loading(Id(raw_item_id)),
-        keywords: item.keywords,
-        contains: world.NotContainer,
-        was_touched: False,
-      )
+  let contains = case dict.get(container_kits, raw_item_id) {
+    Ok(contents) ->
+      list.filter_map(contents, fn(id) {
+        item_instance(table_name, id, container_kits)
+      })
+      |> to_container(item, _)
+    Error(_) if item.is_container -> to_container(item, [])
+    Error(_) -> world.NotContainer
   }
+
+  world.ItemInstance(
+    id: world.generate_id(),
+    item: world.Loading(Id(raw_item_id)),
+    keywords: item.keywords,
+    contains:,
+    was_touched: False,
+  )
   |> Ok
 }
 
