@@ -1085,17 +1085,17 @@ pub fn combat_notify(
 pub fn round_report(
   self: world.MobileInternal,
   participants: Dict(StringId(Mobile), Mobile),
-  commits: List(event.CombatPollData),
+  commits: List(event.DamageEvent),
 ) -> View {
   list.filter_map(commits, fn(commit) {
-    let event.CombatPollData(attacker_id:, victim_id:, dam_roll: damage) =
+    let event.DamageEvent(attacker_id:, victim_id:, damage:, is_killing_blow:) =
       commit
     use attacker <- try(dict.get(participants, attacker_id))
     use victim <- try(dict.get(participants, victim_id))
     let commit = event.CombatCommitData(attacker:, victim:, damage:)
     let perspective = perspective(self, attacker, victim)
     let view = damage_notify(perspective, commit)
-    case victim.hp <= 0 {
+    case is_killing_blow {
       True -> view.join([view, death_notify(perspective, commit)], "\n")
       False -> view
     }

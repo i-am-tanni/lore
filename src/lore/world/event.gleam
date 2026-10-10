@@ -127,7 +127,7 @@ pub type CharacterEvent {
   CombatCommit(CombatCommitData)
   CombatRound(
     participants: Dict(StringId(Mobile), Mobile),
-    commits: List(CombatPollData),
+    commits: List(DamageEvent),
   )
   CombatRoundPoll
   ActFailed(world.ErrorRoomRequest)
@@ -257,6 +257,15 @@ pub type CombatPollData {
     victim_id: StringId(Mobile),
     attacker_id: StringId(Mobile),
     dam_roll: Int,
+  )
+}
+
+pub type DamageEvent {
+  DamageEvent(
+    victim_id: StringId(Mobile),
+    attacker_id: StringId(Mobile),
+    damage: Int,
+    is_killing_blow: Bool,
   )
 }
 

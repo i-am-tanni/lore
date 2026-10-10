@@ -307,7 +307,7 @@ fn schedule_combat_round(
 type CombatRoundTemp {
   CombatRoundTemp(
     participants: Dict(StringId(world.Mobile), world.Mobile),
-    commits: List(event.CombatPollData),
+    commits: List(event.DamageEvent),
     // whether to continue combat or not
     continue: Bool,
   )
@@ -1261,6 +1261,7 @@ fn round_process_action(
     use victim <- try(dict.get(participants, victim_id))
     use <- bool.guard(attacker.hp <= 0 || victim.hp <= 0, Error(Nil))
     use <- bool.guard(affect_in(victim.affects, world.AffGodMode), Error(Nil))
+    let is_killing_blow = victim.hp > 0 && victim.hp - dam_roll <= 0
     let victim = case victim.hp - dam_roll {
       hp if hp > 0 -> world.Mobile(..victim, hp:)
       hp -> world.Mobile(..victim, hp:, fighting: world.NoTarget)
@@ -1285,7 +1286,12 @@ fn round_process_action(
 
     // prepend commits
     let commits =
-      event.CombatPollData(attacker_id:, victim_id:, dam_roll: dam_roll)
+      event.DamageEvent(
+        attacker_id:,
+        victim_id:,
+        damage: dam_roll,
+        is_killing_blow:,
+      )
       |> list.prepend(commits, _)
 
     // Continue with next round only if any victims have hp > 0
