@@ -1071,12 +1071,12 @@ pub fn combat_notify(
   self: world.MobileInternal,
   commit: event.CombatCommitData,
 ) -> View {
-  let event.CombatCommitData(attacker:, victim:, ..) = commit
+  let event.CombatCommitData(attacker:, victim:, is_killing_blow:, ..) = commit
 
   let perspective = perspective(self, attacker, victim)
   let view = damage_notify(perspective, commit)
 
-  case victim.hp <= 0 {
+  case is_killing_blow {
     True -> view.join([view, death_notify(perspective, commit)], "\n")
     False -> view
   }
@@ -1092,13 +1092,8 @@ pub fn round_report(
       commit
     use attacker <- try(dict.get(participants, attacker_id))
     use victim <- try(dict.get(participants, victim_id))
-    let commit = event.CombatCommitData(attacker:, victim:, damage:)
-    let perspective = perspective(self, attacker, victim)
-    let view = damage_notify(perspective, commit)
-    case is_killing_blow {
-      True -> view.join([view, death_notify(perspective, commit)], "\n")
-      False -> view
-    }
+    event.CombatCommitData(attacker:, victim:, damage:, is_killing_blow:)
+    |> combat_notify(self, _)
     |> Ok
   })
   |> view.join("\n")
@@ -1142,7 +1137,7 @@ fn damage_notify(
   perspective: Perspective,
   data: event.CombatCommitData,
 ) -> View {
-  let event.CombatCommitData(victim:, attacker:, damage:) = data
+  let event.CombatCommitData(victim:, attacker:, damage:, ..) = data
   let victim_hp_max = victim.hp_max
 
   case perspective {

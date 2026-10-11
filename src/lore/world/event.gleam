@@ -270,7 +270,12 @@ pub type DamageEvent {
 }
 
 pub type CombatCommitData {
-  CombatCommitData(attacker: world.Mobile, victim: world.Mobile, damage: Int)
+  CombatCommitData(
+    attacker: world.Mobile,
+    victim: world.Mobile,
+    damage: Int,
+    is_killing_blow: Bool,
+  )
 }
 
 /// Zones are a sync point for inter-room events like movement and doors.

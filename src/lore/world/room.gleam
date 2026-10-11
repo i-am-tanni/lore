@@ -1092,6 +1092,8 @@ fn combat_process(
       event.SearchId(victim_id),
     ))
 
+    let is_killing_blow = victim.hp > 0 && victim.hp - dam_roll <= 0
+
     // update victim
     let #(victim, is_victim_alive) = case victim.hp - dam_roll {
       hp if hp > 0 && victim.fighting == world.NoTarget -> #(
@@ -1158,7 +1160,12 @@ fn combat_process(
     let attacker = option.unwrap(attacker_update, attacker)
 
     let combat_commit =
-      event.CombatCommitData(victim:, attacker:, damage: dam_roll)
+      event.CombatCommitData(
+        victim:,
+        attacker:,
+        damage: dam_roll,
+        is_killing_blow:,
+      )
       |> event.CombatCommit
       |> effect.broadcast
 
@@ -1330,7 +1337,7 @@ fn combat_slay(
     }
 
     let effect =
-      event.CombatCommitData(victim:, attacker:, damage:)
+      event.CombatCommitData(victim:, attacker:, damage:, is_killing_blow: True)
       |> event.CombatCommit
       |> effect.broadcast
 
