@@ -4,6 +4,7 @@ import gleam/int
 import gleam/list
 import gleam/option.{type Option}
 import gleam/result
+import lore/character/perspective
 import lore/server/bit_set.{type BitSet, BitSet}
 import lore/server/my_list
 import lore/world/keyword
@@ -105,7 +106,7 @@ pub type Mobile {
     template_id: TemplateId,
     name: String,
     keywords: List(Int),
-    pronouns: PronounKind,
+    pronouns: perspective.PronounKind,
     short: String,
     fighting: Fighting,
     affects: BitSet(MobAffect),
@@ -134,7 +135,7 @@ pub type MobileInternal {
     keywords: List(Int),
     inventory: List(ItemInstance),
     equipment: Dict(WearSlot, Wearing),
-    pronouns: PronounKind,
+    pronouns: perspective.PronounKind,
     short: String,
     fighting: Fighting,
     affects: BitSet(MobAffect),
@@ -260,7 +261,7 @@ pub type ItemSpawn {
 ///
 /// ## Example
 /// ```gleam
-/// id.generate()
+/// generate_id()
 /// // -> 3D40AD6B
 /// ```
 ///
@@ -366,7 +367,7 @@ pub fn mobile_identity() -> Mobile {
     template_id: Npc(Id(0)),
     name: "",
     keywords: [],
-    pronouns: PronounNeutral,
+    pronouns: perspective.Neutral,
     short: "",
     fighting: NoTarget,
     affects: BitSet(0),
@@ -530,37 +531,6 @@ pub fn unwrap_id(id: Id(a)) -> Int {
   let Id(a) = id
   a
 }
-
-pub type Pronoun {
-  /// Note: These are only masculine because he/him/his/himself is clearer
-  /// than she/her/her/herself
-  Pronoun(he: String, him: String, his: String, himself: String)
-}
-
-pub type PronounKind {
-  Feminine
-  Masculine
-  PronounNeutral
-}
-
-pub fn pronouns(choice: PronounKind) -> Pronoun {
-  case choice {
-    Feminine -> feminine
-    Masculine -> masculine
-    PronounNeutral -> neutral
-  }
-}
-
-const feminine = Pronoun(he: "she", him: "her", his: "her", himself: "herself")
-
-const masculine = Pronoun(he: "he", him: "him", his: "his", himself: "himself")
-
-const neutral = Pronoun(
-  he: "they",
-  him: "them",
-  his: "their",
-  himself: "themself",
-)
 
 pub type MobAffect {
   AffSuperInvisible

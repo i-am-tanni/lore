@@ -10,6 +10,7 @@ import gleam/option.{type Option, None, Some}
 import gleam/result.{try}
 import gleam/string_tree.{type StringTree}
 
+import lore/character/perspective
 import lore/character/users
 import lore/character/view.{type View}
 import lore/server/bit_set
@@ -1047,7 +1048,8 @@ fn last_character(binary: BitArray, last_char: BitArray) -> BitArray {
 }
 
 fn pronoun_self(acting_character: world.Mobile) -> String {
-  let world.Pronoun(himself:, ..) = world.pronouns(acting_character.pronouns)
+  let perspective.Pronoun(himself:, ..) =
+    perspective.pronouns(acting_character.pronouns)
   himself
 }
 

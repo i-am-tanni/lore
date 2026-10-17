@@ -20,6 +20,7 @@ import lore/character/controller.{type Controller}
 import lore/character/controller/character_controller
 import lore/character/controller/login_controller
 import lore/character/controller/spawn_controller
+import lore/character/perspective
 import lore/character/view
 import lore/character/view/render
 import lore/server/bit_set.{BitSet}
@@ -105,7 +106,7 @@ fn init_reception(
       role: world.User,
       keywords: [],
       short: "",
-      pronouns: world.Feminine,
+      pronouns: perspective.Feminine,
       inventory: [],
       equipment: dict.new(),
       fighting: world.NoTarget,

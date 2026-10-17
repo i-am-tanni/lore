@@ -18,10 +18,10 @@ import lore/world/room/room_registry
 import lore/world/zone/zone_registry
 import pog
 
-/// Record for looking up a registry name created at runtime.
+/// Record for looking up a named actor created at runtime.
 ///
-/// Given a registry name, we can perform a lookup in the table from the caller
-/// without message passing.
+/// Given a named actor, we can perform a lookup in the table from the caller
+/// directly without message passing to a registry.
 ///
 pub type Lookup {
   /// - ZoneRegistry: Looks up Zone subjects

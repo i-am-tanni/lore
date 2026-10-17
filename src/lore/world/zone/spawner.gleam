@@ -10,6 +10,7 @@ import gleam/pair
 import gleam/result.{try}
 import gleam/set
 import lore/character/character_registry
+import lore/character/perspective
 import lore/character/users
 import lore/server/bit_set.{BitSet}
 import lore/world.{
@@ -201,7 +202,7 @@ fn to_mobile(
     name: row.name,
     role: world.User,
     keywords: row.keywords,
-    pronouns: world.Masculine,
+    pronouns: perspective.Masculine,
     short: row.short,
     inventory: [],
     equipment: dict.new(),
