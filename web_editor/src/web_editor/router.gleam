@@ -39,6 +39,16 @@ pub type RoomInsert {
   )
 }
 
+pub type ItemInsert {
+  ItemInsert(
+    zone_id: Int,
+    name: String,
+    short: String,
+    long: String,
+    keywords: List(String),
+  )
+}
+
 type ExitInsert {
   ExitInsert(
     from_room_id: Int,
@@ -66,8 +76,6 @@ pub type DoorInsert {
   DoorInsert(access_state: String)
 }
 
-/// The HTTP request handler- your application!
-///
 pub fn handle_request(req: Request, db: process.Name(pog.Message)) -> Response {
   // Apply the middleware stack for this request/response.
   use req <- middleware.middleware(req)
@@ -77,43 +85,48 @@ pub fn handle_request(req: Request, db: process.Name(pog.Message)) -> Response {
     ["r"], Get -> new_room_page(req)
     ["r"], Post -> insert_room(req, db)
     ["r", room_id], Get -> {
-      let result = {
-        use id <- try(
-          string_to_int(room_id)
-          |> result.replace_error(WrongType("Invalid room id")),
-        )
-        let db = pog.named_connection(db)
-        use room <- try(query1(sql.room_get(db, id), "Room"))
-        use exits <- try(query_many(sql.exit_get(db, id)))
-        Ok(Room(data: room, exits:))
-      }
-
-      case result {
+      case room_get(room_id, db) {
         Ok(room) -> room_page(req, room)
         Error(error) -> wisp.bad_request(string.inspect(error))
       }
     }
-
     ["r", _id], Post -> update_room(req, db)
     ["z", zone_id], Get -> {
-      let result = {
-        use id <- try(
-          string_to_int(zone_id)
-          |> result.replace_error(WrongType("Invalid zone id")),
-        )
-        let db = pog.named_connection(db)
-        use zone <- try(query1(sql.zone_get(db, id), "Zone"))
-        use rooms <- try(query_many(sql.zone_rooms_get(db, id)))
-        Ok(Zone(zone:, rooms:))
-      }
-
-      case result {
+      case zone_get(zone_id, db) {
         Ok(zone) -> zone_page(req, zone)
         Error(error) -> wisp.bad_request(string.inspect(error))
       }
     }
     _, _ -> wisp.not_found()
   }
+}
+
+fn room_get(
+  room_id: String,
+  db: process.Name(pog.Message),
+) -> Result(Room, Error) {
+  use id <- try(
+    string_to_int(room_id)
+    |> result.replace_error(WrongType("Invalid room id")),
+  )
+  let db = pog.named_connection(db)
+  use room <- try(query1(sql.room_get(db, id), "Room"))
+  use exits <- try(query_many(sql.exit_get(db, id)))
+  Ok(Room(data: room, exits:))
+}
+
+fn zone_get(
+  zone_id: String,
+  db: process.Name(pog.Message),
+) -> Result(Zone, Error) {
+  use id <- try(
+    string_to_int(zone_id)
+    |> result.replace_error(WrongType("Invalid zone id")),
+  )
+  let db = pog.named_connection(db)
+  use zone <- try(query1(sql.zone_get(db, id), "Zone"))
+  use rooms <- try(query_many(sql.zone_rooms_get(db, id)))
+  Ok(Zone(zone:, rooms:))
 }
 
 fn home_page(req: Request) -> Response {
@@ -507,6 +520,58 @@ fn zone_page(_req: Request, zone: Zone) -> Response {
   |> wisp.html_body(html)
 }
 
+fn insert_item(req: Request, db: process.Name(pog.Message)) -> Response {
+  use formdata <- wisp.require_form(req)
+  let result = {
+    use zone_id <- try(form_get_int(formdata, "zone_id"))
+    use name <- try(form_get(formdata, "name"))
+    use short <- try(form_get(formdata, "short"))
+    use long <- try(form_get(formdata, "long"))
+    use keywords <- try(form_get(formdata, "keywords"))
+    use keywords <- try(case string.split(keywords, " ") {
+      keywords if keywords != [] -> list.map(keywords, string.lowercase) |> Ok
+      _ -> Error(NotFound("Keywords"))
+    })
+    let item = ItemInsert(zone_id:, name:, short:, long:, keywords:)
+    use item_id <- try(transaction(db, insert_item_db(_, item)))
+    let item_id = int.to_string(item_id)
+    let success =
+      "<a href='/r/" <> item_id <> "'>Inserted item id #" <> item_id <> "!</a>"
+    Ok(success)
+  }
+  case result {
+    Ok(content) -> {
+      wisp.ok()
+      |> wisp.html_body(content)
+    }
+
+    Error(error) -> wisp.bad_request(string.inspect(error))
+  }
+}
+
+fn insert_item_db(db: pog.Connection, item: ItemInsert) -> Result(Int, Error) {
+  use keyword_ids <- try(
+    list.try_map(item.keywords, fn(kw) {
+      use sql.KeywordInsertRow(keyword_id) <- try(query1(
+        sql.keyword_insert(db, kw),
+        "keyword id",
+      ))
+      Ok(keyword_id)
+    }),
+  )
+  use sql.ItemInsertRow(item_id) <- try(query1(
+    sql.item_insert(db, item.name, item.short, item.long),
+    "item id",
+  ))
+  use _ <- try(
+    list.try_each(keyword_ids, fn(keyword_id) {
+      sql.item_kw_insert(db, item_id, keyword_id)
+    })
+    |> result.map_error(Database),
+  )
+  Ok(item_id)
+}
+
 fn insert_room(req: Request, db: process.Name(pog.Message)) -> Response {
   use formdata <- wisp.require_form(req)
   let db = pog.named_connection(db)
@@ -543,7 +608,10 @@ fn update_room(req: Request, db: process.Name(pog.Message)) -> Response {
   let db = pog.named_connection(db)
   let result = {
     use room_id <- try(form_get(formdata, "room_id"))
-    let assert Ok(id) = string_to_int(room_id)
+    use id <- try(
+      string_to_int(room_id)
+      |> result.replace_error(WrongType("Invalid room id")),
+    )
     use zone_id <- try(form_get_int(formdata, "zone_id"))
     use name <- try(form_get(formdata, "name"))
     use desc <- try(form_get(formdata, "description"))
@@ -696,7 +764,7 @@ fn form_get_int(formdata: wisp.FormData, key: String) -> Result(Int, Error) {
     |> result.replace_error(FormDataMissing(key)),
   )
   use int <- try(
-    string_to_int(int) |> result.replace_error(FormDataMissing(key)),
+    string_to_int(int) |> result.replace_error(WrongType("Invalid " <> key)),
   )
   Ok(int)
 }
@@ -705,11 +773,16 @@ fn form_get_bool(formdata: wisp.FormData, key: String) -> Bool {
   list.key_find(formdata.values, key) == Ok("True")
 }
 
-fn query0(result: Result(pog.Returned(a), pog.QueryError)) -> Result(Nil, Error) {
-  use returned <- try(result.map_error(result, Database))
+fn query0(
+  result: Result(pog.Returned(a), pog.QueryError),
+) -> Result(Nil, Error) {
+  use returned <- result.try(result.map_error(result, Database))
   case returned {
     pog.Returned(count: 1, rows: []) -> Ok(Nil)
-    _ -> Error(NotFound("???"))
+    _ ->
+      Error(NotFound(
+        "query0() called but >0 returned. Did you mean query1() or query_many()?",
+      ))
   }
 }
 
@@ -729,4 +802,18 @@ fn query_many(
 ) -> Result(List(a), Error) {
   use pog.Returned(rows:, ..) <- try(result.map_error(result, Database))
   Ok(rows)
+}
+
+fn transaction(
+  db: process.Name(pog.Message),
+  callback: fn(pog.Connection) -> Result(a, Error),
+) -> Result(a, Error) {
+  let db = pog.named_connection(db)
+  pog.transaction(db, callback)
+  |> result.map_error(fn(err) {
+    case err {
+      pog.TransactionQueryError(err) -> Database(err)
+      pog.TransactionRolledBack(err) -> err
+    }
+  })
 }

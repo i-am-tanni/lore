@@ -349,7 +349,7 @@ reused_reverse AS (
   RETURNING *
 )
 
--- If nothing was reused, create a new exit
+-- If nothing was reused, create new
 INSERT INTO exit (from_room_id, to_room_id, keyword, is_active)
 SELECT $1, $2, $3, TRUE
 WHERE NOT EXISTS (SELECT 1 FROM reused_forward)
@@ -428,6 +428,133 @@ WHERE NOT EXISTS (SELECT 1 FROM door_side_reused);
   |> pog.parameter(pog.int(arg_2))
   |> pog.parameter(pog.text(arg_3))
   |> pog.parameter(pog.int(arg_4))
+  |> pog.returning(decoder)
+  |> pog.execute(db)
+}
+
+/// A row you get from running the `item_insert` query
+/// defined in `./src/web_editor/sql/item_insert.sql`.
+///
+/// > 🐿️ This type definition was generated automatically using v4.4.1 of the
+/// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub type ItemInsertRow {
+  ItemInsertRow(item_id: Int)
+}
+
+/// Runs the `item_insert` query
+/// defined in `./src/web_editor/sql/item_insert.sql`.
+///
+/// > 🐿️ This function was generated automatically using v4.4.1 of
+/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub fn item_insert(
+  db: pog.Connection,
+  arg_1: String,
+  arg_2: String,
+  arg_3: String,
+) -> Result(pog.Returned(ItemInsertRow), pog.QueryError) {
+  let decoder = {
+    use item_id <- decode.field(0, decode.int)
+    decode.success(ItemInsertRow(item_id:))
+  }
+
+  "INSERT INTO item(name, short, long)
+VALUES ($1, $2, $3)
+RETURNING item_id;
+"
+  |> pog.query
+  |> pog.parameter(pog.text(arg_1))
+  |> pog.parameter(pog.text(arg_2))
+  |> pog.parameter(pog.text(arg_3))
+  |> pog.returning(decoder)
+  |> pog.execute(db)
+}
+
+/// Runs the `item_kw_insert` query
+/// defined in `./src/web_editor/sql/item_kw_insert.sql`.
+///
+/// > 🐿️ This function was generated automatically using v4.4.1 of
+/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub fn item_kw_insert(
+  db: pog.Connection,
+  arg_1: Int,
+  arg_2: Int,
+) -> Result(pog.Returned(Nil), pog.QueryError) {
+  let decoder = decode.map(decode.dynamic, fn(_) { Nil })
+
+  "INSERT INTO item_keyword(item_id, keyword_id)
+VALUES ($1, $2);
+"
+  |> pog.query
+  |> pog.parameter(pog.int(arg_1))
+  |> pog.parameter(pog.int(arg_2))
+  |> pog.returning(decoder)
+  |> pog.execute(db)
+}
+
+/// Runs the `item_update` query
+/// defined in `./src/web_editor/sql/item_update.sql`.
+///
+/// > 🐿️ This function was generated automatically using v4.4.1 of
+/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub fn item_update(
+  db: pog.Connection,
+  arg_1: Int,
+  arg_2: String,
+  arg_3: String,
+  arg_4: String,
+) -> Result(pog.Returned(Nil), pog.QueryError) {
+  let decoder = decode.map(decode.dynamic, fn(_) { Nil })
+
+  "UPDATE item
+SET name=$2, short=$3, long=$4
+WHERE item_id = $1;
+"
+  |> pog.query
+  |> pog.parameter(pog.int(arg_1))
+  |> pog.parameter(pog.text(arg_2))
+  |> pog.parameter(pog.text(arg_3))
+  |> pog.parameter(pog.text(arg_4))
+  |> pog.returning(decoder)
+  |> pog.execute(db)
+}
+
+/// A row you get from running the `keyword_insert` query
+/// defined in `./src/web_editor/sql/keyword_insert.sql`.
+///
+/// > 🐿️ This type definition was generated automatically using v4.4.1 of the
+/// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub type KeywordInsertRow {
+  KeywordInsertRow(keyword_id: Int)
+}
+
+/// Runs the `keyword_insert` query
+/// defined in `./src/web_editor/sql/keyword_insert.sql`.
+///
+/// > 🐿️ This function was generated automatically using v4.4.1 of
+/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub fn keyword_insert(
+  db: pog.Connection,
+  arg_1: String,
+) -> Result(pog.Returned(KeywordInsertRow), pog.QueryError) {
+  let decoder = {
+    use keyword_id <- decode.field(0, decode.int)
+    decode.success(KeywordInsertRow(keyword_id:))
+  }
+
+  "INSERT INTO public.keyword (keyword)
+VALUES (lower($1))
+ON CONFLICT ((lower(keyword))) 
+DO UPDATE SET keyword = EXCLUDED.keyword
+RETURNING keyword_id;
+"
+  |> pog.query
+  |> pog.parameter(pog.text(arg_1))
   |> pog.returning(decoder)
   |> pog.execute(db)
 }
