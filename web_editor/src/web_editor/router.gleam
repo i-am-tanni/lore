@@ -572,6 +572,32 @@ fn insert_item_db(db: pog.Connection, item: ItemInsert) -> Result(Int, Error) {
   Ok(item_id)
 }
 
+fn insert_mobile_db(
+  db: pog.Connection,
+  mobile: ItemInsert,
+) -> Result(Int, Error) {
+  use keyword_ids <- try(
+    list.try_map(mobile.keywords, fn(kw) {
+      use sql.KeywordInsertRow(keyword_id) <- try(query1(
+        sql.keyword_insert(db, kw),
+        "keyword id",
+      ))
+      Ok(keyword_id)
+    }),
+  )
+  use sql.MobileInsertRow(mobile_id) <- try(query1(
+    sql.mobile_insert(db, mobile.name, mobile.short, mobile.long),
+    "mobile id",
+  ))
+  use _ <- try(
+    list.try_each(keyword_ids, fn(keyword_id) {
+      sql.mobile_kw_insert(db, mobile_id, keyword_id)
+    })
+    |> result.map_error(Database),
+  )
+  Ok(mobile_id)
+}
+
 fn insert_room(req: Request, db: process.Name(pog.Message)) -> Response {
   use formdata <- wisp.require_form(req)
   let db = pog.named_connection(db)

@@ -559,6 +559,68 @@ RETURNING keyword_id;
   |> pog.execute(db)
 }
 
+/// A row you get from running the `mobile_insert` query
+/// defined in `./src/web_editor/sql/mobile_insert.sql`.
+///
+/// > 🐿️ This type definition was generated automatically using v4.4.1 of the
+/// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub type MobileInsertRow {
+  MobileInsertRow(mobile_id: Int)
+}
+
+/// Runs the `mobile_insert` query
+/// defined in `./src/web_editor/sql/mobile_insert.sql`.
+///
+/// > 🐿️ This function was generated automatically using v4.4.1 of
+/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub fn mobile_insert(
+  db: pog.Connection,
+  arg_1: String,
+  arg_2: String,
+  arg_3: String,
+) -> Result(pog.Returned(MobileInsertRow), pog.QueryError) {
+  let decoder = {
+    use mobile_id <- decode.field(0, decode.int)
+    decode.success(MobileInsertRow(mobile_id:))
+  }
+
+  "INSERT INTO mobile(name, short, long)
+VALUES ($1, $2, $3)
+RETURNING mobile_id;
+"
+  |> pog.query
+  |> pog.parameter(pog.text(arg_1))
+  |> pog.parameter(pog.text(arg_2))
+  |> pog.parameter(pog.text(arg_3))
+  |> pog.returning(decoder)
+  |> pog.execute(db)
+}
+
+/// Runs the `mobile_kw_insert` query
+/// defined in `./src/web_editor/sql/mobile_kw_insert.sql`.
+///
+/// > 🐿️ This function was generated automatically using v4.4.1 of
+/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub fn mobile_kw_insert(
+  db: pog.Connection,
+  arg_1: Int,
+  arg_2: Int,
+) -> Result(pog.Returned(Nil), pog.QueryError) {
+  let decoder = decode.map(decode.dynamic, fn(_) { Nil })
+
+  "INSERT INTO mob_keyword(mobile_id, keyword_id)
+VALUES ($1, $2);
+"
+  |> pog.query
+  |> pog.parameter(pog.int(arg_1))
+  |> pog.parameter(pog.int(arg_2))
+  |> pog.returning(decoder)
+  |> pog.execute(db)
+}
+
 /// A row you get from running the `room_get` query
 /// defined in `./src/web_editor/sql/room_get.sql`.
 ///
