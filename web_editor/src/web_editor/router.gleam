@@ -27,6 +27,26 @@ pub type Zone {
   Zone(zone: sql.ZoneGetRow, rooms: List(sql.ZoneRoomsGetRow))
 }
 
+type ItemData {
+  ItemData(name: String, short: String, long: String, keywords: List(String))
+}
+
+type MobileData {
+  MobileData(name: String, short: String, long: String, keywords: List(String))
+}
+
+type RoomData {
+  RoomData(
+    zone_id: Int,
+    name: String,
+    desc: String,
+    symbol: String,
+    x: Int,
+    y: Int,
+    z: Int,
+  )
+}
+
 type ExitInsert {
   ExitInsert(
     from_room_id: Int,
@@ -501,18 +521,10 @@ fn zone_page(_req: Request, zone: Zone) -> Response {
 fn insert_item(req: Request, db: process.Name(pog.Message)) -> Response {
   use formdata <- wisp.require_form(req)
   let result = {
-    use _zone_id <- try(form_get_int(formdata, "zone_id"))
-    use name <- try(form_get(formdata, "name"))
-    use short <- try(form_get(formdata, "short"))
-    use long <- try(form_get(formdata, "long"))
-    use keywords <- try(form_get(formdata, "keywords"))
-    use keywords <- try(case string.split(keywords, " ") {
-      keywords if keywords != [] -> Ok(keywords)
-      _ -> Error(NotFound("Keywords"))
-    })
+    use item <- try(parse_item(formdata))
     let db = pog.named_connection(db)
     use sql.ItemInsertRow(item_id) <- try(query1(
-      sql.item_insert(db, name, short, long, keywords),
+      sql.item_insert(db, item.name, item.short, item.long, item.keywords),
       "item id",
     ))
     let item_id = int.to_string(item_id)
@@ -530,19 +542,127 @@ fn insert_item(req: Request, db: process.Name(pog.Message)) -> Response {
   }
 }
 
+fn update_item(req: Request, db: process.Name(pog.Message)) -> Response {
+  use formdata <- wisp.require_form(req)
+  let result = {
+    use item_id <- try(form_get(formdata, "item_id"))
+    use id <- try(
+      string_to_int(item_id)
+      |> result.replace_error(WrongType("Invalid item id")),
+    )
+    use item <- try(parse_item(formdata))
+    let db = pog.named_connection(db)
+    use sql.ItemUpdateRow(item_id) <- try(query1(
+      sql.item_update(db, id, item.name, item.short, item.long, item.keywords),
+      "item id",
+    ))
+    let item_id = int.to_string(item_id)
+    let success =
+      "<a href='/r/" <> item_id <> "'>Updated item id #" <> item_id <> "!</a>"
+    Ok(success)
+  }
+
+  case result {
+    Ok(content) -> {
+      wisp.ok()
+      |> wisp.html_body(content)
+    }
+
+    Error(error) -> wisp.bad_request(string.inspect(error))
+  }
+}
+
+fn update_mobile(req: Request, db: process.Name(pog.Message)) -> Response {
+  use formdata <- wisp.require_form(req)
+  let result = {
+    use mobile_id <- try(form_get(formdata, "mobile_id"))
+    use id <- try(
+      string_to_int(mobile_id)
+      |> result.replace_error(WrongType("Invalid mobile id")),
+    )
+    use mobile <- try(parse_mobile(formdata))
+    let db = pog.named_connection(db)
+    use sql.MobileUpdateRow(mobile_id) <- try(query1(
+      sql.mobile_update(
+        db,
+        id,
+        mobile.name,
+        mobile.short,
+        mobile.long,
+        mobile.keywords,
+      ),
+      "mobile id",
+    ))
+    let mobile_id = int.to_string(mobile_id)
+    let success =
+      "<a href='/r/"
+      <> mobile_id
+      <> "'>Updated mobile id #"
+      <> mobile_id
+      <> "!</a>"
+    Ok(success)
+  }
+
+  case result {
+    Ok(content) -> {
+      wisp.ok()
+      |> wisp.html_body(content)
+    }
+
+    Error(error) -> wisp.bad_request(string.inspect(error))
+  }
+}
+
+fn insert_mobile(req: Request, db: process.Name(pog.Message)) -> Response {
+  use formdata <- wisp.require_form(req)
+  let result = {
+    use mobile <- try(parse_mobile(formdata))
+    let db = pog.named_connection(db)
+    use sql.MobileInsertRow(mobile_id) <- try(query1(
+      sql.mobile_insert(
+        db,
+        mobile.name,
+        mobile.short,
+        mobile.long,
+        mobile.keywords,
+      ),
+      "mobile id",
+    ))
+    let mobile_id = int.to_string(mobile_id)
+    let success =
+      "<a href='/r/"
+      <> mobile_id
+      <> "'>Inserted mobile id #"
+      <> mobile_id
+      <> "!</a>"
+    Ok(success)
+  }
+  case result {
+    Ok(content) -> {
+      wisp.ok()
+      |> wisp.html_body(content)
+    }
+
+    Error(error) -> wisp.bad_request(string.inspect(error))
+  }
+}
+
 fn insert_room(req: Request, db: process.Name(pog.Message)) -> Response {
   use formdata <- wisp.require_form(req)
   let db = pog.named_connection(db)
   let result = {
-    use zone_id <- try(form_get_int(formdata, "zone_id"))
-    use name <- try(form_get(formdata, "name"))
-    use desc <- try(form_get(formdata, "description"))
-    use symbol <- try(form_get(formdata, "symbol"))
-    use x <- try(form_get_int(formdata, "x"))
-    use y <- try(form_get_int(formdata, "y"))
-    use z <- try(form_get_int(formdata, "z"))
+    use room <- try(parse_room(formdata))
     use sql.RoomInsertRow(room_id) <- try(query1(
-      sql.room_insert(db, zone_id, name, desc, symbol, x, y, z),
+      sql.room_insert(
+        db,
+        room.zone_id,
+        room.name,
+        room.desc,
+        room.symbol,
+        room.x,
+        room.y,
+        room.z,
+      ),
       "Room Id",
     ))
     let room_id = int.to_string(room_id)
@@ -570,16 +690,20 @@ fn update_room(req: Request, db: process.Name(pog.Message)) -> Response {
       string_to_int(room_id)
       |> result.replace_error(WrongType("Invalid room id")),
     )
-    use zone_id <- try(form_get_int(formdata, "zone_id"))
-    use name <- try(form_get(formdata, "name"))
-    use desc <- try(form_get(formdata, "description"))
-    use symbol <- try(form_get(formdata, "symbol"))
-    use x <- try(form_get_int(formdata, "x"))
-    use y <- try(form_get_int(formdata, "y"))
-    use z <- try(form_get_int(formdata, "z"))
+    use room <- try(parse_room(formdata))
     let to_room_id = form_get_int(formdata, "to_room_id")
     use _ <- try(
-      query0(sql.room_update(db, id, zone_id, name, desc, symbol, x, y, z)),
+      query0(sql.room_update(
+        db,
+        id,
+        room.zone_id,
+        room.name,
+        room.desc,
+        room.symbol,
+        room.x,
+        room.y,
+        room.z,
+      )),
     )
 
     // Delete any exits
@@ -618,7 +742,6 @@ fn update_room(req: Request, db: process.Name(pog.Message)) -> Response {
         ))
         Ok(success)
       }
-
       _ -> Ok(success)
     }
   }
@@ -631,6 +754,43 @@ fn update_room(req: Request, db: process.Name(pog.Message)) -> Response {
 
     Error(error) -> wisp.bad_request(string.inspect(error))
   }
+}
+
+fn parse_item(formdata: wisp.FormData) -> Result(ItemData, Error) {
+  use _zone_id <- try(form_get_int(formdata, "zone_id"))
+  use name <- try(form_get(formdata, "name"))
+  use short <- try(form_get(formdata, "short"))
+  use long <- try(form_get(formdata, "long"))
+  use keywords <- try(form_get(formdata, "keywords"))
+  use keywords <- try(case string.split(keywords, " ") {
+    keywords if keywords != [] -> Ok(keywords)
+    _ -> Error(NotFound("Keywords"))
+  })
+  Ok(ItemData(name:, short:, long:, keywords:))
+}
+
+fn parse_mobile(formdata: wisp.FormData) -> Result(MobileData, Error) {
+  use _zone_id <- try(form_get_int(formdata, "zone_id"))
+  use name <- try(form_get(formdata, "name"))
+  use short <- try(form_get(formdata, "short"))
+  use long <- try(form_get(formdata, "long"))
+  use keywords <- try(form_get(formdata, "keywords"))
+  use keywords <- try(case string.split(keywords, " ") {
+    keywords if keywords != [] -> Ok(keywords)
+    _ -> Error(NotFound("Keywords"))
+  })
+  Ok(MobileData(name:, short:, long:, keywords:))
+}
+
+fn parse_room(formdata: wisp.FormData) -> Result(RoomData, Error) {
+  use zone_id <- try(form_get_int(formdata, "zone_id"))
+  use name <- try(form_get(formdata, "name"))
+  use desc <- try(form_get(formdata, "description"))
+  use symbol <- try(form_get(formdata, "symbol"))
+  use x <- try(form_get_int(formdata, "x"))
+  use y <- try(form_get_int(formdata, "y"))
+  use z <- try(form_get_int(formdata, "z"))
+  Ok(RoomData(zone_id:, name:, desc:, symbol:, x:, y:, z:))
 }
 
 fn direction_to_string(direction: Direction) -> String {

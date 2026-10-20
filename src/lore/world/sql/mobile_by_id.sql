@@ -1,6 +1,5 @@
 SELECT
   m.mobile_id,
-  m.room_id,
   m.name,
   m.short,
   k_agg.keywords as keywords

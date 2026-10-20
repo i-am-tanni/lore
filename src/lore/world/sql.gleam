@@ -490,7 +490,6 @@ pub fn mob_spawns(
 pub type MobileByIdRow {
   MobileByIdRow(
     mobile_id: Int,
-    room_id: Int,
     name: String,
     short: String,
     keywords: List(Int),
@@ -509,16 +508,14 @@ pub fn mobile_by_id(
 ) -> Result(pog.Returned(MobileByIdRow), pog.QueryError) {
   let decoder = {
     use mobile_id <- decode.field(0, decode.int)
-    use room_id <- decode.field(1, decode.int)
-    use name <- decode.field(2, decode.string)
-    use short <- decode.field(3, decode.string)
-    use keywords <- decode.field(4, decode.list(decode.int))
-    decode.success(MobileByIdRow(mobile_id:, room_id:, name:, short:, keywords:))
+    use name <- decode.field(1, decode.string)
+    use short <- decode.field(2, decode.string)
+    use keywords <- decode.field(3, decode.list(decode.int))
+    decode.success(MobileByIdRow(mobile_id:, name:, short:, keywords:))
   }
 
   "SELECT
   m.mobile_id,
-  m.room_id,
   m.name,
   m.short,
   k_agg.keywords as keywords
