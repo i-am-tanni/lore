@@ -453,20 +453,37 @@ pub fn item_insert(
   arg_1: String,
   arg_2: String,
   arg_3: String,
+  arg_4: List(String),
 ) -> Result(pog.Returned(ItemInsertRow), pog.QueryError) {
   let decoder = {
     use item_id <- decode.field(0, decode.int)
     decode.success(ItemInsertRow(item_id:))
   }
 
-  "INSERT INTO item(name, short, long)
-VALUES ($1, $2, $3)
-RETURNING item_id;
+  "WITH inserted_item AS (
+    INSERT INTO item (name, short, long)
+    VALUES ($1, $2, $3)
+    RETURNING item_id
+),
+inserted_keywords AS (
+    INSERT INTO keyword (keyword)
+    SELECT unnest($4::text[])
+    ON CONFLICT (keyword) DO UPDATE SET keyword = EXCLUDED.keyword
+    RETURNING keyword_id
+),
+link_item_keywords AS (
+    INSERT INTO item_keyword (item_id, keyword_id)
+    SELECT inserted_item.item_id, inserted_keywords.keyword_id 
+    FROM inserted_item, inserted_keywords
+    ON CONFLICT (item_id, keyword_id) DO NOTHING
+)
+SELECT item_id FROM inserted_item;
 "
   |> pog.query
   |> pog.parameter(pog.text(arg_1))
   |> pog.parameter(pog.text(arg_2))
   |> pog.parameter(pog.text(arg_3))
+  |> pog.parameter(pog.array(fn(value) { pog.text(value) }, arg_4))
   |> pog.returning(decoder)
   |> pog.execute(db)
 }
@@ -485,13 +502,24 @@ pub fn item_kw_insert(
   let decoder = decode.map(decode.dynamic, fn(_) { Nil })
 
   "INSERT INTO item_keyword(item_id, keyword_id)
-VALUES ($1, $2);
+VALUES ($1, $2)
+ON CONFLICT (item_id, keyword_id) DO NOTHING;
 "
   |> pog.query
   |> pog.parameter(pog.int(arg_1))
   |> pog.parameter(pog.int(arg_2))
   |> pog.returning(decoder)
   |> pog.execute(db)
+}
+
+/// A row you get from running the `item_update` query
+/// defined in `./src/web_editor/sql/item_update.sql`.
+///
+/// > 🐿️ This type definition was generated automatically using v4.4.1 of the
+/// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub type ItemUpdateRow {
+  ItemUpdateRow(item_id: Int)
 }
 
 /// Runs the `item_update` query
@@ -506,18 +534,40 @@ pub fn item_update(
   arg_2: String,
   arg_3: String,
   arg_4: String,
-) -> Result(pog.Returned(Nil), pog.QueryError) {
-  let decoder = decode.map(decode.dynamic, fn(_) { Nil })
+  arg_5: List(String),
+) -> Result(pog.Returned(ItemUpdateRow), pog.QueryError) {
+  let decoder = {
+    use item_id <- decode.field(0, decode.int)
+    decode.success(ItemUpdateRow(item_id:))
+  }
 
-  "UPDATE item
-SET name=$2, short=$3, long=$4
-WHERE item_id = $1;
+  "WITH updated_item AS (
+    UPDATE item
+    SET name = $2, short = $3, long = $4
+    WHERE item_id = $1
+    RETURNING item_id AS item_id
+),
+inserted_keywords AS (
+    INSERT INTO keyword (keyword)
+    SELECT unnest($5::text[])
+    ON CONFLICT (keyword) DO UPDATE SET keyword = EXCLUDED.keyword
+    RETURNING keyword_id
+),
+link_item_keywords AS (
+    INSERT INTO item_keyword (item_id, keyword_id)
+    SELECT updated_item.item_id, inserted_keywords.keyword_id 
+    FROM updated_item, inserted_keywords
+    ON CONFLICT (item_id, keyword_id) DO NOTHING
+)
+SELECT item_id FROM updated_item;
+
 "
   |> pog.query
   |> pog.parameter(pog.int(arg_1))
   |> pog.parameter(pog.text(arg_2))
   |> pog.parameter(pog.text(arg_3))
   |> pog.parameter(pog.text(arg_4))
+  |> pog.parameter(pog.array(fn(value) { pog.text(value) }, arg_5))
   |> pog.returning(decoder)
   |> pog.execute(db)
 }
@@ -580,20 +630,37 @@ pub fn mobile_insert(
   arg_1: String,
   arg_2: String,
   arg_3: String,
+  arg_4: List(String),
 ) -> Result(pog.Returned(MobileInsertRow), pog.QueryError) {
   let decoder = {
     use mobile_id <- decode.field(0, decode.int)
     decode.success(MobileInsertRow(mobile_id:))
   }
 
-  "INSERT INTO mobile(name, short, long)
-VALUES ($1, $2, $3)
-RETURNING mobile_id;
+  "WITH inserted_mobile AS (
+    INSERT INTO mobile (name, short, long)
+    VALUES ($1, $2, $3)
+    RETURNING mobile_id
+),
+inserted_keywords AS (
+    INSERT INTO keyword (keyword)
+    SELECT unnest($4::text[])
+    ON CONFLICT (keyword) DO UPDATE SET keyword = EXCLUDED.keyword
+    RETURNING keyword_id
+),
+link_mobile_keywords AS (
+    INSERT INTO mob_keyword (mobile_id, keyword_id)
+    SELECT inserted_mobile.mobile_id, inserted_keywords.keyword_id 
+    FROM inserted_mobile, inserted_keywords
+    ON CONFLICT (mobile_id, keyword_id) DO NOTHING
+)
+SELECT mobile_id FROM inserted_mobile;
 "
   |> pog.query
   |> pog.parameter(pog.text(arg_1))
   |> pog.parameter(pog.text(arg_2))
   |> pog.parameter(pog.text(arg_3))
+  |> pog.parameter(pog.array(fn(value) { pog.text(value) }, arg_4))
   |> pog.returning(decoder)
   |> pog.execute(db)
 }
@@ -612,11 +679,72 @@ pub fn mobile_kw_insert(
   let decoder = decode.map(decode.dynamic, fn(_) { Nil })
 
   "INSERT INTO mob_keyword(mobile_id, keyword_id)
-VALUES ($1, $2);
+VALUES ($1, $2)
+ON CONFLICT DO NOTHING;
 "
   |> pog.query
   |> pog.parameter(pog.int(arg_1))
   |> pog.parameter(pog.int(arg_2))
+  |> pog.returning(decoder)
+  |> pog.execute(db)
+}
+
+/// A row you get from running the `mobile_update` query
+/// defined in `./src/web_editor/sql/mobile_update.sql`.
+///
+/// > 🐿️ This type definition was generated automatically using v4.4.1 of the
+/// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub type MobileUpdateRow {
+  MobileUpdateRow(mobile_id: Int)
+}
+
+/// Runs the `mobile_update` query
+/// defined in `./src/web_editor/sql/mobile_update.sql`.
+///
+/// > 🐿️ This function was generated automatically using v4.4.1 of
+/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub fn mobile_update(
+  db: pog.Connection,
+  arg_1: Int,
+  arg_2: String,
+  arg_3: String,
+  arg_4: String,
+  arg_5: List(String),
+) -> Result(pog.Returned(MobileUpdateRow), pog.QueryError) {
+  let decoder = {
+    use mobile_id <- decode.field(0, decode.int)
+    decode.success(MobileUpdateRow(mobile_id:))
+  }
+
+  "WITH updated_mobile AS (
+    UPDATE mobile
+    SET name = $2, short = $3, long = $4
+    WHERE mobile_id = $1
+    RETURNING mobile_id AS mobile_id
+),
+inserted_keywords AS (
+    INSERT INTO keyword (keyword)
+    SELECT unnest($5::text[])
+    ON CONFLICT (keyword) DO UPDATE SET keyword = EXCLUDED.keyword
+    RETURNING keyword_id
+),
+link_mobile_keywords AS (
+    INSERT INTO mob_keyword (mobile_id, keyword_id)
+    SELECT updated_mobile.mobile_id, inserted_keywords.keyword_id 
+    FROM updated_mobile, inserted_keywords
+    ON CONFLICT (mobile_id, keyword_id) DO NOTHING
+)
+SELECT mobile_id FROM updated_mobile;
+
+"
+  |> pog.query
+  |> pog.parameter(pog.int(arg_1))
+  |> pog.parameter(pog.text(arg_2))
+  |> pog.parameter(pog.text(arg_3))
+  |> pog.parameter(pog.text(arg_4))
+  |> pog.parameter(pog.array(fn(value) { pog.text(value) }, arg_5))
   |> pog.returning(decoder)
   |> pog.execute(db)
 }

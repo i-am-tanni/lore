@@ -27,28 +27,6 @@ pub type Zone {
   Zone(zone: sql.ZoneGetRow, rooms: List(sql.ZoneRoomsGetRow))
 }
 
-pub type RoomInsert {
-  RoomInsert(
-    zone_id: Int,
-    name: String,
-    description: String,
-    symbol: String,
-    x: Int,
-    y: Int,
-    z: Int,
-  )
-}
-
-pub type ItemInsert {
-  ItemInsert(
-    zone_id: Int,
-    name: String,
-    short: String,
-    long: String,
-    keywords: List(String),
-  )
-}
-
 type ExitInsert {
   ExitInsert(
     from_room_id: Int,
@@ -523,17 +501,20 @@ fn zone_page(_req: Request, zone: Zone) -> Response {
 fn insert_item(req: Request, db: process.Name(pog.Message)) -> Response {
   use formdata <- wisp.require_form(req)
   let result = {
-    use zone_id <- try(form_get_int(formdata, "zone_id"))
+    use _zone_id <- try(form_get_int(formdata, "zone_id"))
     use name <- try(form_get(formdata, "name"))
     use short <- try(form_get(formdata, "short"))
     use long <- try(form_get(formdata, "long"))
     use keywords <- try(form_get(formdata, "keywords"))
     use keywords <- try(case string.split(keywords, " ") {
-      keywords if keywords != [] -> list.map(keywords, string.lowercase) |> Ok
+      keywords if keywords != [] -> Ok(keywords)
       _ -> Error(NotFound("Keywords"))
     })
-    let item = ItemInsert(zone_id:, name:, short:, long:, keywords:)
-    use item_id <- try(transaction(db, insert_item_db(_, item)))
+    let db = pog.named_connection(db)
+    use sql.ItemInsertRow(item_id) <- try(query1(
+      sql.item_insert(db, name, short, long, keywords),
+      "item id",
+    ))
     let item_id = int.to_string(item_id)
     let success =
       "<a href='/r/" <> item_id <> "'>Inserted item id #" <> item_id <> "!</a>"
@@ -547,55 +528,6 @@ fn insert_item(req: Request, db: process.Name(pog.Message)) -> Response {
 
     Error(error) -> wisp.bad_request(string.inspect(error))
   }
-}
-
-fn insert_item_db(db: pog.Connection, item: ItemInsert) -> Result(Int, Error) {
-  use keyword_ids <- try(
-    list.try_map(item.keywords, fn(kw) {
-      use sql.KeywordInsertRow(keyword_id) <- try(query1(
-        sql.keyword_insert(db, kw),
-        "keyword id",
-      ))
-      Ok(keyword_id)
-    }),
-  )
-  use sql.ItemInsertRow(item_id) <- try(query1(
-    sql.item_insert(db, item.name, item.short, item.long),
-    "item id",
-  ))
-  use _ <- try(
-    list.try_each(keyword_ids, fn(keyword_id) {
-      sql.item_kw_insert(db, item_id, keyword_id)
-    })
-    |> result.map_error(Database),
-  )
-  Ok(item_id)
-}
-
-fn insert_mobile_db(
-  db: pog.Connection,
-  mobile: ItemInsert,
-) -> Result(Int, Error) {
-  use keyword_ids <- try(
-    list.try_map(mobile.keywords, fn(kw) {
-      use sql.KeywordInsertRow(keyword_id) <- try(query1(
-        sql.keyword_insert(db, kw),
-        "keyword id",
-      ))
-      Ok(keyword_id)
-    }),
-  )
-  use sql.MobileInsertRow(mobile_id) <- try(query1(
-    sql.mobile_insert(db, mobile.name, mobile.short, mobile.long),
-    "mobile id",
-  ))
-  use _ <- try(
-    list.try_each(keyword_ids, fn(keyword_id) {
-      sql.mobile_kw_insert(db, mobile_id, keyword_id)
-    })
-    |> result.map_error(Database),
-  )
-  Ok(mobile_id)
 }
 
 fn insert_room(req: Request, db: process.Name(pog.Message)) -> Response {
