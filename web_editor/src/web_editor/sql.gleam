@@ -488,30 +488,6 @@ SELECT item_id FROM inserted_item;
   |> pog.execute(db)
 }
 
-/// Runs the `item_kw_insert` query
-/// defined in `./src/web_editor/sql/item_kw_insert.sql`.
-///
-/// > 🐿️ This function was generated automatically using v4.4.1 of
-/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
-///
-pub fn item_kw_insert(
-  db: pog.Connection,
-  arg_1: Int,
-  arg_2: Int,
-) -> Result(pog.Returned(Nil), pog.QueryError) {
-  let decoder = decode.map(decode.dynamic, fn(_) { Nil })
-
-  "INSERT INTO item_keyword(item_id, keyword_id)
-VALUES ($1, $2)
-ON CONFLICT (item_id, keyword_id) DO NOTHING;
-"
-  |> pog.query
-  |> pog.parameter(pog.int(arg_1))
-  |> pog.parameter(pog.int(arg_2))
-  |> pog.returning(decoder)
-  |> pog.execute(db)
-}
-
 /// A row you get from running the `item_update` query
 /// defined in `./src/web_editor/sql/item_update.sql`.
 ///
@@ -549,9 +525,19 @@ pub fn item_update(
 ),
 inserted_keywords AS (
     INSERT INTO keyword (keyword)
-    SELECT unnest($5::text[])
+    SELECT DISTINCT unnest($5::text[])
     ON CONFLICT (keyword) DO UPDATE SET keyword = EXCLUDED.keyword
     RETURNING keyword_id
+),
+deleted AS (
+    DELETE FROM item_keyword ik
+    USING updated_item u
+    WHERE ik.item_id = u.item_id
+      AND NOT EXISTS (
+          SELECT 1
+          FROM inserted_keywords k
+          WHERE k.keyword_id = ik.keyword_id
+      )
 ),
 link_item_keywords AS (
     INSERT INTO item_keyword (item_id, keyword_id)
@@ -568,43 +554,6 @@ SELECT item_id FROM updated_item;
   |> pog.parameter(pog.text(arg_3))
   |> pog.parameter(pog.text(arg_4))
   |> pog.parameter(pog.array(fn(value) { pog.text(value) }, arg_5))
-  |> pog.returning(decoder)
-  |> pog.execute(db)
-}
-
-/// A row you get from running the `keyword_insert` query
-/// defined in `./src/web_editor/sql/keyword_insert.sql`.
-///
-/// > 🐿️ This type definition was generated automatically using v4.4.1 of the
-/// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
-///
-pub type KeywordInsertRow {
-  KeywordInsertRow(keyword_id: Int)
-}
-
-/// Runs the `keyword_insert` query
-/// defined in `./src/web_editor/sql/keyword_insert.sql`.
-///
-/// > 🐿️ This function was generated automatically using v4.4.1 of
-/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
-///
-pub fn keyword_insert(
-  db: pog.Connection,
-  arg_1: String,
-) -> Result(pog.Returned(KeywordInsertRow), pog.QueryError) {
-  let decoder = {
-    use keyword_id <- decode.field(0, decode.int)
-    decode.success(KeywordInsertRow(keyword_id:))
-  }
-
-  "INSERT INTO public.keyword (keyword)
-VALUES (lower($1))
-ON CONFLICT ((lower(keyword))) 
-DO UPDATE SET keyword = EXCLUDED.keyword
-RETURNING keyword_id;
-"
-  |> pog.query
-  |> pog.parameter(pog.text(arg_1))
   |> pog.returning(decoder)
   |> pog.execute(db)
 }
@@ -665,30 +614,6 @@ SELECT mobile_id FROM inserted_mobile;
   |> pog.execute(db)
 }
 
-/// Runs the `mobile_kw_insert` query
-/// defined in `./src/web_editor/sql/mobile_kw_insert.sql`.
-///
-/// > 🐿️ This function was generated automatically using v4.4.1 of
-/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
-///
-pub fn mobile_kw_insert(
-  db: pog.Connection,
-  arg_1: Int,
-  arg_2: Int,
-) -> Result(pog.Returned(Nil), pog.QueryError) {
-  let decoder = decode.map(decode.dynamic, fn(_) { Nil })
-
-  "INSERT INTO mob_keyword(mobile_id, keyword_id)
-VALUES ($1, $2)
-ON CONFLICT DO NOTHING;
-"
-  |> pog.query
-  |> pog.parameter(pog.int(arg_1))
-  |> pog.parameter(pog.int(arg_2))
-  |> pog.returning(decoder)
-  |> pog.execute(db)
-}
-
 /// A row you get from running the `mobile_update` query
 /// defined in `./src/web_editor/sql/mobile_update.sql`.
 ///
@@ -729,6 +654,16 @@ inserted_keywords AS (
     SELECT unnest($5::text[])
     ON CONFLICT (keyword) DO UPDATE SET keyword = EXCLUDED.keyword
     RETURNING keyword_id
+),
+deleted AS (
+    DELETE FROM mob_keyword mk
+    USING updated_mobile u
+    WHERE mk.mobile_id = u.mobile_id
+      AND NOT EXISTS (
+          SELECT 1
+          FROM inserted_keywords k
+          WHERE k.keyword_id = mk.keyword_id
+      )
 ),
 link_mobile_keywords AS (
     INSERT INTO mob_keyword (mobile_id, keyword_id)

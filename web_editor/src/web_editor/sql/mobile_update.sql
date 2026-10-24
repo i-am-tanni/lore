@@ -10,6 +10,16 @@ inserted_keywords AS (
     ON CONFLICT (keyword) DO UPDATE SET keyword = EXCLUDED.keyword
     RETURNING keyword_id
 ),
+deleted AS (
+    DELETE FROM mob_keyword mk
+    USING updated_mobile u
+    WHERE mk.mobile_id = u.mobile_id
+      AND NOT EXISTS (
+          SELECT 1
+          FROM inserted_keywords k
+          WHERE k.keyword_id = mk.keyword_id
+      )
+),
 link_mobile_keywords AS (
     INSERT INTO mob_keyword (mobile_id, keyword_id)
     SELECT updated_mobile.mobile_id, inserted_keywords.keyword_id 

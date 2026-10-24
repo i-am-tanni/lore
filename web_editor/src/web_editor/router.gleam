@@ -552,11 +552,10 @@ fn update_item(req: Request, db: process.Name(pog.Message)) -> Response {
     )
     use item <- try(parse_item(formdata))
     let db = pog.named_connection(db)
-    use sql.ItemUpdateRow(item_id) <- try(query1(
+    use sql.ItemUpdateRow(_) <- try(query1(
       sql.item_update(db, id, item.name, item.short, item.long, item.keywords),
       "item id",
     ))
-    let item_id = int.to_string(item_id)
     let success =
       "<a href='/r/" <> item_id <> "'>Updated item id #" <> item_id <> "!</a>"
     Ok(success)
@@ -582,7 +581,7 @@ fn update_mobile(req: Request, db: process.Name(pog.Message)) -> Response {
     )
     use mobile <- try(parse_mobile(formdata))
     let db = pog.named_connection(db)
-    use sql.MobileUpdateRow(mobile_id) <- try(query1(
+    use sql.MobileUpdateRow(_) <- try(query1(
       sql.mobile_update(
         db,
         id,
@@ -593,7 +592,6 @@ fn update_mobile(req: Request, db: process.Name(pog.Message)) -> Response {
       ),
       "mobile id",
     ))
-    let mobile_id = int.to_string(mobile_id)
     let success =
       "<a href='/r/"
       <> mobile_id

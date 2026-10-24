@@ -6,9 +6,19 @@ WITH updated_item AS (
 ),
 inserted_keywords AS (
     INSERT INTO keyword (keyword)
-    SELECT unnest($5::text[])
+    SELECT DISTINCT unnest($5::text[])
     ON CONFLICT (keyword) DO UPDATE SET keyword = EXCLUDED.keyword
     RETURNING keyword_id
+),
+deleted AS (
+    DELETE FROM item_keyword ik
+    USING updated_item u
+    WHERE ik.item_id = u.item_id
+      AND NOT EXISTS (
+          SELECT 1
+          FROM inserted_keywords k
+          WHERE k.keyword_id = ik.keyword_id
+      )
 ),
 link_item_keywords AS (
     INSERT INTO item_keyword (item_id, keyword_id)
