@@ -1,7 +1,7 @@
 -- migrate:up
 ALTER TABLE mobile
-ADD COLUMN long text;
+ADD COLUMN long text NOT NULL DEFAULT ''
 
 -- migrate:down
-ALTER TABLE
+ALTER TABLE mobile
 DROP COLUMN long;

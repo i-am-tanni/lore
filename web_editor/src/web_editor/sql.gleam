@@ -432,6 +432,62 @@ WHERE NOT EXISTS (SELECT 1 FROM door_side_reused);
   |> pog.execute(db)
 }
 
+/// A row you get from running the `item_get` query
+/// defined in `./src/web_editor/sql/item_get.sql`.
+///
+/// > 🐿️ This type definition was generated automatically using v4.4.1 of the
+/// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub type ItemGetRow {
+  ItemGetRow(
+    item_id: Int,
+    name: String,
+    short: String,
+    long: String,
+    keywords: List(String),
+  )
+}
+
+/// Runs the `item_get` query
+/// defined in `./src/web_editor/sql/item_get.sql`.
+///
+/// > 🐿️ This function was generated automatically using v4.4.1 of
+/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub fn item_get(
+  db: pog.Connection,
+  arg_1: Int,
+) -> Result(pog.Returned(ItemGetRow), pog.QueryError) {
+  let decoder = {
+    use item_id <- decode.field(0, decode.int)
+    use name <- decode.field(1, decode.string)
+    use short <- decode.field(2, decode.string)
+    use long <- decode.field(3, decode.string)
+    use keywords <- decode.field(4, decode.list(decode.string))
+    decode.success(ItemGetRow(item_id:, name:, short:, long:, keywords:))
+  }
+
+  "SELECT
+    i.item_id,
+    i.name,
+    i.short,
+    i.long,
+    ARRAY(
+        SELECT k.keyword
+        FROM item_keyword AS ik
+        INNER JOIN keyword AS k
+            ON k.keyword_id = ik.keyword_id
+        WHERE ik.item_id = i.item_id
+    ) AS keywords
+FROM item AS i
+WHERE i.item_id = $1;
+"
+  |> pog.query
+  |> pog.parameter(pog.int(arg_1))
+  |> pog.returning(decoder)
+  |> pog.execute(db)
+}
+
 /// A row you get from running the `item_insert` query
 /// defined in `./src/web_editor/sql/item_insert.sql`.
 ///
@@ -554,6 +610,62 @@ SELECT item_id FROM updated_item;
   |> pog.parameter(pog.text(arg_3))
   |> pog.parameter(pog.text(arg_4))
   |> pog.parameter(pog.array(fn(value) { pog.text(value) }, arg_5))
+  |> pog.returning(decoder)
+  |> pog.execute(db)
+}
+
+/// A row you get from running the `mobile_get` query
+/// defined in `./src/web_editor/sql/mobile_get.sql`.
+///
+/// > 🐿️ This type definition was generated automatically using v4.4.1 of the
+/// > [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub type MobileGetRow {
+  MobileGetRow(
+    mobile_id: Int,
+    name: String,
+    short: String,
+    long: Option(String),
+    keywords: List(String),
+  )
+}
+
+/// Runs the `mobile_get` query
+/// defined in `./src/web_editor/sql/mobile_get.sql`.
+///
+/// > 🐿️ This function was generated automatically using v4.4.1 of
+/// > the [squirrel package](https://github.com/giacomocavalieri/squirrel).
+///
+pub fn mobile_get(
+  db: pog.Connection,
+  arg_1: Int,
+) -> Result(pog.Returned(MobileGetRow), pog.QueryError) {
+  let decoder = {
+    use mobile_id <- decode.field(0, decode.int)
+    use name <- decode.field(1, decode.string)
+    use short <- decode.field(2, decode.string)
+    use long <- decode.field(3, decode.optional(decode.string))
+    use keywords <- decode.field(4, decode.list(decode.string))
+    decode.success(MobileGetRow(mobile_id:, name:, short:, long:, keywords:))
+  }
+
+  "SELECT
+    i.mobile_id,
+    i.name,
+    i.short,
+    i.long,
+    ARRAY(
+        SELECT k.keyword
+        FROM mob_keyword AS ik
+        INNER JOIN keyword AS k
+            ON k.keyword_id = ik.keyword_id
+        WHERE ik.mobile_id = i.mobile_id
+    ) AS keywords
+FROM mobile AS i
+WHERE i.mobile_id = $1;
+"
+  |> pog.query
+  |> pog.parameter(pog.int(arg_1))
   |> pog.returning(decoder)
   |> pog.execute(db)
 }

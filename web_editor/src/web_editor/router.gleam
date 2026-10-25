@@ -20,23 +20,42 @@ const char_0 = 48
 const char_9 = 57
 
 pub type Room {
-  Room(data: sql.RoomGetRow, exits: List(sql.ExitGetRow))
+  Room(data: RoomPageData, exits: List(sql.ExitGetRow))
+}
+
+pub type RoomPageData {
+  RoomPageData(
+    zone_id: String,
+    room_id: String,
+    x: String,
+    y: String,
+    z: String,
+    name: String,
+    description: String,
+    symbol: String,
+    zone_name: String,
+  )
 }
 
 pub type Zone {
   Zone(zone: sql.ZoneGetRow, rooms: List(sql.ZoneRoomsGetRow))
 }
 
-type ItemData {
-  ItemData(name: String, short: String, long: String, keywords: List(String))
+type ItemParsed {
+  ItemParsed(name: String, short: String, long: String, keywords: List(String))
 }
 
-type MobileData {
-  MobileData(name: String, short: String, long: String, keywords: List(String))
+type MobileParsed {
+  MobileParsed(
+    name: String,
+    short: String,
+    long: String,
+    keywords: List(String),
+  )
 }
 
-type RoomData {
-  RoomData(
+type RoomParsed {
+  RoomParsed(
     zone_id: Int,
     name: String,
     desc: String,
@@ -89,6 +108,13 @@ pub fn handle_request(req: Request, db: process.Name(pog.Message)) -> Response {
       }
     }
     ["r", _id], Post -> update_room(req, db)
+    ["i"], Get -> new_item_page(req)
+    ["i", item_id], Get -> {
+      case item_get(item_id, db) {
+        Ok(item) -> item_page(req, item)
+        Error(error) -> wisp.bad_request(string.inspect(error))
+      }
+    }
     ["z", zone_id], Get -> {
       case zone_get(zone_id, db) {
         Ok(zone) -> zone_page(req, zone)
@@ -108,9 +134,35 @@ fn room_get(
     |> result.replace_error(WrongType("Invalid room id")),
   )
   let db = pog.named_connection(db)
-  use room <- try(query1(sql.room_get(db, id), "Room"))
+  use r <- try(query1(sql.room_get(db, id), "Room"))
   use exits <- try(query_many(sql.exit_get(db, id)))
+  let room =
+    RoomPageData(
+      zone_id: int.to_string(r.zone_id),
+      room_id: int.to_string(r.room_id),
+      x: int.to_string(r.x),
+      y: int.to_string(r.y),
+      z: int.to_string(r.z),
+      name: r.name,
+      description: r.description,
+      symbol: r.symbol,
+      zone_name: r.zone_name,
+    )
+
   Ok(Room(data: room, exits:))
+}
+
+fn item_get(
+  item_id: String,
+  db: process.Name(pog.Message),
+) -> Result(sql.ItemGetRow, Error) {
+  use id <- try(
+    string_to_int(item_id)
+    |> result.replace_error(WrongType("Invalid item id")),
+  )
+  let db = pog.named_connection(db)
+  use item <- try(query1(sql.item_get(db, id), "item"))
+  Ok(item)
 }
 
 fn zone_get(
@@ -133,10 +185,14 @@ fn home_page(req: Request) -> Response {
   html.div([], [
     html.h1([], [html.text("Online Creation")]),
     html.h2([], [html.text("To edit an existing object:")]),
-    html.ul([], [html.li([], [html.text("/r/# Loads a room with an id")])]),
+    html.ul([], [
+      html.li([], [html.text("/r/# Loads a room via an id for editing")]),
+      html.li([], [html.text("/i/# Loads a item via an id for editing")]),
+    ]),
     html.h2([], [html.text("To add a new object:")]),
     html.ul([], [
       html.li([], [html.a([attribute.href("/r")], [html.text("New Room")])]),
+      html.li([], [html.a([attribute.href("/i")], [html.text("New Item")])]),
     ]),
   ])
   |> element.to_document_string
@@ -177,7 +233,7 @@ fn new_room_page(_req: Request) -> Response {
         html.label([], [
           html.text("Id:"),
           html.input([
-            attribute.type_("int"),
+            attribute.type_("text"),
             attribute.class("id_readonly"),
             attribute.name("room_id"),
             attribute.readonly(True),
@@ -257,8 +313,8 @@ fn new_room_page(_req: Request) -> Response {
 }
 
 fn room_page(_req: Request, room: Room) -> Response {
-  let sql.RoomGetRow(
-    zone_id,
+  let RoomPageData(
+    zone_id:,
     room_id:,
     symbol:,
     x:,
@@ -269,11 +325,6 @@ fn room_page(_req: Request, room: Room) -> Response {
     zone_name:,
   ) = room.data
 
-  let assert [zone_id, room_id, x, y, z] =
-    list.map([zone_id, room_id, x, y, z], int.to_string)
-
-  let assert [name, description, symbol] =
-    list.map([name, description, symbol], wisp.escape_html)
   let num_exits = int.to_string(list.length(room.exits))
 
   let exits =
@@ -470,7 +521,7 @@ fn room_page(_req: Request, room: Room) -> Response {
                       attribute.name("exit_keyword"),
                     ],
                     [
-                      html.option([attribute.value("north")], "North"),
+                      html.option([attribute.value("north")], "north"),
                       html.option([attribute.value("south")], "south"),
                       html.option([attribute.value("east")], "east"),
                       html.option([attribute.value("west")], "west"),
@@ -516,6 +567,147 @@ fn zone_page(_req: Request, zone: Zone) -> Response {
 
   wisp.ok()
   |> wisp.html_body(html)
+}
+
+fn new_item_page(_req: Request) -> Response {
+  let html =
+    element.fragment([
+      html.head([], []),
+      html.div([], [
+        html.form([attribute.method("post")], [
+          html.label([], [
+            html.text("Id:"),
+            html.input([
+              attribute.type_("int"),
+              attribute.class("id_readonly"),
+              attribute.name("room_id"),
+              attribute.readonly(True),
+            ]),
+          ]),
+          html.label([], [
+            html.text("Name:"),
+            html.input([
+              attribute.type_("int"),
+              attribute.name("name"),
+              attribute.placeholder("Insert Item Name Here"),
+              attribute.required(True),
+            ]),
+          ]),
+          html.label([], [
+            html.text("Short:"),
+            html.input([
+              attribute.type_("int"),
+              attribute.name("short"),
+              attribute.placeholder(
+                "Insert what the item shows dropped in the room here",
+              ),
+              attribute.required(True),
+            ]),
+          ]),
+          html.div([], [
+            html.label([], [html.text("Zone Id:")]),
+            html.input([attribute.type_("int"), attribute.name("zone_id")]),
+          ]),
+          html.label([], [
+            html.text("Keywords:"),
+            html.input([
+              attribute.type_("int"),
+              attribute.name("keywords"),
+              attribute.placeholder(
+                "Insert a space separated list of item keywords here.",
+              ),
+              attribute.required(True),
+            ]),
+          ]),
+          html.div([], [
+            html.label([], [html.text("Description:")]),
+            html.textarea(
+              [
+                attribute.name("long"),
+                attribute.class("description"),
+                attribute.placeholder("Insert item description here."),
+                attribute.spellcheck(True),
+                attribute.required(True),
+              ],
+              "",
+            ),
+          ]),
+          html.input([attribute.type_("submit"), attribute.value("Update")]),
+        ]),
+      ]),
+    ])
+    |> element.to_string
+
+  wisp.ok() |> wisp.html_body(html)
+}
+
+fn item_page(_req: Request, item: sql.ItemGetRow) -> Response {
+  let html =
+    element.fragment([
+      html.head([], []),
+      html.div([], [
+        html.form([attribute.method("post")], [
+          html.label([], [
+            html.text("Id:"),
+            html.input([
+              attribute.type_("int"),
+              attribute.class("id_readonly"),
+              attribute.name("item_id"),
+              attribute.value(int.to_string(item.item_id)),
+              attribute.readonly(True),
+            ]),
+          ]),
+          html.label([], [
+            html.text("Name:"),
+            html.input([
+              attribute.type_("int"),
+              attribute.name("name"),
+              attribute.value(item.name),
+              attribute.required(True),
+            ]),
+          ]),
+          html.label([], [
+            html.text("Short:"),
+            html.input([
+              attribute.type_("int"),
+              attribute.name("short"),
+              attribute.value(item.short),
+              attribute.required(True),
+            ]),
+          ]),
+          html.div([], [
+            html.label([], [html.text("Zone Id:")]),
+            html.input([attribute.type_("int"), attribute.name("zone_id")]),
+          ]),
+          html.label([], [
+            html.text("Keywords:"),
+            html.input([
+              attribute.type_("int"),
+              attribute.name("keywords"),
+              attribute.value(string.join(item.keywords, " ")),
+              attribute.required(True),
+            ]),
+          ]),
+          html.div([], [
+            html.label([], [html.text("Description:")]),
+            html.textarea(
+              [
+                attribute.name("long"),
+                attribute.class("description"),
+                attribute.value(item.long),
+                attribute.spellcheck(True),
+                attribute.required(True),
+              ],
+              "",
+            ),
+          ]),
+          html.input([attribute.type_("submit"), attribute.value("Update")]),
+        ]),
+      ]),
+    ])
+    |> element.to_string
+
+  wisp.ok() |> wisp.html_body(html)
 }
 
 fn insert_item(req: Request, db: process.Name(pog.Message)) -> Response {
@@ -754,7 +946,7 @@ fn update_room(req: Request, db: process.Name(pog.Message)) -> Response {
   }
 }
 
-fn parse_item(formdata: wisp.FormData) -> Result(ItemData, Error) {
+fn parse_item(formdata: wisp.FormData) -> Result(ItemParsed, Error) {
   use _zone_id <- try(form_get_int(formdata, "zone_id"))
   use name <- try(form_get(formdata, "name"))
   use short <- try(form_get(formdata, "short"))
@@ -764,10 +956,10 @@ fn parse_item(formdata: wisp.FormData) -> Result(ItemData, Error) {
     keywords if keywords != [] -> Ok(keywords)
     _ -> Error(NotFound("Keywords"))
   })
-  Ok(ItemData(name:, short:, long:, keywords:))
+  Ok(ItemParsed(name:, short:, long:, keywords:))
 }
 
-fn parse_mobile(formdata: wisp.FormData) -> Result(MobileData, Error) {
+fn parse_mobile(formdata: wisp.FormData) -> Result(MobileParsed, Error) {
   use _zone_id <- try(form_get_int(formdata, "zone_id"))
   use name <- try(form_get(formdata, "name"))
   use short <- try(form_get(formdata, "short"))
@@ -777,10 +969,10 @@ fn parse_mobile(formdata: wisp.FormData) -> Result(MobileData, Error) {
     keywords if keywords != [] -> Ok(keywords)
     _ -> Error(NotFound("Keywords"))
   })
-  Ok(MobileData(name:, short:, long:, keywords:))
+  Ok(MobileParsed(name:, short:, long:, keywords:))
 }
 
-fn parse_room(formdata: wisp.FormData) -> Result(RoomData, Error) {
+fn parse_room(formdata: wisp.FormData) -> Result(RoomParsed, Error) {
   use zone_id <- try(form_get_int(formdata, "zone_id"))
   use name <- try(form_get(formdata, "name"))
   use desc <- try(form_get(formdata, "description"))
@@ -788,7 +980,7 @@ fn parse_room(formdata: wisp.FormData) -> Result(RoomData, Error) {
   use x <- try(form_get_int(formdata, "x"))
   use y <- try(form_get_int(formdata, "y"))
   use z <- try(form_get_int(formdata, "z"))
-  Ok(RoomData(zone_id:, name:, desc:, symbol:, x:, y:, z:))
+  Ok(RoomParsed(zone_id:, name:, desc:, symbol:, x:, y:, z:))
 }
 
 fn direction_to_string(direction: Direction) -> String {
